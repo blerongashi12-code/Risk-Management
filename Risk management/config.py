@@ -26,10 +26,6 @@ OUTPUT_DIR     = BASE_DIR / "output"
 for p in (DATA_DIR, CACHE_DIR, OUTPUT_DIR):
     p.mkdir(parents=True, exist_ok=True)
 
-# Master-Workbook Pfad (wird vom Benutzer gesetzt/überschrieben)
-WORKBOOK_PATH = BASE_DIR / "DAX_Credit_Stress_Master.xlsx"
-
-
 # ----------------------------------------------------------------------
 # 2. DAX-40 TICKER
 # ----------------------------------------------------------------------
@@ -118,7 +114,6 @@ def show_config():
     print(f"  Base Dir:       {BASE_DIR}")
     print(f"  Data Dir:       {DATA_DIR}")
     print(f"  Cache Dir:      {CACHE_DIR}")
-    print(f"  Workbook:       {WORKBOOK_PATH}")
     print(f"  DAX-40 Tickers: {len(DAX40_TICKERS)}")
     print(f"  Zeitraum:       {START_DATE} bis {END_DATE}")
     print(f"  Horizon:        {DEFAULT_HORIZON} Jahre")
