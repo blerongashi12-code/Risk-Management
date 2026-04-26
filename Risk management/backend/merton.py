@@ -228,22 +228,63 @@ def equity_vol_from_prices(
 # ----------------------------------------------------------------------
 # 5. DAX-40 Convenience-Wrapper
 # ----------------------------------------------------------------------
-def _resolve_debt(row: pd.Series) -> tuple[float, str]:
-    """Liefert (debt_value, source_tag).
+def _compute_default_point(row: pd.Series, ltd_weight: float
+                           ) -> tuple[float, str]:
+    """Default Point (DPT) nach Moody's KMV / Bharath-Shumway (2008).
 
-    Quellen-Hierarchie:
-        1. TotalDebt
-        2. ShortTermDebt + LongTermDebt
-        3. NaN, source = 'missing'
+    Bevorzugt: DPT = ShortTermDebt + ltd_weight · LongTermDebt
+
+    Fallback (wenn ST/LT nicht beide vorliegen): TotalDebt direkt
+    als konservative Obergrenze. Dieser Fall ist im Output mit
+    Quelle 'TotalDebt' markiert, damit Auditoren ihn filtern können.
+
+    Returns
+    -------
+    (dpt_value, source_tag)
+        source_tag ∈ {'ST+ltd·LT', 'TotalDebt', 'missing'}
     """
-    td = row.get("TotalDebt")
-    if pd.notna(td) and td > 0:
-        return float(td), "TotalDebt"
     st = row.get("ShortTermDebt")
     lt = row.get("LongTermDebt")
     if pd.notna(st) and pd.notna(lt) and (st + lt) > 0:
-        return float(st) + float(lt), "ST+LT"
+        return float(st) + ltd_weight * float(lt), "ST+ltd·LT"
+
+    td = row.get("TotalDebt")
+    if pd.notna(td) and td > 0:
+        return float(td), "TotalDebt"
+
     return float("nan"), "missing"
+
+
+def _apply_sector_vol_multiplier(
+    res: MertonResult,
+    sector: Optional[str],
+    multiplier_map: dict,
+    default_mul: float,
+) -> tuple[MertonResult, float]:
+    """Wendet Sektor-σ_V-Multiplier an und re-berechnet DD und PD.
+
+    Standard-Merton untertreibt PDs für stark geleveragte Sektoren
+    (insbes. Banken). Korrektur: σ_V_adj = σ_V · multiplier(sector).
+    DD und PD werden mit σ_V_adj neu berechnet; V bleibt unverändert,
+    weil V als Asset-Wert vom Multiplier nicht betroffen sein sollte.
+
+    Returns
+    -------
+    (adjusted MertonResult, multiplier_used)
+    """
+    mul = multiplier_map.get(sector, default_mul) if sector else default_mul
+    if mul == 1.0 or not res.converged or np.isnan(res.asset_vol):
+        return res, mul
+
+    sigma_adj = res.asset_vol * mul
+    dd_adj = distance_to_default(res.asset_value, sigma_adj,
+                                 res.debt, res.rate, res.horizon)
+    pd_adj = merton_pd(dd_adj)
+    return res._replace(
+        asset_vol=float(sigma_adj),
+        distance_to_default=float(dd_adj),
+        pd=float(pd_adj),
+    ), mul
 
 
 def run_dax40(
@@ -254,27 +295,48 @@ def run_dax40(
     horizon: float = 1.0,
     lookback: int = 252,
     as_of: Optional[pd.Timestamp] = None,
+    ltd_weight: Optional[float] = None,
+    sector_vol_multiplier: Optional[dict] = None,
+    default_sector_vol_multiplier: Optional[float] = None,
 ) -> pd.DataFrame:
     """Wendet Merton/KMV auf alle Tickers in `fundamentals_df` an.
 
+    Modell-Prämissen (override-bar via Parameter, defaults aus config.py):
+      - Default Point: DPT = ShortTermDebt + ltd_weight · LongTermDebt
+        (Moody's KMV / Bharath-Shumway 2008). ltd_weight default 0.5.
+      - Sektor-σ_V-Multiplier: post-KMV σ_V × multiplier(sector); für
+        Financial Services 1.5 (siehe MODEL_ASSUMPTIONS.md §4).
+
     Parameters
     ----------
-    prices_df : DatetimeIndex × Tickers (Aktienkurse)
-    fundamentals_df : Index = Ticker, mit MarketCap, TotalDebt, ShortTermDebt,
-        LongTermDebt, Sector_Yahoo, Currency, ReportDate, Name
-    svensson_df : Bundesbank-Parameter-Zeitreihe
-    horizon : T in Jahren (default 1)
-    lookback : Lookback für Equity-Vola (default 252)
-    as_of : Stichtag für Risk-free rate; default = letzter Preis-Tag
+    prices_df : DatetimeIndex × Tickers (Aktienkurse).
+    fundamentals_df : Index = Ticker, Cols incl. MarketCap, TotalDebt,
+        ShortTermDebt, LongTermDebt, Sector_Yahoo, Name.
+    svensson_df : Bundesbank-Parameter-Zeitreihe.
+    horizon : T in Jahren (default 1).
+    lookback : Equity-Vola-Lookback in Handelstagen (default 252).
+    as_of : Stichtag für r; default = letzter Preis-Tag.
+    ltd_weight : Überschreibt config.DPT_LTD_WEIGHT.
+    sector_vol_multiplier : Überschreibt config.SECTOR_VOL_MULTIPLIER.
+    default_sector_vol_multiplier : Überschreibt config.DEFAULT_SECTOR_VOL_MULTIPLIER.
 
     Returns
     -------
     pd.DataFrame, Index = Ticker, Columns:
-        Name, Sector, MarketCap, Debt, DebtSource, EquityVol,
-        Rate, AssetValue, AssetVol, DD, PD, Iterations, Converged
+        Name, Sector, MarketCap, DPT, DebtSource, EquityVol, Rate,
+        AssetValue, AssetVolRaw, SectorVolMul, AssetVol, DD, PD,
+        Iterations, Converged.
     """
     from svensson import historical_curve, zero_rate  # type: ignore
+    from config import (DPT_LTD_WEIGHT, SECTOR_VOL_MULTIPLIER,  # type: ignore
+                        DEFAULT_SECTOR_VOL_MULTIPLIER)
 
+    if ltd_weight is None:
+        ltd_weight = DPT_LTD_WEIGHT
+    if sector_vol_multiplier is None:
+        sector_vol_multiplier = SECTOR_VOL_MULTIPLIER
+    if default_sector_vol_multiplier is None:
+        default_sector_vol_multiplier = DEFAULT_SECTOR_VOL_MULTIPLIER
     if as_of is None:
         as_of = prices_df.index.max()
 
@@ -283,19 +345,16 @@ def run_dax40(
 
     rows = []
     for ticker, fund_row in fundamentals_df.iterrows():
-        # Equity
         E = fund_row.get("MarketCap")
         if pd.isna(E) or E <= 0:
             rows.append(_skip_row(ticker, fund_row, reason="no MarketCap"))
             continue
 
-        # Debt
-        L, debt_src = _resolve_debt(fund_row)
+        L, debt_src = _compute_default_point(fund_row, ltd_weight)
         if pd.isna(L):
             rows.append(_skip_row(ticker, fund_row, reason="no debt"))
             continue
 
-        # Equity-Vola
         if ticker not in prices_df.columns:
             rows.append(_skip_row(ticker, fund_row, reason="no prices"))
             continue
@@ -304,21 +363,33 @@ def run_dax40(
             rows.append(_skip_row(ticker, fund_row, reason="vola NaN"))
             continue
 
-        res = merton_kmv(E, sigma_E, L, r, horizon)
+        # Schritt 1: Standard-Merton/KMV
+        res_raw = merton_kmv(E, sigma_E, L, r, horizon)
+        sigma_v_raw = res_raw.asset_vol
+
+        # Schritt 2: Sektor-σ_V-Multiplier (post-KMV)
+        sector = fund_row.get("Sector_Yahoo")
+        res_adj, mul = _apply_sector_vol_multiplier(
+            res_raw, sector, sector_vol_multiplier,
+            default_sector_vol_multiplier,
+        )
+
         rows.append({
             "Name": fund_row.get("Name"),
-            "Sector": fund_row.get("Sector_Yahoo"),
+            "Sector": sector,
             "MarketCap": E,
-            "Debt": L,
+            "DPT": L,
             "DebtSource": debt_src,
             "EquityVol": sigma_E,
             "Rate": r,
-            "AssetValue": res.asset_value,
-            "AssetVol": res.asset_vol,
-            "DD": res.distance_to_default,
-            "PD": res.pd,
-            "Iterations": res.iterations,
-            "Converged": res.converged,
+            "AssetValue": res_adj.asset_value,
+            "AssetVolRaw": sigma_v_raw,
+            "SectorVolMul": mul,
+            "AssetVol": res_adj.asset_vol,
+            "DD": res_adj.distance_to_default,
+            "PD": res_adj.pd,
+            "Iterations": res_adj.iterations,
+            "Converged": res_adj.converged,
         })
 
     out = pd.DataFrame(rows, index=fundamentals_df.index)
@@ -327,16 +398,18 @@ def run_dax40(
 
 
 def _skip_row(ticker: str, fund_row: pd.Series, *, reason: str) -> dict:
-    """Leere Result-Zeile mit dokumentiertem Skip-Grund."""
+    """Leere Result-Zeile mit dokumentiertem Skip-Grund (DPT-Schema)."""
     return {
         "Name": fund_row.get("Name"),
         "Sector": fund_row.get("Sector_Yahoo"),
         "MarketCap": fund_row.get("MarketCap"),
-        "Debt": np.nan,
+        "DPT": np.nan,
         "DebtSource": f"skipped: {reason}",
         "EquityVol": np.nan,
         "Rate": np.nan,
         "AssetValue": np.nan,
+        "AssetVolRaw": np.nan,
+        "SectorVolMul": np.nan,
         "AssetVol": np.nan,
         "DD": np.nan,
         "PD": np.nan,
@@ -432,9 +505,40 @@ def _boundary_test() -> bool:
     return ok_zero and ok_iter
 
 
+def _sector_multiplier_test() -> bool:
+    """Sektor-σ_V-Multiplier wirkt korrekt:
+       Mul=1.0 → unverändert; Mul=1.5 → σ_V·1.5 und entsprechend PD↑."""
+    print("  [5] Sektor-σ_V-Multiplier:")
+    res = merton_kmv(equity=10.0, equity_vol=0.30,
+                     debt=80.0, r=0.03, T=1.0)
+    pd_raw = res.pd
+    sig_raw = res.asset_vol
+
+    res_neutral, mul_n = _apply_sector_vol_multiplier(
+        res, "Industrials", {"Financial Services": 1.5}, 1.0)
+    res_bank, mul_b = _apply_sector_vol_multiplier(
+        res, "Financial Services", {"Financial Services": 1.5}, 1.0)
+
+    ok_neutral = (mul_n == 1.0
+                  and abs(res_neutral.pd - pd_raw) < 1e-15
+                  and abs(res_neutral.asset_vol - sig_raw) < 1e-15)
+    ok_bank_sig = abs(res_bank.asset_vol - sig_raw * 1.5) < 1e-12
+    ok_bank_pd = res_bank.pd > pd_raw  # höhere Vola → höhere PD
+
+    print(f"      Neutral (Industrials, mul={mul_n}):  "
+          f"σ_V={res_neutral.asset_vol:.4f}, PD={res_neutral.pd*100:.4f}%  "
+          f"{'OK' if ok_neutral else 'FAIL'}")
+    print(f"      Bank (Fin.Services, mul={mul_b}):    "
+          f"σ_V={res_bank.asset_vol:.4f}, PD={res_bank.pd*100:.4f}%  "
+          f"(raw σ_V={sig_raw:.4f}, raw PD={pd_raw*100:.4f}%)")
+    print(f"      σ_V·1.5 exact: {'OK' if ok_bank_sig else 'FAIL'}    "
+          f"PD increased: {'OK' if ok_bank_pd else 'FAIL'}")
+    return ok_neutral and ok_bank_sig and ok_bank_pd
+
+
 def _real_dax40_run() -> bool:
     """Echter DAX-40-Run: alle 38 Firmen über die Pipeline."""
-    print("  [5] DAX-40 Run (echte Daten):")
+    print("  [6] DAX-40 Run (echte Daten, mit DPT + Sektor-Multiplier):")
     try:
         from config import CACHE_DIR  # type: ignore
     except ImportError:
@@ -464,20 +568,27 @@ def _real_dax40_run() -> bool:
     print(f"      Firmen total = {n}, KMV converged = {n_ok}, skipped = {n_skipped}")
     print(f"      PD range     = [{pd_min:.4f}%, {pd_max:.4f}%]   median = {pd_med:.4f}%")
 
-    # Top-3 PDs (ausser skipped)
     valid = df[df["Converged"]].sort_values("PD", ascending=False)
-    print(f"      Top-3 riskiest:")
-    for tk, row in valid.head(3).iterrows():
+    print(f"      Top-5 riskiest (mit Multiplier):")
+    for tk, row in valid.head(5).iterrows():
         print(f"        {tk:<8} {row['Name']:<22}  "
-              f"DD={row['DD']:5.2f}  PD={row['PD']*100:6.3f}%  "
-              f"({row['Sector']})")
-    print(f"      Bottom-3 (lowest PD):")
-    for tk, row in valid.tail(3).iterrows():
-        print(f"        {tk:<8} {row['Name']:<22}  "
-              f"DD={row['DD']:5.2f}  PD={row['PD']*100:.2e}%  "
-              f"({row['Sector']})")
+              f"DD={row['DD']:5.2f}  PD={row['PD']*100:7.4f}%  "
+              f"σ_V={row['AssetVol']:.3f} (raw {row['AssetVolRaw']:.3f}, "
+              f"mul={row['SectorVolMul']:.1f})  ({row['Sector']})")
 
-    # Akzeptanz-Kriterien: ≥80% konvergiert, alle PDs in [0,1]
+    # Vorher/Nachher-Vergleich Banken (Multiplier-Effekt explizit zeigen)
+    banks = valid[valid["Sector"] == "Financial Services"]
+    if len(banks) > 0:
+        print(f"      Financial-Services-Effekt:")
+        for tk, row in banks.iterrows():
+            # PD ohne Multiplier rechnen
+            dd_raw = distance_to_default(row["AssetValue"], row["AssetVolRaw"],
+                                         row["DPT"], row["Rate"], 1.0)
+            pd_raw = merton_pd(dd_raw)
+            print(f"        {tk:<8} {row['Name']:<22}  "
+                  f"PD raw={pd_raw*100:.4f}% → with mul={row['PD']*100:.4f}%  "
+                  f"(×{row['PD']/max(pd_raw,1e-30):.1f})")
+
     rate_ok = n_ok >= 0.8 * (n - n_skipped)
     range_ok = (df["PD"].dropna() >= 0).all() and (df["PD"].dropna() <= 1).all()
     print(f"      ≥80% converged: {'OK' if rate_ok else 'FAIL'}    "
@@ -495,6 +606,7 @@ if __name__ == "__main__":
         _hull_spot_test(),
         _monotonicity_test(),
         _boundary_test(),
+        _sector_multiplier_test(),
         _real_dax40_run(),
     ]
 

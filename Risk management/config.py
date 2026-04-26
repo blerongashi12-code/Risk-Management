@@ -99,6 +99,29 @@ DEFAULT_N_SIMS    = 10_000 # Monte Carlo Pfade
 
 
 # ----------------------------------------------------------------------
+# 5a. CREDIT-MODELL-PRÄMISSEN  (siehe MODEL_ASSUMPTIONS.md)
+# ----------------------------------------------------------------------
+# Default Point (DPT) nach Moody's KMV / Bharath-Shumway (2008):
+#     DPT = ShortTermDebt + DPT_LTD_WEIGHT · LongTermDebt
+# Begründung: Langfristige Schulden lösen nicht akut einen Default aus —
+# nur ein Anteil davon zählt zur Default-Schwelle. α=0.5 ist
+# akademischer Industrie-Standard.
+DPT_LTD_WEIGHT = 0.5
+
+# Sektor-spezifischer σ_V-Multiplier (post-KMV).
+# Standard-Merton untertreibt PDs für stark geleveragte Sektoren
+# (Banken, REITs), weil Equity-Vola strukturell gedämpft ist
+# (Einlagensicherung, Liquiditäts-Backstop, regulatorischer Floor).
+# Quellen: Hovakimian/Kane/Laeven (2012); Moody's KMV CreditEdge-Doku.
+# Werte > 1.0 erhöhen die effektive Asset-Vola → höhere PD.
+SECTOR_VOL_MULTIPLIER = {
+    "Financial Services": 1.5,  # Banken + Versicherungen
+    "Real Estate":        1.2,  # ähnliche Bilanz-Hebelung
+}
+DEFAULT_SECTOR_VOL_MULTIPLIER = 1.0  # alle anderen Sektoren
+
+
+# ----------------------------------------------------------------------
 # 6. BUNDESBANK CSV-STRUKTUR
 # ----------------------------------------------------------------------
 # Spaltenordnung im offiziellen Bundesbank-Export
