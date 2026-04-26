@@ -157,6 +157,17 @@ FACTOR_MATURITY      = 10.0 # Δr-Faktor: Δ Svensson-Rate bei 10y
 
 
 # ----------------------------------------------------------------------
+# 5c. MONTE-CARLO-STRESS-ENGINE  (siehe MODEL_ASSUMPTIONS.md §6a)
+# ----------------------------------------------------------------------
+# Schock-Vektor: [r_brent, Δr_10y]_t, multivariat-normal, μ/Σ aus
+# 252-Tage-Historie. Vektorisierte Pfade × Firmen via Cholesky.
+MC_N_SIMS         = DEFAULT_N_SIMS   # 10 000 Pfade
+MC_HORIZON_DAYS   = 252              # 1Y, konsistent mit Merton-Horizon
+MC_SEED           = 42               # Reproduzierbarkeit
+MC_INCLUDE_IDIO   = True             # ε~N(0, σ_ε·√H) im Stress-Pfad
+
+
+# ----------------------------------------------------------------------
 # 6. BUNDESBANK CSV-STRUKTUR
 # ----------------------------------------------------------------------
 # Spaltenordnung im offiziellen Bundesbank-Export

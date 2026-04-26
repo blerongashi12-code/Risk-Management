@@ -13,7 +13,7 @@ Stand: 2026-04-26
 | Risk-free rate | `backend/svensson.py` | Svensson (1994), Bundesbank-Parameter, tagesaktuell |
 | Strukturmodell | `backend/merton.py` | Merton (1974) mit KMV-Iteration nach Crosbie/Bohn (2003) |
 | Faktor-Modell | `backend/factor_model.py` | 2-Faktor-OLS: Brent Crude + Δr_10y |
-| Stress-Engine | `backend/monte_carlo.py` *(noch nicht implementiert)* | Multivariate-Normal Shocks, historische Korrelations-Matrix |
+| Stress-Engine | `backend/monte_carlo.py` | Multivariate-Normal Shocks, historische Korrelations-Matrix |
 | Aggregation | `backend/portfolio.py` *(noch nicht implementiert)* | Portfolio-PD, Expected Loss, Concentration |
 | Frontend | `streamlit_app/` *(noch nicht implementiert)* | Streamlit-Cockpit |
 
@@ -182,6 +182,91 @@ r      = svensson.zero_rate(T, params, as_decimal=True)
 
 ---
 
+## §6a Monte-Carlo-Stress-Engine
+
+**Ziel:** Statistische Verteilung der Stress-PD pro Firma über N stochastische Pfade. Im Gegensatz zu deterministischen Szenarien (Corona/Ukraine — kommt in `scenarios.py`) sind hier **alle Pfade Realisationen aus einer multivariaten Normal-Verteilung**, geschätzt aus der historischen Faktor-Statistik.
+
+### §6a.1 Schock-Vektor und Verteilung
+
+$$\mathbf{z}_t = \begin{bmatrix} r_{\text{Brent}, t} \\ \Delta r_{10y, t} \end{bmatrix} \sim \mathcal{N}\bigl(\boldsymbol{\mu}, \boldsymbol{\Sigma}\bigr)$$
+
+| Komponente | Konstruktion | Quelle |
+|---|---|---|
+| $\boldsymbol{\mu}$ | tägliches Mean der Faktor-Returns | `factor_model.factor_returns` über letzte 252 Tage |
+| $\boldsymbol{\Sigma}$ | tägliche Kovarianzmatrix | dito |
+| $\mathbf{u}_t$ | iid Standard-Normal | `numpy.random.Generator` |
+| $L L^T = \boldsymbol{\Sigma}$ | Cholesky | `np.linalg.cholesky` |
+| $\mathbf{z}_t = \boldsymbol{\mu} + L \mathbf{u}_t$ | korrelierte tägliche Schocks | vektorisiert |
+
+**Pfad am Horizont H** (Summen über H iid Tage):
+$$\mathbf{Z}_H = \sum_{t=1}^H \mathbf{z}_t \quad \Rightarrow \quad \mathbf{Z}_H \sim \mathcal{N}(H\boldsymbol{\mu}, H\boldsymbol{\Sigma})$$
+
+### §6a.2 Anwendung pro Firma & Pfad
+
+Für jede Firma mit Baseline-Inputs $(E_0, \sigma_E, L, r_0, T)$ und Faktor-Modell-Outputs $(\alpha, \beta_E^{\text{adj}}, \beta_R, \sigma_\varepsilon)$ wird pro Pfad $i$ folgendes berechnet:
+
+$$\log r_{E,H}^{(i)} = \alpha \cdot H + \beta_E^{\text{adj}} \cdot Z_{\text{Brent}}^{(i)} + \beta_R \cdot Z_{\Delta r}^{(i)} + \varepsilon^{(i)} \cdot \sqrt{H}$$
+
+mit $\varepsilon^{(i)} \sim \mathcal{N}(0, \sigma_\varepsilon)$ wenn `MC_INCLUDE_IDIO=True`.
+
+**Stressed Inputs für KMV:**
+- $E_{\text{stress}}^{(i)} = E_0 \cdot \exp\bigl(\log r_{E,H}^{(i)}\bigr)$
+- $r_{\text{stress}}^{(i)} = r_0 + Z_{\Delta r}^{(i)} / 100$ (pp → Dezimal)
+- $\sigma_E$ und $L$ bleiben unverändert (Vola-Stress in V2)
+
+→ Vektorisiertes KMV (`monte_carlo._kmv_vec`) löst $V^{(i)}, \sigma_V^{(i)}$ über alle Pfade gleichzeitig.
+
+→ Anschließend Sektor-σ_V-Multiplier wie in §4 (Banken 1.5, REITs 1.2): $\sigma_V^{\text{adj}} = m_{\text{sector}} \cdot \sigma_V$.
+
+→ Final $\text{DD}^{(i)} = \frac{\ln(V^{(i)}/L) + (r_{\text{stress}}^{(i)} - \tfrac{1}{2}\sigma_V^{\text{adj},(i)2}) T}{\sigma_V^{\text{adj},(i)} \sqrt{T}}$, $\text{PD}^{(i)} = N(-\text{DD}^{(i)})$.
+
+### §6a.3 Konsistenz mit Baseline
+
+Die Multiplier (Sektor-Energy auf $\beta_E$, Sektor-Vola auf $\sigma_V$) werden **identisch** zur Baseline angewendet — sonst wäre das Stress-Ergebnis inkonsistent zwischen den beiden Pipeline-Pfaden.
+
+### §6a.4 Mean vs. Quantile — wichtige Interpretations-Anmerkung
+
+Das **Mean** der Stress-PD-Verteilung ist **kein adverser Stress-Indikator** — bei positivem historischem μ kann Mean(Stress-PD) sogar unter der Baseline-PD liegen (Drift-Effekt). Die **adversen Indikatoren** sind die **Quantile**:
+
+| Statistik | Bedeutung |
+|---|---|
+| `StressPDMean` | Erwartungswert über alle Pfade — zentrale Tendenz |
+| `StressPDp50` | Median |
+| `StressPDp95` | 95%-Quantil — moderater Stress |
+| `StressPDp99` | **99%-Quantil — adverser 1%-Worst-Case-Pfad** |
+| `StressPDMax` | Maximum über N Pfade |
+
+Beim DAX-40-Run (Stand 2026-04-26):
+
+| Ticker | Baseline-PD | Stress-p99 | Δ(p99) |
+|---|---|---|---|
+| CBK.DE | 1.59 % | 2.04 % | **+0.45 pp** |
+| DBK.DE | 0.54 % | 0.71 % | **+0.17 pp** |
+| VNA.DE | 0.003 % | 0.020 % | +0.017 pp |
+
+Die p99-Werte zeigen die richtige Stress-Asymmetrie.
+
+### §6a.5 Konfiguration und Reproduzierbarkeit
+
+| Parameter | Wert | Konfiguration |
+|---|---|---|
+| `MC_N_SIMS` | 10 000 | `config.py` |
+| `MC_HORIZON_DAYS` | 252 (1Y) | `config.py` |
+| `MC_SEED` | 42 | `config.py` |
+| `MC_INCLUDE_IDIO` | True | `config.py` |
+| **Reproduzierbarkeit** | bit-identisch bei gleichem Seed | Test [3] in `monte_carlo.py` |
+| **Performance** | ~0.5 s für 38 Firmen × 10k Pfade × H=252 | vektorisiert via Cholesky + KMV-vec |
+
+### §6a.6 Bekannte Limitierungen
+
+| Limit | Status |
+|---|---|
+| Vola-Schock auf $\sigma_E$ | nicht modelliert (V2) |
+| Fat-Tails (t-Verteilung) | nicht modelliert; Standard-MVN |
+| Regime-Wechsel | keine Markov-Chain |
+| Asymmetrische Schocks | keine GARCH/Sprung-Komponenten |
+| Drift-freie Variante | Toggle in V2 möglich (`drift_mode='zero'`) |
+
 ## §7 KMV-Iteration
 
 **Fixpunkt-System** (für jede Firma einzeln gelöst):
@@ -246,3 +331,4 @@ Erwartete Ausgabe: `[PASS] Alle N Test-Blöcke bestanden.`
 | 2026-04-25 | `merton.py` initial (TotalDebt, kein Multiplier) | Erste KMV-Implementierung |
 | 2026-04-26 | DPT-Switch (Moody's KMV Standard) + Sektor-σ_V-Multiplier (1.5 Banken / 1.2 REITs) | Akademisch sauberere Default-Schwelle; Banken-PDs realistisch nach §4 |
 | 2026-04-26 | `factor_model.py` initial (2-Faktor: Brent + Δr_10y) + Sektor-Energy-Multiplier nach E/U-Methodik (§4.5) | Stress-Cockpit braucht strukturelle Energie-Exposition pro Sektor |
+| 2026-04-26 | `monte_carlo.py` initial (MVN Pfade × vektorisierter KMV) | Stochastische Stress-Distribution mit Konsistenz zu Sektor-Multipliern |
