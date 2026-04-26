@@ -122,6 +122,41 @@ DEFAULT_SECTOR_VOL_MULTIPLIER = 1.0  # alle anderen Sektoren
 
 
 # ----------------------------------------------------------------------
+# 5b. FAKTOR-MODELL · ENERGY-BETA-MULTIPLIER  (siehe MODEL_ASSUMPTIONS.md §4.5)
+# ----------------------------------------------------------------------
+# Methodik (fachlich fundiert):
+#     EnergyMul_sector = clip( (E/U)_sector / (E/U)_Industrials, 0.1, 4.0 )
+# wobei E/U = Energieaufwand / Umsatz beim DAX-Benchmark-Unternehmen.
+# Industrials (Siemens) dient als Referenz-Sektor mit Mul=1.0.
+#
+# Werte sind First-Cut basierend auf öffentlich bekannten Sektorstudien
+# und Geschäftsberichten. Spätere Kalibrierung über direkte GB-Recherche
+# ist explizit vorgesehen — alle Werte sind hier zentral änderbar.
+#
+# Anwendung in factor_model.run_dax40:
+#     beta_brent_adjusted = beta_brent_raw * EnergyMul[sector]
+SECTOR_ENERGY_MUL = {
+    "Utilities":              4.0,   # Benchmark RWE,  E/U ~35%, gecapped
+    "Energy":                 4.0,   # Branchenstandard ~50% E/U, gecapped
+    "Basic Materials":        2.4,   # Benchmark BASF, E/U ~12% (VCI)
+    "Industrials":            1.0,   # Benchmark Siemens, E/U ~5% (Referenz)
+    "Consumer Cyclical":      0.8,   # Benchmark BMW,  E/U ~4%
+    "Communication Services": 0.6,   # Benchmark DT,   E/U ~3% (RZ-Strom)
+    "Healthcare":             0.5,   # Benchmark Merck, E/U ~2.5%
+    "Real Estate":            0.4,   # Benchmark Vonovia, E/U ~2%
+    "Consumer Defensive":     0.4,   # Benchmark Henkel, E/U ~2%
+    "Technology":             0.3,   # Benchmark SAP,  E/U ~1.5% (RZ-Strom)
+    "Financial Services":     0.1,   # Benchmark DB,   E/U ~0.5%
+}
+DEFAULT_SECTOR_ENERGY_MUL = 1.0      # Fallback für unbekannte Sektoren
+
+# Faktor-Modell: Lookback (gleich wie Merton, Konsistenz)
+FACTOR_LOOKBACK_DAYS = 252
+FACTOR_MIN_OBS       = 60   # darunter wird eine Firma als "nicht schätzbar" markiert
+FACTOR_MATURITY      = 10.0 # Δr-Faktor: Δ Svensson-Rate bei 10y
+
+
+# ----------------------------------------------------------------------
 # 6. BUNDESBANK CSV-STRUKTUR
 # ----------------------------------------------------------------------
 # Spaltenordnung im offiziellen Bundesbank-Export

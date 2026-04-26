@@ -12,7 +12,7 @@ Stand: 2026-04-26
 |---|---|---|
 | Risk-free rate | `backend/svensson.py` | Svensson (1994), Bundesbank-Parameter, tagesaktuell |
 | Strukturmodell | `backend/merton.py` | Merton (1974) mit KMV-Iteration nach Crosbie/Bohn (2003) |
-| Faktor-Modell | `backend/factor_model.py` *(noch nicht implementiert)* | 2-Faktor-OLS: Brent Crude + Δr |
+| Faktor-Modell | `backend/factor_model.py` | 2-Faktor-OLS: Brent Crude + Δr_10y |
 | Stress-Engine | `backend/monte_carlo.py` *(noch nicht implementiert)* | Multivariate-Normal Shocks, historische Korrelations-Matrix |
 | Aggregation | `backend/portfolio.py` *(noch nicht implementiert)* | Portfolio-PD, Expected Loss, Concentration |
 | Frontend | `streamlit_app/` *(noch nicht implementiert)* | Streamlit-Cockpit |
@@ -87,6 +87,67 @@ $$\sigma_V^{\text{adj}} = m_{\text{sector}} \cdot \sigma_V$$
 Die korrigierten Werte liegen im plausiblen Bereich für 1Y-Default-Rates von Banken im BBB-Spektrum.
 
 ---
+
+## §4a Faktor-Modell (Brent + Δr_10y)
+
+**Spezifikation:** Pro Firma wird eine OLS-Regression über die Equity-Log-Returns geschätzt:
+
+$$r_{\text{equity},t} = \alpha + \beta_E \cdot r_{\text{Brent},t} + \beta_R \cdot \Delta r_{10y,t} + \varepsilon_t$$
+
+| Parameter | Wert | Konfiguration |
+|---|---|---|
+| Lookback | 252 Handelstage (≈ 1 Jahr) | `config.FACTOR_LOOKBACK_DAYS` |
+| Δr-Maturity | 10 Jahre | `config.FACTOR_MATURITY` |
+| Min-Obs | 60 | `config.FACTOR_MIN_OBS` |
+| Lookback-Konsistenz | identisch zu Merton (§5) | bewusst gleich gewählt |
+| OLS-Engine | `numpy.linalg.lstsq` | kein scipy/statsmodels |
+
+**Faktor-Konstruktion** (`factor_model.factor_returns`):
+- `r_brent`: tägliche Log-Returns aus `brent_crude.parquet` (Spalte `Return_log`, bereits in der Data-Layer-Pipeline berechnet)
+- `Δr_10y`: $r_{10y}(t) - r_{10y}(t-1)$, ausgewertet mit der Svensson-Funktion bei τ = 10 Jahren, in Prozentpunkten
+
+**Sektor-Multiplier auf β_E:** Siehe §4.5.
+
+## §4.5 Energy-Beta-Multiplier (Sektor-Skalierung von β_E)
+
+**Prämisse:** Die OLS-Schätzung von β_E (Brent-Sensitivität) auf einer 252-Tages-Stichprobe enthält statistisches Rauschen und reflektiert nur den realisierten Stress-Pfad. Für ein **Stress-Cockpit** ist eine fachlich fundierte Skalierung sinnvoll, die die strukturelle Energie-Exposition einer Branche abbildet.
+
+**Methodik:**
+
+$$\text{EnergyMul}_{\text{sector}} = \text{clip}\!\left( \frac{(E/U)_{\text{sector}}}{(E/U)_{\text{Industrials}}}, \; 0{,}1, \; 4{,}0 \right)$$
+
+mit $E/U$ = Energieaufwand / Umsatz beim DAX-Benchmark-Unternehmen des Sektors. Industrials (Siemens, $E/U \approx 5\%$) dient als Referenz mit Multiplier 1.0. Cap [0.1, 4.0] verhindert Extremwerte bei sehr energieintensiven Sektoren (Utilities, Energy).
+
+**Anwendung im Code** (`factor_model.run_dax40`):
+```python
+beta_brent_adjusted = beta_brent_raw * EnergyMul[sector]
+```
+Beide Werte (`BetaBrentRaw` und `BetaBrentAdjusted`) erscheinen im Output, damit der Multiplier-Effekt in der Streamlit-Frontend transparent dargestellt werden kann.
+
+**First-Cut-Werte** (Stand: 2026-04-26):
+
+| Yahoo-Sektor | DAX-Benchmark | $E/U$ (geschätzt) | Multiplier | Quelle / Begründung |
+|---|---|---|---|---|
+| Utilities | RWE | ~35 % | **4.0** (cap) | RWE GB, Brennstoff-/Energiebezugskosten relativ Umsatz; reine Stromerzeugung ist 1.-energieintensivste Branche |
+| Energy | (keine reine in DAX) | ~50 % | **4.0** (cap) | Branchenstandard EIA / IEA |
+| Basic Materials | BASF | ~12 % | **2.4** | VCI Energiekostenmonitor; Chemie ist 2.-energieintensivste Branche |
+| Industrials | Siemens | ~5 % | **1.0** | Siemens GB; **Referenz-Sektor** |
+| Consumer Cyclical | BMW | ~4 % | **0.8** | BMW GB, Material- + Energieaufwand |
+| Communication Services | Deutsche Telekom | ~3 % | **0.6** | DT GB, Energiekosten Rechenzentren |
+| Healthcare | Merck | ~2.5 % | **0.5** | Merck GB |
+| Real Estate | Vonovia | ~2 % | **0.4** | Vonovia GB; Heizenergie wird grossteils umgelegt |
+| Consumer Defensive | Henkel | ~2 % | **0.4** | Henkel GB |
+| Technology | SAP | ~1.5 % | **0.3** | SAP GB, Rechenzentrum-Strom |
+| Financial Services | Deutsche Bank | ~0.5 % | **0.1** | DB GB, reine Verwaltungs-/RZ-Stromkosten |
+
+> ⚠️ **Status: First-Cut.** Die $E/U$-Werte sind aus öffentlich bekannten Sektorstudien und Geschäftsberichts-Auszügen abgeleitet, **noch nicht** durch direkte Recherche der spezifischen DAX-Geschäftsberichte verifiziert. Spätere Kalibrierung ist ausdrücklich vorgesehen — alle Werte sind in `config.SECTOR_ENERGY_MUL` zentral änderbar, ohne Code-Anpassung.
+
+**Vorgehen für die Kalibrierung** (für zukünftige Bearbeiter):
+1. Aus dem aktuellen Geschäftsbericht des Benchmark-Unternehmens den Posten *Materialaufwand → Energiekosten* (oder *Sonstige Aufwendungen → Energiebezug*) extrahieren.
+2. $E/U$ = Energiekosten / Umsatzerlöse berechnen.
+3. Multiplier = $\text{clip}( E/U_{\text{sector}} / 0.05, 0.1, 4.0 )$.
+4. Wert in `config.SECTOR_ENERGY_MUL` aktualisieren, Quelle (GB-Seite) im Kommentar dokumentieren.
+5. `python backend/factor_model.py` zur Verifikation laufen lassen.
 
 ## §5 Equity-Volatilitäts-Schätzung
 
@@ -184,3 +245,4 @@ Erwartete Ausgabe: `[PASS] Alle N Test-Blöcke bestanden.`
 | 2026-04-25 | `svensson.py` initial | Excel-Sweep validiert |
 | 2026-04-25 | `merton.py` initial (TotalDebt, kein Multiplier) | Erste KMV-Implementierung |
 | 2026-04-26 | DPT-Switch (Moody's KMV Standard) + Sektor-σ_V-Multiplier (1.5 Banken / 1.2 REITs) | Akademisch sauberere Default-Schwelle; Banken-PDs realistisch nach §4 |
+| 2026-04-26 | `factor_model.py` initial (2-Faktor: Brent + Δr_10y) + Sektor-Energy-Multiplier nach E/U-Methodik (§4.5) | Stress-Cockpit braucht strukturelle Energie-Exposition pro Sektor |
