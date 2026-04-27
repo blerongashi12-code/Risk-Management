@@ -168,6 +168,54 @@ MC_INCLUDE_IDIO   = True             # ε~N(0, σ_ε·√H) im Stress-Pfad
 
 
 # ----------------------------------------------------------------------
+# 5d. SZENARIO-LIBRARY  (siehe MODEL_ASSUMPTIONS.md §6c)
+# ----------------------------------------------------------------------
+# Deterministische historische / hypothetische Stress-Szenarien.
+# Pro Szenario: kumulativer ΔBrent (log-Return) + Δr_10y (pp) am Horizont.
+#
+# 'source' Werte:
+#   'historical'    → Werte werden zur Laufzeit aus brent_df + svensson_df
+#                     kalibriert (Periode 'period' in den Daten verfügbar)
+#   'literature'    → Werte aus akademischer Literatur, weil die Periode
+#                     ausserhalb des Daten-Lookback-Fensters liegt
+#                     (z.B. Corona-Crash 2020-Q1 vor Brent-Daten-Start)
+#   'hypothetical'  → Forward-looking Szenario, frei spezifiziert
+SCENARIO_LIBRARY = {
+    "corona_2020": {
+        "description": "COVID-19 Crash (Jan-Apr 2020): Demand-Schock, ECB Liquidity Push",
+        "source": "literature",
+        "period": ("2020-01-21", "2020-04-21"),
+        "override": {
+            "delta_brent_log":   -1.20,   # Brent ~$66 → ~$20 (Lit.: -70%)
+            "delta_rate_10y_pp": -0.65,   # 10y Bund-Yield −65 bp
+            "horizon_days":      60,
+        },
+    },
+    "ukraine_2022": {
+        "description": "Russia-Ukraine War + ECB Hawkish Pivot (Feb-Apr 2022)",
+        "source": "historical",
+        "period": ("2022-02-22", "2022-04-30"),
+        # delta_brent_log, delta_rate_10y_pp, horizon_days → zur Laufzeit
+    },
+    "ukraine_2022_peak": {
+        "description": "Ukraine Initial Shock — Brent peak 2022-03-08",
+        "source": "historical",
+        "period": ("2022-02-22", "2022-03-08"),
+    },
+    "iran_2026": {
+        "description": "Iran Escalation 2026 (hypothetical) — Supply shock + ECB cautious",
+        "source": "hypothetical",
+        "period": None,
+        "override": {
+            "delta_brent_log":    0.55,   # +73 % Brent (z.B. $80 → $138)
+            "delta_rate_10y_pp":  0.50,   # +50 bp Bund-Yield
+            "horizon_days":      30,
+        },
+    },
+}
+
+
+# ----------------------------------------------------------------------
 # 6. BUNDESBANK CSV-STRUKTUR
 # ----------------------------------------------------------------------
 # Spaltenordnung im offiziellen Bundesbank-Export

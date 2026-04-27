@@ -344,6 +344,59 @@ Pro Yahoo-Sektor werden aggregiert: Anzahl Firmen, EAD, EAD-Anteil, EL-Baseline,
 
 **Beobachtung:** Trotz dass Consumer Cyclical der EAD-grösste Sektor ist (39 %), trägt **Financial Services 99.8 % des EL** (610 m von 611 m). Das ist die Konsequenz aus den Bank-Multipliern (§4) — fachlich korrekt: der Stress-Test misst Risiko, nicht Größe. Banken haben strukturell höhere PDs als Industriefirmen.
 
+## §6c Szenario-Library (deterministische Stress-Pfade)
+
+Im Gegensatz zur stochastischen MC-Engine (§6a) werden hier **deterministische Schock-Vektoren** auf die gleiche Faktor → Equity → KMV-Pipeline angewendet. Jedes Szenario reduziert sich auf einen **Single-Pfad**:
+
+$$\mathbf{z}_{\text{scenario}} = \begin{bmatrix} \Delta\!\log P_{\text{Brent}} \\ \Delta r_{10y} \;[\text{pp}] \end{bmatrix}, \quad H \;[\text{Tage}]$$
+
+### §6c.1 Szenario-Quellen-Hierarchie
+
+| `source` | Bedeutung | Anwendung |
+|---|---|---|
+| `historical` | Kalibrierung aus realen Brent + Bundesbank-Daten über Periode `(start, end)` | für Episoden, die im Daten-Lookback liegen |
+| `literature` | Hartkodierte Werte aus akademischer Stress-Test-Literatur | für Episoden **vor** dem Daten-Lookback (z.B. Corona-Crash 2020-Q1, Brent-Daten beginnen erst 2020-04-23) |
+| `hypothetical` | Forward-looking Szenarien | What-if-Analysen |
+
+### §6c.2 Library-Inhalt (Stand 2026-04-27)
+
+| Szenario | Source | ΔBrent_log | Δr_10y | H | Bemerkung |
+|---|---|---|---|---|---|
+| `corona_2020` | literature | −1.20 (≈ −70%) | −65 bp | 60 d | Brent ~$66 → ~$20 (Jan-Apr 2020), 10y Bund −65 bp |
+| `ukraine_2022` | historical | **+0.12** | **+67 bp** | 66 d | aus Bundesbank/Brent-Daten 2022-02-22 bis 2022-04-30 |
+| `ukraine_2022_peak` | historical | **+0.28** | **−15 bp** | 14 d | Initial-Peak Brent bis 2022-03-08 |
+| `iran_2026` | hypothetical | +0.55 (≈ +73%) | +50 bp | 30 d | Supply-Schock + ECB cautious |
+
+### §6c.3 Anwendung pro Firma
+
+Identisch zu `monte_carlo.stress_one_firm` mit `Z_brent = ΔBrent_log` und `Z_Δr = Δr_pp`, **ohne** ε-Drift (deterministisch):
+
+$$\log r_E^{(\text{scen})} = \alpha \cdot H + \beta_E^{\text{adj}} \cdot \Delta\!\log P_{\text{Brent}} + \beta_R \cdot \Delta r_{10y}$$
+
+Das Output-DataFrame enthält die **Decomposition** (`AlphaContrib`, `BrentContrib`, `RateContrib`) für eine Waterfall-Visualisierung im Streamlit.
+
+### §6c.4 Bekannte Modell-Limitation bei Bank-Szenarien
+
+**Beobachtung (Stand 2026-04-27):** Im DAX-40-Run zeigen Banken (CBK, DBK) bei Corona/Ukraine **niedrigere** Stress-PDs als Baseline.
+
+| Ticker | Baseline | corona_2020 | ukraine_2022 | iran_2026 |
+|---|---|---|---|---|
+| CBK.DE | 1.59 % | 1.39 % | 1.39 % | 1.52 % |
+| DBK.DE | 0.54 % | 0.47 % | 0.47 % | 0.51 % |
+
+**Mechanik:**
+1. $\beta_R > 0$ für Banken (Zinsanstieg → Margenexpansion → höherer Aktienkurs).
+2. $\beta_E^{\text{adj}}$ für Banken ist klein ($\text{mul} = 0.1$, §4.5) — Brent-Schock ist quasi wirkungslos.
+3. Direkt-Effekt im Merton: bei steigendem $r$ sinkt $L \cdot e^{-rT}$ → $V/L$ erhöht sich → PD sinkt.
+
+**Was das Modell NICHT erfasst** (Banken-spezifisch):
+- Kreditausfall-Wellen bei Stress (Corporate Default Domino)
+- Counterparty- und Liquiditätsrisiken
+- Vola-Sprünge bei Krisen (Equity-Vola steigt typisch um 2–3× im Stress)
+- Regulatorische Eingriffe / Notenbank-Liquiditäts-Push
+
+**Konsequenz:** Bank-Szenarien sind im Cockpit als **modell-konsistente Markt-Reaktion** zu lesen, nicht als „echtes" Bankenkrisen-Szenario. Für letzteres wäre ein anderes Modell (z.B. SRISK oder Bank-spezifisches CCAR-Framework) nötig — bewusst ausserhalb des Scope dieses Cockpits.
+
 ## §7 KMV-Iteration
 
 **Fixpunkt-System** (für jede Firma einzeln gelöst):
@@ -410,3 +463,4 @@ Erwartete Ausgabe: `[PASS] Alle N Test-Blöcke bestanden.`
 | 2026-04-26 | `factor_model.py` initial (2-Faktor: Brent + Δr_10y) + Sektor-Energy-Multiplier nach E/U-Methodik (§4.5) | Stress-Cockpit braucht strukturelle Energie-Exposition pro Sektor |
 | 2026-04-26 | `monte_carlo.py` initial (MVN Pfade × vektorisierter KMV) | Stochastische Stress-Distribution mit Konsistenz zu Sektor-Multipliern |
 | 2026-04-27 | `portfolio.py` initial (EL/VaR/CVaR/HHI + Sektor-Breakdown, EAD = DPT, LGD = 45 %) | Aggregations-Layer: Einzelfirmen-PDs zu Portfolio-Metriken |
+| 2026-04-27 | `scenarios.py` initial (Library: corona_2020, ukraine_2022, ukraine_2022_peak, iran_2026; historical/literature/hypothetical Quellen) | Deterministische Stress-Pfade mit Waterfall-Decomposition; Modell-Limitation bei Banken in §6c.4 dokumentiert |
