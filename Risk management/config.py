@@ -216,6 +216,21 @@ SCENARIO_LIBRARY = {
 
 
 # ----------------------------------------------------------------------
+# 5e. REVERSE-STRESS-TEST  (siehe MODEL_ASSUMPTIONS.md §6d)
+# ----------------------------------------------------------------------
+# Inverse Frage: Welcher ΔBrent / Δr ist nötig, damit PD = target_pd
+# bzw. DD = target_dd erreicht wird? Gelöst via scipy.optimize.brentq.
+REVERSE_STRESS_TARGET_PD    = 0.05      # 5 % PD-Schwelle
+REVERSE_STRESS_TARGET_DD    = 1.0       # DD = 1.0 Schwelle (≈ 16 % PD)
+# Such-Intervalle weit gesetzt, weil DAX-Blue-Chips dank niedriger β
+# typischerweise Schock-resistent sind. NaN-Output bedeutet: Schwelle
+# nicht im realistischen Bereich erreichbar (siehe MODEL_ASSUMPTIONS.md §6d).
+REVERSE_STRESS_BRENT_RANGE  = (-3.0, 3.0)   # log-Return-Such-Intervall
+REVERSE_STRESS_RATE_RANGE   = (-5.0, 5.0)   # Δr-pp-Such-Intervall
+REVERSE_STRESS_HORIZON_DAYS = 252       # 1Y, konsistent mit Merton
+
+
+# ----------------------------------------------------------------------
 # 6. BUNDESBANK CSV-STRUKTUR
 # ----------------------------------------------------------------------
 # Spaltenordnung im offiziellen Bundesbank-Export

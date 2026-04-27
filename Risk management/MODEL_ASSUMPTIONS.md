@@ -397,6 +397,63 @@ Das Output-DataFrame enthält die **Decomposition** (`AlphaContrib`, `BrentContr
 
 **Konsequenz:** Bank-Szenarien sind im Cockpit als **modell-konsistente Markt-Reaktion** zu lesen, nicht als „echtes" Bankenkrisen-Szenario. Für letzteres wäre ein anderes Modell (z.B. SRISK oder Bank-spezifisches CCAR-Framework) nötig — bewusst ausserhalb des Scope dieses Cockpits.
 
+## §6d Reverse Stress Test
+
+**Inverse Frage zu Szenarien (§6c):** Welcher Schock $\Delta\!\log P_{\text{Brent}}^*$ bzw. $\Delta r^*_{10y}$ ist nötig, damit eine Firma einen vorgegebenen PD- oder DD-Schwellenwert erreicht?
+
+### §6d.1 Methodik
+
+Für jede Firma werden vier kritische Werte über `scipy.optimize.brentq` gesucht:
+
+| Schwelle | Suchvariable | feste Variable | Default-Target |
+|---|---|---|---|
+| `CritBrent_PD5` | $\Delta\!\log P_{\text{Brent}}$ | $\Delta r = 0$ | $\text{PD} = 5\%$ |
+| `CritRate_PD5` | $\Delta r_{10y}$ | $\Delta\!\log P_{\text{Brent}} = 0$ | $\text{PD} = 5\%$ |
+| `CritBrent_DD1` | $\Delta\!\log P_{\text{Brent}}$ | $\Delta r = 0$ | $\text{DD} = 1{,}0$ |
+| `CritRate_DD1` | $\Delta r_{10y}$ | $\Delta\!\log P_{\text{Brent}} = 0$ | $\text{DD} = 1{,}0$ |
+
+Plus: `iso_pd_curve` zeichnet die 2D-Iso-PD-Linie in der $(\Delta\!\log P_{\text{Brent}}, \Delta r)$-Ebene für Cockpit-Visualisierungen.
+
+### §6d.2 Marginal Stress (kein α-Drift)
+
+Im Gegensatz zu Szenarien (§6c) wird hier $\alpha \cdot H = 0$ gesetzt:
+
+$$\log r_E = \beta_E^{\text{adj}} \cdot \Delta\!\log P_{\text{Brent}} + \beta_R \cdot \Delta r$$
+
+**Begründung:** Reverse Stress fragt _„welcher Schock kippt die Firma heute?"_ — nicht _„wo steht sie nach 252 Tagen Drift?"_. Bei Firmen mit positivem α (z.B. CBK $\alpha = 0{,}002$/Tag, also $\alpha \cdot H = +0{,}50$) würde der Drift sonst die Schwelle künstlich verschieben und der Schock müsste erst den Drift überkompensieren.
+
+### §6d.3 Such-Intervalle und Konfiguration
+
+| Parameter | Wert | Konfiguration |
+|---|---|---|
+| `REVERSE_STRESS_TARGET_PD` | 0.05 (5 %) | `config.py` |
+| `REVERSE_STRESS_TARGET_DD` | 1.0 | `config.py` |
+| `REVERSE_STRESS_BRENT_RANGE` | (−3.0, +3.0) | log-Return |
+| `REVERSE_STRESS_RATE_RANGE` | (−5.0, +5.0) | Δr in pp |
+| `REVERSE_STRESS_HORIZON_DAYS` | 252 | gleich Merton-Horizon |
+
+Die Such-Intervalle sind weit gewählt — DAX-Blue-Chips sind mit kleinen β-Werten relativ schock-resistent (siehe §6d.5).
+
+### §6d.4 NaN-Semantik
+
+Liefert eine Funktion NaN, bedeutet das **„Schwelle im Such-Intervall nicht erreichbar"** (kein Vorzeichenwechsel von $f(\text{shock}) = \text{PD}(\text{shock}) - \text{target}$). Drei mögliche Ursachen:
+
+1. **Firma zu robust:** $\beta_E^{\text{adj}}$ oder $\beta_R$ zu klein, um die Target-PD im Schock-Intervall zu erreichen (häufig bei DAX-Blue-Chips, vor allem Banken).
+2. **Baseline bereits über Target:** $\text{PD}_0 \geq \text{target}_\text{PD}$ — Comment-Spalte markiert das.
+3. **KMV-Nicht-Monotonität:** Bei extremen Schocks ($E \ll L$) wird $\sigma_V \to 0$ und DD springt zurück — kein eindeutiger Crossing.
+
+### §6d.5 Beobachtung im DAX-40-Run
+
+**Stand 2026-04-27:** Mit den Default-Targets (PD = 5 %, DD = 1.0) liefern **alle 36 konvergierten DAX-Firmen NaN** für Brent- und Rate-Schwellen.
+
+**Mechanik:**
+- Banken: $\beta_E^{\text{adj}} \approx -0.027$ (CBK), $\beta_R \approx +0.008$ — winzig. Selbst $\Delta\!\log P_{\text{Brent}} = -3$ verschiebt PD nur um $\sim 0{,}1$ pp.
+- Industriefirmen: starke $\beta$-Werte (z.B. RWE $\beta_E^{\text{adj}} = +0.087$), aber sehr niedrige Baseline-PD (≪ 0,01 %) — der Sprung auf 5 % wäre ein 500-facher PD-Anstieg.
+
+**Das ist eine Modell-Realität, kein Bug.** DAX-Blue-Chips sind im 2-Faktor-Markt-Modell tatsächlich gegen reine Brent/Δr-Schocks robust. Echte Default-Risiken kommen aus anderen Kanälen (Counterparty, Liquidity, Asset-Vola-Sprünge, Bilanz-Stress) — bewusst out of scope (§4 / §6c.4).
+
+**Cockpit-Strategie:** Adaptive Targets pro Firma (z.B. `target_pd = max(2·Baseline, 1%)`) liefern sinnvollere Schwellen für die Visualisierung. Implementierung als Streamlit-Filter.
+
 ## §7 KMV-Iteration
 
 **Fixpunkt-System** (für jede Firma einzeln gelöst):
@@ -464,3 +521,4 @@ Erwartete Ausgabe: `[PASS] Alle N Test-Blöcke bestanden.`
 | 2026-04-26 | `monte_carlo.py` initial (MVN Pfade × vektorisierter KMV) | Stochastische Stress-Distribution mit Konsistenz zu Sektor-Multipliern |
 | 2026-04-27 | `portfolio.py` initial (EL/VaR/CVaR/HHI + Sektor-Breakdown, EAD = DPT, LGD = 45 %) | Aggregations-Layer: Einzelfirmen-PDs zu Portfolio-Metriken |
 | 2026-04-27 | `scenarios.py` initial (Library: corona_2020, ukraine_2022, ukraine_2022_peak, iran_2026; historical/literature/hypothetical Quellen) | Deterministische Stress-Pfade mit Waterfall-Decomposition; Modell-Limitation bei Banken in §6c.4 dokumentiert |
+| 2026-04-27 | `reverse_stress.py` initial (CritBrent / CritRate für PD=5% bzw. DD=1.0; iso_pd_curve; brentq) | Inverse zu Szenarien — kritische Schwellen für Cockpit. Marginal Stress (kein α-Drift), §6d. DAX-Blue-Chips meist NaN — Modell-Realität dokumentiert |
