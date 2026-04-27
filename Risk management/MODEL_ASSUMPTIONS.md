@@ -14,7 +14,7 @@ Stand: 2026-04-26
 | Strukturmodell | `backend/merton.py` | Merton (1974) mit KMV-Iteration nach Crosbie/Bohn (2003) |
 | Faktor-Modell | `backend/factor_model.py` | 2-Faktor-OLS: Brent Crude + Δr_10y |
 | Stress-Engine | `backend/monte_carlo.py` | Multivariate-Normal Shocks, historische Korrelations-Matrix |
-| Aggregation | `backend/portfolio.py` *(noch nicht implementiert)* | Portfolio-PD, Expected Loss, Concentration |
+| Aggregation | `backend/portfolio.py` | Portfolio-EL, VaR/CVaR, HHI, Sektor-Breakdown |
 | Frontend | `streamlit_app/` *(noch nicht implementiert)* | Streamlit-Cockpit |
 
 ---
@@ -267,6 +267,83 @@ Die p99-Werte zeigen die richtige Stress-Asymmetrie.
 | Asymmetrische Schocks | keine GARCH/Sprung-Komponenten |
 | Drift-freie Variante | Toggle in V2 möglich (`drift_mode='zero'`) |
 
+## §6b Portfolio-Aggregation
+
+Aggregiert Einzelfirmen-PDs zu Portfolio-Risiko-Metriken.
+
+### §6b.1 Exposure-at-Default (EAD)
+
+$$\text{EAD}_i = \text{DPT}_i = \text{ShortTermDebt}_i + 0.5 \cdot \text{LongTermDebt}_i$$
+
+**Begründung:** Konsistent mit der Default-Schwelle aus §3 — was im Default ökonomisch verloren geht, ist die Default-Punkt-Verschuldung. Konfigurierbar über `ead_col`-Parameter (alternativ: `MarketCap`, `TotalDebt`).
+
+### §6b.2 Loss Given Default (LGD)
+
+$$\text{LGD} = 0{,}45$$
+
+**Quelle:** Basel-II/III-Standard für Senior Unsecured Corporate Debt. Konstant für alle Sektoren in V1; sektor-spezifische LGD ist in V2 vorgesehen.
+
+### §6b.3 Expected Loss
+
+$$\text{EL} = \sum_i \text{EAD}_i \cdot \text{LGD} \cdot \text{PD}_i$$
+
+Ausgewertet drei Mal: mit Baseline-PD, Stress-Mean-PD und Stress-p99-PD. Letzteres ist der **adverse-Stress-Indikator**.
+
+### §6b.4 Loss-Distribution (Conditional EL pro Pfad)
+
+$$L^{(i)} = \sum_j \text{EAD}_j \cdot \text{LGD} \cdot \text{PD}_j^{(i)}$$
+
+mit $\text{PD}_j^{(i)}$ = realisierte PD von Firma $j$ auf MC-Pfad $i$ (aus `monte_carlo.stress_one_firm` mit `keep_samples=True`).
+
+**Korrelation zwischen Firmen** entsteht **automatisch** über die gemeinsamen Faktoren (Brent, Δr_10y) im MC — keine zusätzliche Copula nötig.
+
+**Optional: Bernoulli-Sampling** (`sample_defaults=True`) erzeugt zusätzlich diskrete Default-Events $D_j^{(i)} \sim \text{Bernoulli}(\text{PD}_j^{(i)})$. Liefert echte Loss-Sprünge (höhere Varianz im Tail), aber rauschiger. Default ist die **Conditional-EL-Variante**.
+
+### §6b.5 VaR und CVaR
+
+$$\text{VaR}_\alpha = \text{Quantil}_\alpha(L), \qquad \text{CVaR}_\alpha = \mathbb{E}[L \mid L \geq \text{VaR}_\alpha]$$
+
+Berechnet für $\alpha \in \{0.95, 0.99\}$. CVaR (= Expected Shortfall) ist die kohärente Risiko-Metrik nach Basel III FRTB.
+
+### §6b.6 Konzentrations-Metriken
+
+$$\text{HHI} = \sum_i w_i^2, \quad w_i = \text{EAD}_i / \sum_j \text{EAD}_j$$
+
+$$N_{\text{eff}} = 1/\text{HHI}$$
+
+Bei perfekter Gleichgewichtung: $N_{\text{eff}} = N$. Bei vollständiger Konzentration: $N_{\text{eff}} = 1$.
+
+### §6b.7 Sektor-Breakdown
+
+Pro Yahoo-Sektor werden aggregiert: Anzahl Firmen, EAD, EAD-Anteil, EL-Baseline, EL-Stress-Mean, EL-Stress-p99. Ermöglicht Sektor-Konzentrations-Analyse im Streamlit-Frontend.
+
+### §6b.8 Numerische Resultate (DAX-40, Stand 2026-04-26)
+
+| Metrik | Wert |
+|---|---|
+| Konvergierte Firmen | 36 / 38 |
+| Total EAD (Σ DPT) | 650.2 bn EUR |
+| LGD | 45 % |
+| **EL Baseline** | **611 m EUR (0.094 %)** |
+| EL Stress (Mean) | 365 m EUR (0.056 %) |
+| **EL Stress (p99)** | **794 m EUR (0.122 %)** |
+| VaR 95 | 581 m EUR |
+| CVaR 95 | 636 m EUR |
+| VaR 99 | 671 m EUR |
+| **CVaR 99** | **719 m EUR** |
+| HHI | 0.0943 |
+| Effective N | 10.6 (von 36) |
+
+**Sektor-Konzentration (Top-3 nach EAD):**
+
+| Sektor | N | EAD-Anteil | EL Baseline | EL p99 |
+|---|---|---|---|---|
+| Consumer Cyclical | 8 | 39.0 % | 0.6 m | 2.2 m |
+| Financial Services | 6 | 30.2 % | **609.9 m** | **789.7 m** |
+| Communication Services | 1 | 8.6 % | 0.0 m | 0.0 m |
+
+**Beobachtung:** Trotz dass Consumer Cyclical der EAD-grösste Sektor ist (39 %), trägt **Financial Services 99.8 % des EL** (610 m von 611 m). Das ist die Konsequenz aus den Bank-Multipliern (§4) — fachlich korrekt: der Stress-Test misst Risiko, nicht Größe. Banken haben strukturell höhere PDs als Industriefirmen.
+
 ## §7 KMV-Iteration
 
 **Fixpunkt-System** (für jede Firma einzeln gelöst):
@@ -332,3 +409,4 @@ Erwartete Ausgabe: `[PASS] Alle N Test-Blöcke bestanden.`
 | 2026-04-26 | DPT-Switch (Moody's KMV Standard) + Sektor-σ_V-Multiplier (1.5 Banken / 1.2 REITs) | Akademisch sauberere Default-Schwelle; Banken-PDs realistisch nach §4 |
 | 2026-04-26 | `factor_model.py` initial (2-Faktor: Brent + Δr_10y) + Sektor-Energy-Multiplier nach E/U-Methodik (§4.5) | Stress-Cockpit braucht strukturelle Energie-Exposition pro Sektor |
 | 2026-04-26 | `monte_carlo.py` initial (MVN Pfade × vektorisierter KMV) | Stochastische Stress-Distribution mit Konsistenz zu Sektor-Multipliern |
+| 2026-04-27 | `portfolio.py` initial (EL/VaR/CVaR/HHI + Sektor-Breakdown, EAD = DPT, LGD = 45 %) | Aggregations-Layer: Einzelfirmen-PDs zu Portfolio-Metriken |
