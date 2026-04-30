@@ -1,0 +1,399 @@
+/* =====================================================================
+ * McKinsey-Aesthetic · DAX Credit Stress Cockpit
+ * ---------------------------------------------------------------------
+ * Palette
+ *   --navy        #051C2C  primary text + headers
+ *   --mid-blue    #034B6F  subheadings + secondary accents
+ *   --bright-blue #2251FF  charts, links, primary buttons
+ *   --teal        #00A9A5  positive deltas (sparingly)
+ *   --crimson     #A52F4D  adverse / negative deltas (sparingly)
+ *   --stone       #6E6E6E  muted body text
+ *   --hairline    #E6E6E6  borders, dividers
+ *   --canvas      #F4F4F4  card backgrounds, table zebra
+ * ===================================================================== */
+
+:root {
+  --mc-navy:        #051C2C;
+  --mc-mid-blue:    #034B6F;
+  --mc-bright-blue: #2251FF;
+  --mc-teal:        #00A9A5;
+  --mc-crimson:     #A52F4D;
+  --mc-stone:       #6E6E6E;
+  --mc-hairline:    #E6E6E6;
+  --mc-canvas:      #F4F4F4;
+  --mc-white:       #FFFFFF;
+
+  --mc-serif: "Source Serif Pro", "Playfair Display", Georgia, "Times New Roman", serif;
+  --mc-sans:  "Inter", -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --mc-mono:  "JetBrains Mono", "SF Mono", Consolas, "Courier New", monospace;
+}
+
+/* ---------- Base typography ----------------------------------------- */
+html, body, [class*="css"], .stApp, .main, .block-container {
+  font-family: var(--mc-sans) !important;
+  color: var(--mc-navy);
+  letter-spacing: 0.005em;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--mc-serif) !important;
+  font-weight: 600 !important;
+  color: var(--mc-navy) !important;
+  letter-spacing: -0.01em;
+}
+
+h1 { font-size: 2.25rem !important; line-height: 1.15; margin-bottom: 0.4rem !important; }
+h2 { font-size: 1.55rem !important; line-height: 1.2;  margin-top: 2.0rem !important; margin-bottom: 0.5rem !important; }
+h3 { font-size: 1.20rem !important; line-height: 1.25; margin-top: 1.4rem !important; margin-bottom: 0.4rem !important; }
+
+/* The page hero (st.title equivalent) */
+.stApp h1:first-of-type {
+  border-bottom: 1px solid var(--mc-hairline);
+  padding-bottom: 0.6rem;
+  margin-bottom: 1.0rem !important;
+}
+
+/* Captions and small text */
+.stCaption, [data-testid="stCaptionContainer"], small {
+  color: var(--mc-stone) !important;
+  font-size: 0.82rem !important;
+  letter-spacing: 0.01em;
+}
+
+/* Body text */
+.stMarkdown p, .stMarkdown li {
+  color: var(--mc-navy);
+  line-height: 1.55;
+  font-size: 0.95rem;
+}
+
+/* Subtle stylized lead paragraph (first paragraph after a title) */
+.stApp h1:first-of-type + div .stMarkdown p:first-child {
+  font-size: 1.05rem;
+  color: var(--mc-mid-blue);
+  font-weight: 400;
+}
+
+/* ---------- Layout container ---------------------------------------- */
+.main .block-container {
+  padding-top: 2.4rem;
+  padding-bottom: 4rem;
+  max-width: 1400px;
+}
+
+/* Dividers — hairline, not bold */
+hr, [data-testid="stDivider"] {
+  border: none !important;
+  border-top: 1px solid var(--mc-hairline) !important;
+  margin: 1.6rem 0 !important;
+}
+
+/* ---------- Sidebar ------------------------------------------------- */
+[data-testid="stSidebar"] {
+  background: var(--mc-canvas);
+  border-right: 1px solid var(--mc-hairline);
+}
+[data-testid="stSidebar"] h1 {
+  font-size: 1.15rem !important;
+  font-family: var(--mc-serif) !important;
+  color: var(--mc-navy) !important;
+  border-bottom: 1px solid var(--mc-hairline);
+  padding-bottom: 0.5rem;
+}
+[data-testid="stSidebar"] [data-testid="stCaptionContainer"] {
+  color: var(--mc-stone) !important;
+}
+[data-testid="stSidebar"] .stRadio > label,
+[data-testid="stSidebar"] .stSlider > label,
+[data-testid="stSidebar"] .stSelectbox > label {
+  color: var(--mc-navy) !important;
+  font-weight: 500 !important;
+  font-size: 0.85rem !important;
+}
+
+/* Sidebar nav items (page list) */
+[data-testid="stSidebarNav"] li a {
+  font-family: var(--mc-sans) !important;
+  font-size: 0.92rem !important;
+  color: var(--mc-navy) !important;
+  padding: 0.5rem 0.75rem !important;
+  border-radius: 0 !important;
+  border-left: 2px solid transparent;
+}
+[data-testid="stSidebarNav"] li a:hover {
+  background: var(--mc-white) !important;
+  border-left-color: var(--mc-mid-blue);
+}
+[data-testid="stSidebarNav"] li a[aria-current="page"] {
+  background: var(--mc-white) !important;
+  border-left-color: var(--mc-bright-blue);
+  font-weight: 600;
+}
+
+/* ---------- Metrics (KPI cards) ------------------------------------- */
+[data-testid="stMetric"] {
+  background: var(--mc-white);
+  border: 1px solid var(--mc-hairline);
+  border-left: 3px solid var(--mc-mid-blue);
+  padding: 0.9rem 1.1rem;
+  border-radius: 0;
+  transition: border-left-color 0.15s ease;
+}
+[data-testid="stMetric"]:hover {
+  border-left-color: var(--mc-bright-blue);
+}
+
+[data-testid="stMetricLabel"] {
+  color: var(--mc-stone) !important;
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+[data-testid="stMetricValue"] {
+  color: var(--mc-navy) !important;
+  font-family: var(--mc-serif) !important;
+  font-size: 1.75rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+[data-testid="stMetricDelta"] {
+  font-size: 0.82rem !important;
+  font-weight: 500 !important;
+}
+[data-testid="stMetricDelta"] svg { display: none; }
+[data-testid="stMetricDelta"][data-direction="up"]   { color: var(--mc-crimson) !important; }
+[data-testid="stMetricDelta"][data-direction="down"] { color: var(--mc-teal) !important; }
+
+/* ---------- Buttons ------------------------------------------------- */
+.stButton > button {
+  background: var(--mc-navy);
+  color: var(--mc-white);
+  border: 1px solid var(--mc-navy);
+  border-radius: 0;
+  font-family: var(--mc-sans);
+  font-weight: 500;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.45rem 1.0rem;
+  transition: all 0.15s ease;
+}
+.stButton > button:hover {
+  background: var(--mc-mid-blue);
+  border-color: var(--mc-mid-blue);
+  color: var(--mc-white);
+}
+.stButton > button:focus { box-shadow: none !important; outline: 2px solid var(--mc-bright-blue); }
+
+/* ---------- Tables / DataFrames ------------------------------------- */
+[data-testid="stDataFrame"] {
+  border: 1px solid var(--mc-hairline);
+  border-radius: 0;
+}
+[data-testid="stDataFrame"] thead tr th {
+  background: var(--mc-canvas) !important;
+  color: var(--mc-navy) !important;
+  font-family: var(--mc-sans) !important;
+  font-weight: 600 !important;
+  font-size: 0.78rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--mc-mid-blue) !important;
+}
+[data-testid="stDataFrame"] tbody tr td {
+  font-family: var(--mc-mono) !important;
+  font-size: 0.85rem !important;
+  color: var(--mc-navy);
+  border-bottom: 1px solid var(--mc-hairline) !important;
+}
+[data-testid="stDataFrame"] tbody tr:nth-child(even) td {
+  background: var(--mc-canvas);
+}
+
+/* ---------- Tabs ---------------------------------------------------- */
+.stTabs [data-baseweb="tab-list"] {
+  gap: 0;
+  border-bottom: 1px solid var(--mc-hairline);
+}
+.stTabs [data-baseweb="tab"] {
+  font-family: var(--mc-sans) !important;
+  font-size: 0.88rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.02em;
+  color: var(--mc-stone) !important;
+  background: transparent !important;
+  border: none !important;
+  border-bottom: 2px solid transparent !important;
+  border-radius: 0 !important;
+  padding: 0.6rem 1.2rem !important;
+}
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+  color: var(--mc-navy) !important;
+  border-bottom-color: var(--mc-bright-blue) !important;
+}
+
+/* ---------- Inputs (sliders, selects, radios) ----------------------- */
+.stSlider [data-baseweb="slider"] [role="slider"] {
+  background: var(--mc-bright-blue) !important;
+  border: 2px solid var(--mc-white) !important;
+  box-shadow: 0 0 0 1px var(--mc-bright-blue) !important;
+}
+.stSlider [data-baseweb="slider"] > div > div > div {
+  background: var(--mc-bright-blue) !important;
+}
+.stSelectbox > div > div, .stTextInput > div > div > input {
+  border-radius: 0 !important;
+  border: 1px solid var(--mc-hairline) !important;
+  background: var(--mc-white) !important;
+}
+.stSelectbox > div > div:hover { border-color: var(--mc-mid-blue) !important; }
+
+/* ---------- Expanders ----------------------------------------------- */
+.streamlit-expanderHeader {
+  background: var(--mc-white) !important;
+  border: 1px solid var(--mc-hairline) !important;
+  border-radius: 0 !important;
+  font-family: var(--mc-sans) !important;
+  font-size: 0.88rem !important;
+  font-weight: 500 !important;
+  color: var(--mc-navy) !important;
+}
+[data-testid="stExpander"] {
+  border-radius: 0 !important;
+  border: 1px solid var(--mc-hairline) !important;
+}
+
+/* ---------- Alerts (info, success, warn, error) --------------------- */
+[data-testid="stAlert"] {
+  border-radius: 0 !important;
+  border: 1px solid var(--mc-hairline) !important;
+  border-left-width: 3px !important;
+  background: var(--mc-white) !important;
+  color: var(--mc-navy) !important;
+  font-family: var(--mc-sans) !important;
+}
+[data-testid="stAlert"][kind="info"]    { border-left-color: var(--mc-mid-blue) !important; }
+[data-testid="stAlert"][kind="success"] { border-left-color: var(--mc-teal)     !important; }
+[data-testid="stAlert"][kind="warning"] { border-left-color: #C9A227 !important; }
+[data-testid="stAlert"][kind="error"]   { border-left-color: var(--mc-crimson)  !important; }
+
+/* ---------- Hero banner (top of app.py landing) --------------------- */
+.mc-hero {
+  border-top:    4px solid var(--mc-bright-blue);
+  border-bottom: 1px solid var(--mc-hairline);
+  padding: 1.6rem 0 1.2rem 0;
+  margin-bottom: 1.4rem;
+}
+.mc-hero .mc-eyebrow {
+  font-family: var(--mc-sans);
+  font-size: 0.74rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mc-mid-blue);
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+.mc-hero h1 {
+  font-family: var(--mc-serif) !important;
+  font-size: 2.5rem !important;
+  font-weight: 600 !important;
+  color: var(--mc-navy) !important;
+  margin: 0 0 0.5rem 0 !important;
+  line-height: 1.1;
+  border-bottom: none !important;
+  padding-bottom: 0 !important;
+}
+.mc-hero .mc-deck {
+  font-family: var(--mc-serif);
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: var(--mc-mid-blue);
+  font-style: italic;
+  max-width: 70ch;
+  margin: 0;
+}
+
+/* ---------- Section eyebrow ----------------------------------------- */
+.mc-eyebrow-inline {
+  font-family: var(--mc-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--mc-mid-blue);
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+  display: block;
+}
+
+/* ---------- Insight card -------------------------------------------- */
+.mc-insight {
+  background: var(--mc-canvas);
+  border-left: 3px solid var(--mc-navy);
+  padding: 0.9rem 1.1rem;
+  margin: 0.6rem 0;
+  font-family: var(--mc-serif);
+  font-size: 0.98rem;
+  color: var(--mc-navy);
+  line-height: 1.5;
+}
+.mc-insight strong { color: var(--mc-mid-blue); }
+
+/* ---------- Footer line --------------------------------------------- */
+.mc-footer {
+  margin-top: 3rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--mc-hairline);
+  font-family: var(--mc-sans);
+  font-size: 0.78rem;
+  color: var(--mc-stone);
+  letter-spacing: 0.02em;
+}
+
+/* ---------- Page link cards (st.page_link) -------------------------- */
+[data-testid="stPageLink"] a {
+  display: flex !important;
+  flex-direction: column;
+  justify-content: center;
+  background: var(--mc-white) !important;
+  border: 1px solid var(--mc-hairline) !important;
+  border-left: 3px solid var(--mc-mid-blue) !important;
+  border-radius: 0 !important;
+  padding: 0.85rem 1.0rem !important;
+  margin: 0 !important;
+  font-family: var(--mc-sans) !important;
+  font-size: 0.92rem !important;
+  font-weight: 500 !important;
+  color: var(--mc-navy) !important;
+  text-decoration: none !important;
+  letter-spacing: 0.01em;
+  min-height: 64px;
+  transition: all 0.15s ease;
+  box-shadow: none !important;
+}
+[data-testid="stPageLink"] a:hover {
+  border-left-color: var(--mc-bright-blue) !important;
+  background: var(--mc-canvas) !important;
+  color: var(--mc-navy) !important;
+  cursor: pointer;
+  transform: translateY(-1px);
+}
+[data-testid="stPageLink"] a span {
+  color: var(--mc-navy) !important;
+  font-weight: 500 !important;
+}
+[data-testid="stPageLink"] a svg {
+  display: none !important;
+}
+
+/* ---------- Hide Streamlit chrome ----------------------------------- */
+#MainMenu          { visibility: hidden; }
+footer             { visibility: hidden; }
+header             { visibility: hidden; }
+[data-testid="stToolbar"] { display: none; }
+
+/* ---------- Plotly tooltip ------------------------------------------ */
+.js-plotly-plot .plotly .hoverlayer .hovertext {
+  font-family: var(--mc-sans) !important;
+}

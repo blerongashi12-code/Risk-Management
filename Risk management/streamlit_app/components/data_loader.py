@@ -1,14 +1,13 @@
-"""Cached Wrapper rund um die Backend-Module.
+"""Cached wrappers around the data layer.
 
-Streamlit ruft diese Funktionen bei jedem Re-Run auf; @st.cache_data
-verhindert Doppel-Berechnung. TTL = 24h, weil Daten täglich aktualisiert
-werden (Bundesbank + yfinance).
+Slim version after the Tier-1 cleanup — only the macro-factor cache
+(Brent + Bundesbank-Svensson) and the Svensson curve helpers remain.
 """
 from __future__ import annotations
 
-import streamlit as st
-import pandas as pd
 import numpy as np
+import pandas as pd
+import streamlit as st
 
 from components.backend_path import setup
 setup()
@@ -17,83 +16,31 @@ from config import CACHE_DIR  # type: ignore
 
 
 # ----------------------------------------------------------------------
-# 1. Statische Daten aus dem Cache
+# 1. Static cache (Brent + Svensson only)
 # ----------------------------------------------------------------------
-@st.cache_data(ttl=24 * 3600, show_spinner="Lade Daten-Layer …")
+@st.cache_data(ttl=24 * 3600, show_spinner="Loading data layer …")
 def load_data_layer() -> dict:
-    """Liest alle Parquet-Files aus data/cache/ und gibt sie als Dict zurück.
-
-    Keys: 'prices', 'brent', 'svensson', 'fundamentals', 'market'.
-    """
+    """Reads Brent + Svensson parquet files from data/cache/."""
     out = {}
     needed = {
-        "prices":       "dax40_prices.parquet",
-        "brent":        "brent_crude.parquet",
-        "svensson":     "svensson_params.parquet",
-        "fundamentals": "dax40_fundamentals.parquet",
-        "market":       "market_proxy.parquet",
+        "brent":    "brent_crude.parquet",
+        "svensson": "svensson_params.parquet",
     }
     for key, fname in needed.items():
         path = CACHE_DIR / fname
-        if path.exists():
-            out[key] = pd.read_parquet(path)
-        else:
-            out[key] = None
+        out[key] = pd.read_parquet(path) if path.exists() else None
     return out
 
 
 # ----------------------------------------------------------------------
-# 2. Baseline (Merton + Faktor-Modell)
-# ----------------------------------------------------------------------
-@st.cache_data(ttl=24 * 3600, show_spinner="Berechne Baseline-Merton …")
-def run_baseline() -> dict:
-    """Lädt Daten und führt Merton + Faktor-Modell aus.
-
-    Returns
-    -------
-    dict mit
-        merton_df : Output von merton.run_dax40
-        factor_df : Output von factor_model.run_dax40
-        as_of     : letzter Preis-Tag (Timestamp)
-    """
-    from merton import run_dax40 as run_merton  # type: ignore
-    from factor_model import run_dax40 as run_factor  # type: ignore
-
-    data = load_data_layer()
-    if any(data[k] is None for k in ("prices", "brent", "svensson", "fundamentals")):
-        return {"merton_df": None, "factor_df": None, "as_of": None}
-
-    merton_df = run_merton(data["prices"], data["fundamentals"], data["svensson"])
-    factor_df = run_factor(data["prices"], data["brent"], data["svensson"],
-                           data["fundamentals"])
-    as_of = data["prices"].index.max()
-    return {"merton_df": merton_df, "factor_df": factor_df, "as_of": as_of}
-
-
-# ----------------------------------------------------------------------
-# 3. Szenario-Library (cached, da deterministisch)
-# ----------------------------------------------------------------------
-@st.cache_data(ttl=24 * 3600, show_spinner="Berechne Szenario-Library …")
-def run_scenarios() -> dict:
-    from scenarios import run_scenario_library  # type: ignore
-    data = load_data_layer()
-    return run_scenario_library(
-        data["prices"], data["brent"], data["svensson"], data["fundamentals"],
-    )
-
-
-# ----------------------------------------------------------------------
-# 4. Δr-10y aus Svensson-β-Shifts
+# 2. Δr_10y from Svensson β-shifts
 # ----------------------------------------------------------------------
 @st.cache_data(ttl=3600)
 def delta_r_from_beta_shifts(
     d_beta0: float, d_beta1: float, d_beta2: float, d_beta3: float,
     *, maturity: float = 10.0,
 ) -> float:
-    """Berechnet Δr_10y in Prozentpunkten aus den vier β-Shifts.
-
-    Nutzt den letzten verfügbaren Svensson-Tag als Basis.
-    """
+    """Computes Δr_10y in pp from the four β-shifts using the latest curve."""
     from svensson import (historical_curve, shift_curve, zero_rate)  # type: ignore
 
     data = load_data_layer()
@@ -112,7 +59,7 @@ def delta_r_from_beta_shifts(
 
 @st.cache_data(ttl=3600)
 def baseline_yield_curve(maturities: tuple = None) -> pd.DataFrame:
-    """Liefert die aktuelle Bundesbank-Zinskurve über ein Maturity-Grid."""
+    """Current Bundesbank zero curve over a maturity grid."""
     from svensson import historical_curve, curve_grid  # type: ignore
 
     data = load_data_layer()

@@ -1,0 +1,28 @@
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# Claude Code tooling (worktrees, sessions)
+.claude/
+
+# Streamlit runtime cache
+.streamlit/secrets.toml
+
+# Large EBA raw files (kept locally only — too big for git)
+Risk management/data/tr_cre.csv
+Risk management/data/tr_sov.csv
+Risk management/data/tr_oth.csv
+Risk management/data/tr_mrk.csv
+Risk management/data/SDD.xlsx
+Risk management/data/TR_Metadata.xlsx
+Risk management/data/2025 EU-wide stress test - Templates.xlsx
+
+# OS junk
+.DS_Store
+Thumbs.db

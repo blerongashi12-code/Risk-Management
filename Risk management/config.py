@@ -1,12 +1,13 @@
 """
 ============================================================================
- config.py  ·  Zentrale Konfiguration für das DAX Credit Stress Modell
+ config.py · Central configuration for the Credit Stress Cockpit
 ============================================================================
- Enthält:
-   - Pfade zu Excel-Workbook & Data-Cache
-   - DAX-40 Ticker-Mapping
-   - Datenquellen-Konstanten (Start-Datum, Proxy-Ticker)
-   - Modellparameter (Horizon, LGD, etc.)
+ Tier 2 (Vasicek/ASRF + EBA Sovereign) configuration only:
+   - Filesystem paths (data, cache, EBA raw files, output)
+   - Bundesbank Svensson curve (still drives the macro shock)
+   - Brent crude proxy
+   - Vasicek/Basel-III IRB constants
+   - EBA macro→M routing
 ============================================================================
 """
 
@@ -14,242 +15,111 @@ from pathlib import Path
 from datetime import datetime, timedelta
 
 # ----------------------------------------------------------------------
-# 1. PFADE
+# 1. Paths
 # ----------------------------------------------------------------------
-# Basis-Verzeichnis = Ordner, in dem dieses config.py liegt
 BASE_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.cwd()
 
-# Unterordner automatisch anlegen
-DATA_DIR       = BASE_DIR / "data"
-CACHE_DIR      = DATA_DIR / "cache"
-OUTPUT_DIR     = BASE_DIR / "output"
-for p in (DATA_DIR, CACHE_DIR, OUTPUT_DIR):
+DATA_DIR              = BASE_DIR / "data"
+CACHE_DIR             = DATA_DIR / "cache"
+EBA_DIR               = DATA_DIR / "eba"            # parsed parquet outputs
+EBA_TRANSPARENCY_DIR  = EBA_DIR / "transparency_2025"
+EBA_STRESS_DIR        = EBA_DIR / "stress_test_2025"
+OUTPUT_DIR            = BASE_DIR / "output"
+for p in (DATA_DIR, CACHE_DIR, EBA_DIR, EBA_TRANSPARENCY_DIR,
+          EBA_STRESS_DIR, OUTPUT_DIR):
     p.mkdir(parents=True, exist_ok=True)
 
-# ----------------------------------------------------------------------
-# 2. DAX-40 TICKER
-# ----------------------------------------------------------------------
-DAX40 = {
-    "ADS.DE":  "Adidas",
-    "AIR.DE":  "Airbus",
-    "ALV.DE":  "Allianz",
-    "BAS.DE":  "BASF",
-    "BAYN.DE": "Bayer",
-    "BMW.DE":  "BMW",
-    "BNR.DE":  "Brenntag",
-    "CBK.DE":  "Commerzbank",
-    "CON.DE":  "Continental",
-    "1COV.DE": "Covestro",
-    "DHL.DE":  "DHL Group",
-    "DB1.DE":  "Deutsche Börse",
-    "DBK.DE":  "Deutsche Bank",
-    "DTE.DE":  "Deutsche Telekom",
-    "EOAN.DE": "E.ON",
-    "FRE.DE":  "Fresenius",
-    "HNR1.DE": "Hannover Rück",
-    "HEI.DE":  "Heidelberg Materials",
-    "HEN3.DE": "Henkel",
-    "IFX.DE":  "Infineon",
-    "MBG.DE":  "Mercedes-Benz",
-    "MRK.DE":  "Merck",
-    "MTX.DE":  "MTU Aero",
-    "MUV2.DE": "Münchener Rück",
-    "P911.DE": "Porsche AG",
-    "PAH3.DE": "Porsche SE",
-    "QIA.DE":  "Qiagen",
-    "RHM.DE":  "Rheinmetall",
-    "RWE.DE":  "RWE",
-    "SAP.DE":  "SAP",
-    "SRT3.DE": "Sartorius",
-    "SIE.DE":  "Siemens",
-    "ENR.DE":  "Siemens Energy",
-    "SHL.DE":  "Siemens Healthineers",
-    "SY1.DE":  "Symrise",
-    "VOW3.DE": "Volkswagen",
-    "VNA.DE":  "Vonovia",
-    "ZAL.DE":  "Zalando",
-}
 
-DAX40_TICKERS = list(DAX40.keys())
+# ----------------------------------------------------------------------
+# 1a. EBA raw-data resolution
+# ----------------------------------------------------------------------
+# The raw EBA Transparency CSVs (tr_cre.csv, tr_sov.csv, tr_oth.csv,
+# tr_mrk.csv) plus metadata (TR_Metadata.xlsx, SDD.xlsx) are large and
+# kept out of the repo. The loader looks for them in:
+#   1. BASE_DIR / "data"  (worktree-local, if present)
+#   2. The main repo's data/ when running from a git worktree
+def _resolve_eba_raw_dir() -> Path:
+    """Find the directory containing the raw EBA CSVs."""
+    candidates = [DATA_DIR]
+    parts = BASE_DIR.parts
+    if ".claude" in parts and "worktrees" in parts:
+        try:
+            wt_idx = parts.index(".claude")
+            main_data = Path(*parts[:wt_idx]) / "Risk management" / "data"
+            candidates.append(main_data)
+        except ValueError:
+            pass
+    for d in candidates:
+        if (d / "tr_cre.csv").exists():
+            return d
+    return DATA_DIR
+
+EBA_RAW_DIR = _resolve_eba_raw_dir()
 
 
 # ----------------------------------------------------------------------
-# 3. MARKTDATEN-PROXIES
+# 2. Macro proxies
 # ----------------------------------------------------------------------
 ENERGY_PROXY = "BZ=F"      # ICE Brent Crude Futures (USD/bbl)
-FX_PROXY     = "EURUSD=X"  # für Umrechnung Brent USD → EUR falls gewünscht
-MARKET_PROXY = "^GDAXI"    # DAX Performance Index (für Markt-Beta)
+FX_PROXY     = "EURUSD=X"  # USD → EUR conversion if needed
 
 
 # ----------------------------------------------------------------------
-# 4. DATEN-ZEITRAUM
+# 3. Lookback window (for empirical factor covariance)
 # ----------------------------------------------------------------------
-# 6 Jahre Historie, passt zum Svensson-Zeitraum
 LOOKBACK_YEARS = 6
 START_DATE = (datetime.today() - timedelta(days=int(LOOKBACK_YEARS * 365.25))).strftime("%Y-%m-%d")
 END_DATE   = datetime.today().strftime("%Y-%m-%d")
 
 
 # ----------------------------------------------------------------------
-# 5. MODELLPARAMETER
+# 4. Vasicek / Basel III IRB
 # ----------------------------------------------------------------------
-DEFAULT_HORIZON   = 1.0    # Jahre — für Merton PD
-DEFAULT_LGD       = 0.45   # Loss Given Default (Basel-Standard)
-DEFAULT_N_SIMS    = 10_000 # Monte Carlo Pfade
+# Confidence level for the ASRF loss quantile (Basel III: 99.9%).
+VASICEK_CONFIDENCE = 0.999
 
+# Default effective maturity for corporate exposures (Basel cap [1.0, 5.0]).
+VASICEK_DEFAULT_MATURITY_YEARS = 2.5
 
-# ----------------------------------------------------------------------
-# 5a. CREDIT-MODELL-PRÄMISSEN  (siehe MODEL_ASSUMPTIONS.md)
-# ----------------------------------------------------------------------
-# Default Point (DPT) nach Moody's KMV / Bharath-Shumway (2008):
-#     DPT = ShortTermDebt + DPT_LTD_WEIGHT · LongTermDebt
-# Begründung: Langfristige Schulden lösen nicht akut einen Default aus —
-# nur ein Anteil davon zählt zur Default-Schwelle. α=0.5 ist
-# akademischer Industrie-Standard.
-DPT_LTD_WEIGHT = 0.5
-
-# Sektor-spezifischer σ_V-Multiplier (post-KMV).
-# Standard-Merton untertreibt PDs für stark geleveragte Sektoren
-# (Banken, REITs), weil Equity-Vola strukturell gedämpft ist
-# (Einlagensicherung, Liquiditäts-Backstop, regulatorischer Floor).
-# Quellen: Hovakimian/Kane/Laeven (2012); Moody's KMV CreditEdge-Doku.
-# Werte > 1.0 erhöhen die effektive Asset-Vola → höhere PD.
-SECTOR_VOL_MULTIPLIER = {
-    "Financial Services": 1.5,  # Banken + Versicherungen
-    "Real Estate":        1.2,  # ähnliche Bilanz-Hebelung
-}
-DEFAULT_SECTOR_VOL_MULTIPLIER = 1.0  # alle anderen Sektoren
+# Default LGD for the bank-portfolio aggregate (override per segment).
+VASICEK_DEFAULT_LGD = 0.45
 
 
 # ----------------------------------------------------------------------
-# 5b. FAKTOR-MODELL · ENERGY-BETA-MULTIPLIER  (siehe MODEL_ASSUMPTIONS.md §4.5)
+# 5. EBA macro→M routing
 # ----------------------------------------------------------------------
-# Methodik (fachlich fundiert):
-#     EnergyMul_sector = clip( (E/U)_sector / (E/U)_Industrials, 0.1, 4.0 )
-# wobei E/U = Energieaufwand / Umsatz beim DAX-Benchmark-Unternehmen.
-# Industrials (Siemens) dient als Referenz-Sektor mit Mul=1.0.
-#
-# Werte sind First-Cut basierend auf öffentlich bekannten Sektorstudien
-# und Geschäftsberichten. Spätere Kalibrierung über direkte GB-Recherche
-# ist explizit vorgesehen — alle Werte sind hier zentral änderbar.
-#
-# Anwendung in factor_model.run_dax40:
-#     beta_brent_adjusted = beta_brent_raw * EnergyMul[sector]
-SECTOR_ENERGY_MUL = {
-    "Utilities":              4.0,   # Benchmark RWE,  E/U ~35%, gecapped
-    "Energy":                 4.0,   # Branchenstandard ~50% E/U, gecapped
-    "Basic Materials":        2.4,   # Benchmark BASF, E/U ~12% (VCI)
-    "Industrials":            1.0,   # Benchmark Siemens, E/U ~5% (Referenz)
-    "Consumer Cyclical":      0.8,   # Benchmark BMW,  E/U ~4%
-    "Communication Services": 0.6,   # Benchmark DT,   E/U ~3% (RZ-Strom)
-    "Healthcare":             0.5,   # Benchmark Merck, E/U ~2.5%
-    "Real Estate":            0.4,   # Benchmark Vonovia, E/U ~2%
-    "Consumer Defensive":     0.4,   # Benchmark Henkel, E/U ~2%
-    "Technology":             0.3,   # Benchmark SAP,  E/U ~1.5% (RZ-Strom)
-    "Financial Services":     0.1,   # Benchmark DB,   E/U ~0.5%
-}
-DEFAULT_SECTOR_ENERGY_MUL = 1.0      # Fallback für unbekannte Sektoren
+# Anchor vintage used by macro_factor.anchor_from_eba()
+EBA_VINTAGE_PRIMARY = "2025"
 
-# Faktor-Modell: Lookback (gleich wie Merton, Konsistenz)
-FACTOR_LOOKBACK_DAYS = 252
-FACTOR_MIN_OBS       = 60   # darunter wird eine Firma als "nicht schätzbar" markiert
-FACTOR_MATURITY      = 10.0 # Δr-Faktor: Δ Svensson-Rate bei 10y
+# Macro-shock → systematic-factor M mapping route:
+#   "anchor"  : EBA stress-test anchor only (regulator-citable)
+#   "data"    : empirical Mahalanobis only (data-driven)
+#   "hybrid"  : average of both — anchor as primary, data as sanity
+MACRO_FACTOR_ROUTE = "hybrid"
 
 
 # ----------------------------------------------------------------------
-# 5c. MONTE-CARLO-STRESS-ENGINE  (siehe MODEL_ASSUMPTIONS.md §6a)
+# 6. Bundesbank CSV layout
 # ----------------------------------------------------------------------
-# Schock-Vektor: [r_brent, Δr_10y]_t, multivariat-normal, μ/Σ aus
-# 252-Tage-Historie. Vektorisierte Pfade × Firmen via Cholesky.
-MC_N_SIMS         = DEFAULT_N_SIMS   # 10 000 Pfade
-MC_HORIZON_DAYS   = 252              # 1Y, konsistent mit Merton-Horizon
-MC_SEED           = 42               # Reproduzierbarkeit
-MC_INCLUDE_IDIO   = True             # ε~N(0, σ_ε·√H) im Stress-Pfad
-
-
-# ----------------------------------------------------------------------
-# 5d. SZENARIO-LIBRARY  (siehe MODEL_ASSUMPTIONS.md §6c)
-# ----------------------------------------------------------------------
-# Deterministische historische / hypothetische Stress-Szenarien.
-# Pro Szenario: kumulativer ΔBrent (log-Return) + Δr_10y (pp) am Horizont.
-#
-# 'source' Werte:
-#   'historical'    → Werte werden zur Laufzeit aus brent_df + svensson_df
-#                     kalibriert (Periode 'period' in den Daten verfügbar)
-#   'literature'    → Werte aus akademischer Literatur, weil die Periode
-#                     ausserhalb des Daten-Lookback-Fensters liegt
-#                     (z.B. Corona-Crash 2020-Q1 vor Brent-Daten-Start)
-#   'hypothetical'  → Forward-looking Szenario, frei spezifiziert
-SCENARIO_LIBRARY = {
-    "corona_2020": {
-        "description": "COVID-19 Crash (Jan-Apr 2020): Demand-Schock, ECB Liquidity Push",
-        "source": "literature",
-        "period": ("2020-01-21", "2020-04-21"),
-        "override": {
-            "delta_brent_log":   -1.20,   # Brent ~$66 → ~$20 (Lit.: -70%)
-            "delta_rate_10y_pp": -0.65,   # 10y Bund-Yield −65 bp
-            "horizon_days":      60,
-        },
-    },
-    "ukraine_2022": {
-        "description": "Russia-Ukraine War + ECB Hawkish Pivot (Feb-Apr 2022)",
-        "source": "historical",
-        "period": ("2022-02-22", "2022-04-30"),
-        # delta_brent_log, delta_rate_10y_pp, horizon_days → zur Laufzeit
-    },
-    "ukraine_2022_peak": {
-        "description": "Ukraine Initial Shock — Brent peak 2022-03-08",
-        "source": "historical",
-        "period": ("2022-02-22", "2022-03-08"),
-    },
-    "iran_2026": {
-        "description": "Iran Escalation 2026 (hypothetical) — Supply shock + ECB cautious",
-        "source": "hypothetical",
-        "period": None,
-        "override": {
-            "delta_brent_log":    0.55,   # +73 % Brent (z.B. $80 → $138)
-            "delta_rate_10y_pp":  0.50,   # +50 bp Bund-Yield
-            "horizon_days":      30,
-        },
-    },
-}
-
-
-# ----------------------------------------------------------------------
-# 5e. REVERSE-STRESS-TEST  (siehe MODEL_ASSUMPTIONS.md §6d)
-# ----------------------------------------------------------------------
-# Inverse Frage: Welcher ΔBrent / Δr ist nötig, damit PD = target_pd
-# bzw. DD = target_dd erreicht wird? Gelöst via scipy.optimize.brentq.
-REVERSE_STRESS_TARGET_PD    = 0.05      # 5 % PD-Schwelle
-REVERSE_STRESS_TARGET_DD    = 1.0       # DD = 1.0 Schwelle (≈ 16 % PD)
-# Such-Intervalle weit gesetzt, weil DAX-Blue-Chips dank niedriger β
-# typischerweise Schock-resistent sind. NaN-Output bedeutet: Schwelle
-# nicht im realistischen Bereich erreichbar (siehe MODEL_ASSUMPTIONS.md §6d).
-REVERSE_STRESS_BRENT_RANGE  = (-3.0, 3.0)   # log-Return-Such-Intervall
-REVERSE_STRESS_RATE_RANGE   = (-5.0, 5.0)   # Δr-pp-Such-Intervall
-REVERSE_STRESS_HORIZON_DAYS = 252       # 1Y, konsistent mit Merton
-
-
-# ----------------------------------------------------------------------
-# 6. BUNDESBANK CSV-STRUKTUR
-# ----------------------------------------------------------------------
-# Spaltenordnung im offiziellen Bundesbank-Export
-BBK_COLUMNS = ["Date", "Beta0", "Beta1", "Beta2", "Beta3", "Tau1", "Tau2"]
-BBK_RAW_INDICES = [0, 1, 3, 5, 7, 9, 11]   # Spalten-Indizes (Rest sind Flag-Spalten)
+BBK_COLUMNS     = ["Date", "Beta0", "Beta1", "Beta2", "Beta3", "Tau1", "Tau2"]
+BBK_RAW_INDICES = [0, 1, 3, 5, 7, 9, 11]
 
 
 def show_config():
-    """Hilfsfunktion: zeigt aktuelle Konfiguration."""
+    """Prints the current configuration."""
     print("=" * 60)
-    print("DAX Credit Stress · Konfiguration")
+    print("Credit Stress Cockpit · Configuration")
     print("=" * 60)
-    print(f"  Base Dir:       {BASE_DIR}")
-    print(f"  Data Dir:       {DATA_DIR}")
-    print(f"  Cache Dir:      {CACHE_DIR}")
-    print(f"  DAX-40 Tickers: {len(DAX40_TICKERS)}")
-    print(f"  Zeitraum:       {START_DATE} bis {END_DATE}")
-    print(f"  Horizon:        {DEFAULT_HORIZON} Jahre")
-    print(f"  MC Paths:       {DEFAULT_N_SIMS:,}")
+    print(f"  Base Dir:        {BASE_DIR}")
+    print(f"  Data Dir:        {DATA_DIR}")
+    print(f"  Cache Dir:       {CACHE_DIR}")
+    print(f"  EBA Dir:         {EBA_DIR}")
+    print(f"  EBA Raw Dir:     {EBA_RAW_DIR}")
+    print(f"  Lookback:        {START_DATE} -> {END_DATE}")
+    print(f"  Vasicek conf:    {VASICEK_CONFIDENCE}")
+    print(f"  Vasicek default LGD: {VASICEK_DEFAULT_LGD}")
+    print(f"  EBA vintage:     {EBA_VINTAGE_PRIMARY}")
+    print(f"  Macro route:     {MACRO_FACTOR_ROUTE}")
     print("=" * 60)
 
 

@@ -1,524 +1,303 @@
-# Modell-Prämissen · DAX Credit Stress Cockpit
+# Model Assumptions · EU Banking Credit Stress Cockpit
 
-Dieses Dokument fasst alle modell-relevanten Annahmen zusammen, damit Reviewer, Auditoren und zukünftige Bearbeiter das Verhalten des Modells nachvollziehen und reproduzieren können. Jede Prämisse ist zu ihrer Quelle (Code-Ort + akademische Referenz) verlinkt.
+This document records every assumption, parameter, formula and known limitation of the cockpit, with source references. It is the single source of truth for model behaviour. Each premise links to its code location and the academic / regulatory anchor.
 
-Stand: 2026-04-26
+Vintage: 2026-04-30
 
 ---
 
-## §1 Modell-Architektur
+## §1 Architecture
 
-| Schicht | Modul | Methode |
+| Layer | Module | Method |
 |---|---|---|
-| Risk-free rate | `backend/svensson.py` | Svensson (1994), Bundesbank-Parameter, tagesaktuell |
-| Strukturmodell | `backend/merton.py` | Merton (1974) mit KMV-Iteration nach Crosbie/Bohn (2003) |
-| Faktor-Modell | `backend/factor_model.py` | 2-Faktor-OLS: Brent Crude + Δr_10y |
-| Stress-Engine | `backend/monte_carlo.py` | Multivariate-Normal Shocks, historische Korrelations-Matrix |
-| Aggregation | `backend/portfolio.py` | Portfolio-EL, VaR/CVaR, HHI, Sektor-Breakdown |
-| Frontend | `streamlit_app/` *(noch nicht implementiert)* | Streamlit-Cockpit |
+| Risk-free curve | `backend/svensson.py` | Svensson (1994), daily Bundesbank parameters |
+| Macro factor mapping | `backend/macro_factor.py` | (Brent, Δr_10y) → Vasicek systematic factor M |
+| Loan-book engine | `backend/vasicek.py` | Vasicek single-factor (ASRF), Basel-III IRB capital formulas |
+| EBA universe + sovereign | `backend/eba_loader.py` | Parses `tr_cre.csv` (loan-book IRB) + `tr_sov.csv` (sovereign book) |
+| Frontend | `streamlit_app/` | Streamlit cockpit · McKinsey aesthetic |
 
----
+Data inputs:
 
-## §2 Datenquellen
-
-| Datentyp | Quelle | Modul | Update-Frequenz |
-|---|---|---|---|
-| DAX-40 Aktienkurse | yfinance (`*.DE`) | `01_fetch_dax40_prices.py` | täglich |
-| DAX-40 Bilanzdaten | yfinance | `02_fetch_dax40_fundamentals.py` | quartalsweise |
-| Brent Crude Futures | yfinance (`BZ=F`) | `03_fetch_brent_crude.py` | täglich |
-| Svensson-Parameter | Bundesbank Zeitreihen-DB | `04_fetch_bundesbank_svensson.py` | täglich |
-| DAX-Index | yfinance (`^GDAXI`) | `05_fetch_market_proxy.py` | täglich |
-
-Lookback-Zeitraum: 6 Jahre (`config.LOOKBACK_YEARS = 6`).
-
----
-
-## §3 Default Point (DPT)
-
-**Prämisse:** Die Default-Schwelle einer Firma ist *nicht* die gesamte Verschuldung, sondern der kurzfristig fällige Anteil zuzüglich eines Anteils der langfristigen Schulden:
-
-$$\text{DPT} = \text{ShortTermDebt} + \alpha \cdot \text{LongTermDebt}, \qquad \alpha = 0{,}5$$
-
-| Parameter | Wert | Konfiguration |
+| Type | Source | Frequency |
 |---|---|---|
-| `α` (LTD-Gewicht) | **0.5** | `config.DPT_LTD_WEIGHT` |
-
-**Begründung:** Langfristige Schulden lösen nicht akut einen Default aus — nur ein Anteil zählt zur tatsächlichen Default-Schwelle. Dieser Standard geht auf Moody's KMV CreditEdge zurück und ist in der akademischen Literatur etabliert.
-
-**Quellen:**
-- Crosbie, P. & Bohn, J. (2003). *Modeling Default Risk*. Moody's KMV Corporation.
-- Bharath, S.T. & Shumway, T. (2008). *Forecasting Default with the Merton Distance to Default Model.* Review of Financial Studies 21(3), 1339–1369.
-
-**Fallback-Logik** (`merton._compute_default_point`):
-1. Wenn `ShortTermDebt` und `LongTermDebt` beide vorhanden → DPT-Formel.
-2. Sonst → `TotalDebt` als konservative Obergrenze (im Output mit `DebtSource = "TotalDebt"` markiert).
-3. Sonst → Skip mit `DebtSource = "skipped: no debt"`.
+| Brent Crude futures | yfinance (`BZ=F`) | daily |
+| Svensson zero-curve | Bundesbank time-series database | daily |
+| EBA Transparency Exercise 2025 | EBA public CSV (`tr_cre.csv`, `tr_sov.csv`, `TR_Metadata.xlsx`, `SDD.xlsx`) | annual (Dec release) |
 
 ---
 
-## §4 Sektor-σ_V-Multiplier
+## §2 Bundesbank Svensson Curve
 
-**Prämisse:** Standard-Merton untertreibt die PD bei stark geleveragten Sektoren (Banken, REITs), weil die beobachtete Equity-Volatilität strukturell gedämpft ist (Einlagensicherung, Notenbank-Liquidität, regulatorische Eigenkapital-Floor). Korrektur: nach KMV-Lösung wird die Asset-Volatilität sektor-spezifisch multipliziert, DD und PD werden mit der angepassten Vola neu berechnet.
+**Function:** Svensson (1994) extension of the Nelson-Siegel zero-coupon curve:
 
-$$\sigma_V^{\text{adj}} = m_{\text{sector}} \cdot \sigma_V$$
+$$y(\tau) = \beta_0 + \beta_1 \cdot \frac{1 - e^{-\tau/\tau_1}}{\tau/\tau_1} + \beta_2 \cdot \!\left[\frac{1 - e^{-\tau/\tau_1}}{\tau/\tau_1} - e^{-\tau/\tau_1}\right] + \beta_3 \cdot \!\left[\frac{1 - e^{-\tau/\tau_2}}{\tau/\tau_2} - e^{-\tau/\tau_2}\right]$$
 
-| Sektor (Yahoo) | Multiplier `m` | Konfiguration |
-|---|---|---|
-| Financial Services | **1.5** | `config.SECTOR_VOL_MULTIPLIER["Financial Services"]` |
-| Real Estate | **1.2** | `config.SECTOR_VOL_MULTIPLIER["Real Estate"]` |
-| alle anderen | **1.0** | `config.DEFAULT_SECTOR_VOL_MULTIPLIER` |
+Parameters $\beta_0, \beta_1, \beta_2, \beta_3, \tau_1, \tau_2$ are published daily by the Bundesbank.
 
-**Begründung der Werte:**
-- *Financial Services (1.5):* In US-Bank-Stresstests (Hovakimian/Kane/Laeven 2012) und Moody's KMV-CreditEdge-Kalibrierung sind Bank-Asset-Volas typisch 30–60% höher als das Merton-Modell direkt liefert.
-- *Real Estate (1.2):* REITs zeigen ähnliche Bilanz-Hebelung, aber weniger ausgeprägt als bei Banken.
-- *Alle anderen Sektoren (1.0):* Standard-Merton, kein Multiplier.
+**Validation:** 48 060 historical observations cross-checked against an Excel-sheet reference; max absolute error $2{,}66 \times 10^{-14}\%$ — mathematically identical to the published formula.
 
-**Quellen:**
-- Hovakimian, A., Kane, E.J. & Laeven, L. (2012). *Variation in systemic risk at US banks during 1974–2010.* NBER WP 18043.
-- Crosbie & Bohn (2003), KMV CreditEdge Methodology Document.
+**Use in the cockpit:**
 
-**Effekt im DAX-40-Run (Stand 2026-04-25):**
-
-| Ticker | Name | PD ohne Multiplier | PD mit Multiplier (1.5) |
-|---|---|---|---|
-| CBK.DE | Commerzbank | 0.0455% | **1.594%** |
-| DBK.DE | Deutsche Bank | 0.0048% | **0.538%** |
-
-Die korrigierten Werte liegen im plausiblen Bereich für 1Y-Default-Rates von Banken im BBB-Spektrum.
+| Use | Module |
+|---|---|
+| Δr_10y daily diff over 252 days | `macro_factor.factor_returns` |
+| Cumulative Δr_10y under live β-shifts | `data_loader.delta_r_from_beta_shifts` |
+| Multi-maturity rate KPI strip | Yield-Curve page |
+| Discount factor in Sovereign duration P&L | implicit in modified-duration approximation |
 
 ---
 
-## §4a Faktor-Modell (Brent + Δr_10y)
+## §3 Macro Factor Mapping (Macro → M)
 
-**Spezifikation:** Pro Firma wird eine OLS-Regression über die Equity-Log-Returns geschätzt:
+**Bridge:** the (ΔBrent, Δr_10y) shock vector is mapped onto the Vasicek systematic factor $M \sim \mathcal{N}(0,1)$ that drives §4's conditional PDs. Two methodologically independent routes are computed and a hybrid is the default.
 
-$$r_{\text{equity},t} = \alpha + \beta_E \cdot r_{\text{Brent},t} + \beta_R \cdot \Delta r_{10y,t} + \varepsilon_t$$
+### §3.1 Anchor route — primary, regulator-citable
 
-| Parameter | Wert | Konfiguration |
+Use the EBA 2025 stress-test adverse anchor:
+
+$$\bigl(\Delta\!\log P_{\text{Brent}}^{\text{anchor}}, \Delta r_{10y}^{\text{anchor}}, M^{\text{anchor}}\bigr) = (+0{,}47, +200\,\text{bp}, -2{,}5)$$
+
+A new shock vector projects onto the anchor:
+
+$$M_{\text{anchor}} = M^{\text{anchor}} \cdot \cos(\angle\,\text{shock, anchor}) \cdot \frac{\|\text{shock}\|}{\|\text{anchor}\|}$$
+
+Properties:
+- self-consistency: shock = anchor → $M = M^{\text{anchor}}$
+- linearity: 2× shock → 2× $M$
+- sign-flip: anti-aligned shock (Brent crash + rate cut) → $M > 0$ (benign)
+
+### §3.2 Data route — empirical, validation
+
+Mahalanobis distance of the shock in the empirical 252-day Brent + Δr_10y covariance, signed by alignment with the adverse direction $(+1, +1)/\sqrt{2}$:
+
+$$M_{\text{data}} = -\sqrt{\text{shock}^\top \boldsymbol{\Sigma}_h^{-1}\text{shock}} \cdot \cos(\angle\,\text{shock, adverse})$$
+
+where $\boldsymbol{\Sigma}_h = H \cdot \boldsymbol{\Sigma}_{\text{daily}}$ is the daily covariance scaled to the horizon.
+
+### §3.3 Hybrid route — default
+
+$M_{\text{hybrid}} = \tfrac{1}{2}(M_{\text{anchor}} + M_{\text{data}})$. The cockpit displays all three values and the consistency $|M_{\text{anchor}} - M_{\text{data}}|$ as a diagnostic.
+
+**Empirical baseline:** with 252-day Bundesbank + Brent data, $\hat\rho(\text{Brent}, \Delta r_{10y}) = +0{,}20$. The anchor and data routes agree to within ~0.5σ on the EBA adverse anchor itself.
+
+---
+
+## §4 Vasicek / ASRF Engine
+
+### §4.1 Asset model
+
+$$A_i = \sqrt{\rho}\,M + \sqrt{1-\rho}\,\varepsilon_i, \quad M, \varepsilon_i \stackrel{iid}{\sim} \mathcal{N}(0,1)$$
+
+Default occurs if $A_i < N^{-1}(\text{PD}_i)$.
+
+### §4.2 Conditional PD given systematic factor
+
+$$\text{PD}(z) = N\!\left(\frac{N^{-1}(\text{PD}) - \sqrt{\rho}\,z}{\sqrt{1-\rho}}\right)$$
+
+Sign convention: $z<0$ is adverse stress, $z>0$ is benign.
+
+### §4.3 ASRF loss quantile (Vasicek 2002, large-pool limit)
+
+$$L_\alpha = \text{LGD} \cdot N\!\left(\frac{N^{-1}(\text{PD}) + \sqrt{\rho}\,N^{-1}(\alpha)}{\sqrt{1-\rho}}\right)$$
+
+This is the direct mathematical source of the Basel III IRB capital formula.
+
+### §4.4 Asset correlation ρ (Basel III, BCBS §272 ff.)
+
+| Exposure class | Formula | Range |
 |---|---|---|
-| Lookback | 252 Handelstage (≈ 1 Jahr) | `config.FACTOR_LOOKBACK_DAYS` |
-| Δr-Maturity | 10 Jahre | `config.FACTOR_MATURITY` |
-| Min-Obs | 60 | `config.FACTOR_MIN_OBS` |
-| Lookback-Konsistenz | identisch zu Merton (§5) | bewusst gleich gewählt |
-| OLS-Engine | `numpy.linalg.lstsq` | kein scipy/statsmodels |
+| Corporate / Bank / Sovereign | $\rho = 0{,}12 R + 0{,}24(1-R)$, $R = \frac{1-e^{-50\,\text{PD}}}{1-e^{-50}}$ | 0.12–0.24 |
+| SME-Corporate ($S \in [5, 50]$ m EUR) | $\rho_{\text{Corp}} - 0{,}04\bigl(1 - (S-5)/45\bigr)$ | up to −0.04 |
+| Residential Mortgage | $\rho = 0{,}15$ (constant) | 0.15 |
+| QRRE (Qualifying Revolving Retail) | $\rho = 0{,}04$ (constant) | 0.04 |
+| Other Retail | $\rho = 0{,}03 R + 0{,}16(1-R)$, $R = \frac{1-e^{-35\,\text{PD}}}{1-e^{-35}}$ | 0.03–0.16 |
 
-**Faktor-Konstruktion** (`factor_model.factor_returns`):
-- `r_brent`: tägliche Log-Returns aus `brent_crude.parquet` (Spalte `Return_log`, bereits in der Data-Layer-Pipeline berechnet)
-- `Δr_10y`: $r_{10y}(t) - r_{10y}(t-1)$, ausgewertet mit der Svensson-Funktion bei τ = 10 Jahren, in Prozentpunkten
+### §4.5 Maturity adjustment (corporate only)
 
-**Sektor-Multiplier auf β_E:** Siehe §4.5.
+$$b(\text{PD}) = (0{,}11852 - 0{,}05478 \cdot \ln \text{PD})^2$$
 
-## §4.5 Energy-Beta-Multiplier (Sektor-Skalierung von β_E)
+$$\text{MA}(M) = \frac{1 + (M - 2{,}5) \cdot b(\text{PD})}{1 - 1{,}5 \cdot b(\text{PD})}$$
 
-**Prämisse:** Die OLS-Schätzung von β_E (Brent-Sensitivität) auf einer 252-Tages-Stichprobe enthält statistisches Rauschen und reflektiert nur den realisierten Stress-Pfad. Für ein **Stress-Cockpit** ist eine fachlich fundierte Skalierung sinnvoll, die die strukturelle Energie-Exposition einer Branche abbildet.
+with effective maturity $M$ capped to $[1{,}0; 5{,}0]$ years. Retail / mortgage have no MA.
 
-**Methodik:**
+### §4.6 IRB capital charge
 
-$$\text{EnergyMul}_{\text{sector}} = \text{clip}\!\left( \frac{(E/U)_{\text{sector}}}{(E/U)_{\text{Industrials}}}, \; 0{,}1, \; 4{,}0 \right)$$
+$$K = \bigl[L_\alpha - \text{PD} \cdot \text{LGD}\bigr] \cdot \text{MA}(M), \quad \alpha = 0{,}999$$
 
-mit $E/U$ = Energieaufwand / Umsatz beim DAX-Benchmark-Unternehmen des Sektors. Industrials (Siemens, $E/U \approx 5\%$) dient als Referenz mit Multiplier 1.0. Cap [0.1, 4.0] verhindert Extremwerte bei sehr energieintensiven Sektoren (Utilities, Energy).
+$$\text{RWA} = K \cdot 12{,}5 \cdot \text{EAD}$$
 
-**Anwendung im Code** (`factor_model.run_dax40`):
-```python
-beta_brent_adjusted = beta_brent_raw * EnergyMul[sector]
-```
-Beide Werte (`BetaBrentRaw` und `BetaBrentAdjusted`) erscheinen im Output, damit der Multiplier-Effekt in der Streamlit-Frontend transparent dargestellt werden kann.
+Reproduced in tests against the BCBS reference example: PD = 1%, LGD = 45%, M = 2.5 y → $K \approx 0{,}084$.
 
-**First-Cut-Werte** (Stand: 2026-04-26):
+---
 
-| Yahoo-Sektor | DAX-Benchmark | $E/U$ (geschätzt) | Multiplier | Quelle / Begründung |
+## §5 EBA Transparency Loader
+
+### §5.1 Source files
+
+EBA EU-wide Transparency Exercise 2025 (~120 banks). Reporting period: June 2025 (file vintage Dec 2024 release).
+
+| File | Content | Size |
+|---|---|---|
+| `tr_cre.csv` | Credit risk (IRB + SA) — long format | ~123 MB |
+| `tr_sov.csv` | Sovereign debt exposures | ~91 MB |
+| `tr_oth.csv` | Capital, leverage, P&L, NPE | ~15 MB |
+| `tr_mrk.csv` | Market risk | ~3.8 MB |
+| `TR_Metadata.xlsx` | LEI ↔ name + dimensional dictionaries | ~2.8 MB |
+| `SDD.xlsx` | Single Data Dictionary (item codes) | ~58 KB |
+
+The cockpit currently consumes only `tr_cre.csv` and `tr_sov.csv` plus the metadata workbooks.
+
+### §5.2 Loan-book parsing (`parse_credit_risk_csv`)
+
+Streams `tr_cre.csv` in 500 k-row chunks and filters to the IRB items:
+
+| Item | Meaning |
+|---|---|
+| `2520502` | Original Exposure (SA + IRB) |
+| `2520512` | of which DEFAULTED (only published under Status = 2) |
+| `2520522` | Exposure Value ≈ EAD (post-CCF) |
+| `2520532` | Risk-Exposure Amount (RWA) |
+| `2520552` | Value adjustments and provisions |
+
+Filters: `Portfolio = 2 (IRB)`, `Country = 0 (counterparty-aggregate)`, `Status ∈ {0, 2}`, `Perf_Status = 0`.
+
+### §5.3 EBA exposure-class → Vasicek class mapping
+
+`eba_loader.EXPOSURE_TO_VASICEK_CLASS` maps 30+ EBA codes onto the seven Vasicek classes (`sovereign`, `bank`, `corporate`, `sme_corporate`, `mortgage`, `qrre`, `other_retail`). Items outside this set (601 default flag, 604–607 securitisations / equity, 800 other) are excluded as ancillary.
+
+### §5.4 Implied PD
+
+Since the Transparency Exercise does not publish risk parameters directly, PD is derived from the observed default ratio:
+
+$$\text{PD}_{\text{implied}}^{(\text{class},\text{bank})} = \frac{\text{Defaulted Exposure (Item 2520512, Status = 2)}}{\text{Original Exposure (Item 2520502, Status = 0)}}$$
+
+Floor 3 bp (Basel sovereign floor); cap 50% for numerical stability. This is a *backward-looking* point estimate of the realised default rate, not a forward-looking 1Y PD. Stress sensitivity (§4.2) is robust to this choice — the macro shock drives the *change* in PD, not its absolute level.
+
+### §5.5 LGD assumptions (Basel F-IRB defaults)
+
+| Vasicek class | LGD | Source |
+|---|---|---|
+| Sovereign / Bank / Corporate / SME-Corp | 45% | F-IRB senior unsecured standard |
+| Mortgage | 20% | Basel III residential mortgage LGD floor |
+| QRRE | 65% | Unsecured revolving standard |
+| Other Retail | 45% | F-IRB retail other |
+
+A-IRB banks use internal LGD models that are not published by the EBA, so the F-IRB defaults serve as a regulator-citable workaround.
+
+### §5.6 Sovereign parsing (`parse_sovereign_csv`)
+
+Streams `tr_sov.csv`. Schema dimensions: Bank × Counterparty-Country × Maturity-Bucket × Accounting-Portfolio. Items kept:
+
+| Item | Meaning |
+|---|---|
+| `2520810` | On-balance gross carrying amount (primary exposure measure) |
+| `2520822` | RWA on sovereign exposures |
+
+**Filter subtlety:** unlike `tr_cre.csv`, the sovereign file does **not** publish a `Country = 0` aggregate; aggregation across counterparty countries must be done by summing the specific-country rows (`Country > 0`).
+
+### §5.7 Modified-duration approximation per maturity bucket
+
+The 7 EBA maturity buckets are approximated by their midpoints as Macaulay duration:
+
+| Bucket | Duration (years) |
+|---|---|
+| `< 3M` | 0.125 |
+| `3M – 1Y` | 0.625 |
+| `1 – 2Y` | 1.5 |
+| `2 – 3Y` | 2.5 |
+| `3 – 5Y` | 4.0 |
+| `5 – 10Y` | 7.5 |
+| `> 10Y` | 15.0 |
+
+Per-bank Mark-to-Market under parallel rate shock $\Delta r$ (in pp), $\Delta y = \Delta r / 100$:
+
+$$\Delta P_b = -\sum_{m \in \text{buckets}} D_m \cdot \Delta y \cdot E_{b,m}$$
+
+### §5.8 Adverse-scenario anchors
+
+Hardcoded from the EBA stress-test methodology notes (the Excel templates are password-protected and not parsed):
+
+| Vintage | ΔBrent log | Δr_10y | GDP shock | $M^{\text{anchor}}$ |
 |---|---|---|---|---|
-| Utilities | RWE | ~35 % | **4.0** (cap) | RWE GB, Brennstoff-/Energiebezugskosten relativ Umsatz; reine Stromerzeugung ist 1.-energieintensivste Branche |
-| Energy | (keine reine in DAX) | ~50 % | **4.0** (cap) | Branchenstandard EIA / IEA |
-| Basic Materials | BASF | ~12 % | **2.4** | VCI Energiekostenmonitor; Chemie ist 2.-energieintensivste Branche |
-| Industrials | Siemens | ~5 % | **1.0** | Siemens GB; **Referenz-Sektor** |
-| Consumer Cyclical | BMW | ~4 % | **0.8** | BMW GB, Material- + Energieaufwand |
-| Communication Services | Deutsche Telekom | ~3 % | **0.6** | DT GB, Energiekosten Rechenzentren |
-| Healthcare | Merck | ~2.5 % | **0.5** | Merck GB |
-| Real Estate | Vonovia | ~2 % | **0.4** | Vonovia GB; Heizenergie wird grossteils umgelegt |
-| Consumer Defensive | Henkel | ~2 % | **0.4** | Henkel GB |
-| Technology | SAP | ~1.5 % | **0.3** | SAP GB, Rechenzentrum-Strom |
-| Financial Services | Deutsche Bank | ~0.5 % | **0.1** | DB GB, reine Verwaltungs-/RZ-Stromkosten |
-
-> ⚠️ **Status: First-Cut.** Die $E/U$-Werte sind aus öffentlich bekannten Sektorstudien und Geschäftsberichts-Auszügen abgeleitet, **noch nicht** durch direkte Recherche der spezifischen DAX-Geschäftsberichte verifiziert. Spätere Kalibrierung ist ausdrücklich vorgesehen — alle Werte sind in `config.SECTOR_ENERGY_MUL` zentral änderbar, ohne Code-Anpassung.
-
-**Vorgehen für die Kalibrierung** (für zukünftige Bearbeiter):
-1. Aus dem aktuellen Geschäftsbericht des Benchmark-Unternehmens den Posten *Materialaufwand → Energiekosten* (oder *Sonstige Aufwendungen → Energiebezug*) extrahieren.
-2. $E/U$ = Energiekosten / Umsatzerlöse berechnen.
-3. Multiplier = $\text{clip}( E/U_{\text{sector}} / 0.05, 0.1, 4.0 )$.
-4. Wert in `config.SECTOR_ENERGY_MUL` aktualisieren, Quelle (GB-Seite) im Kommentar dokumentieren.
-5. `python backend/factor_model.py` zur Verifikation laufen lassen.
-
-## §5 Equity-Volatilitäts-Schätzung
-
-**Methode:** Annualisierte Standardabweichung der täglichen Log-Returns über die letzten `lookback` Handelstage.
-
-$$\sigma_E = \text{std}\!\left(\ln \frac{P_t}{P_{t-1}}\right) \cdot \sqrt{252}$$
-
-| Parameter | Wert | Konfiguration |
-|---|---|---|
-| Lookback | 252 Handelstage (≈ 1 Jahr) | `merton.equity_vol_from_prices(lookback=…)` |
-| Annualisierungs-Faktor | √252 | `merton.equity_vol_from_prices(trading_days_per_year=…)` |
-| Stichproben-σ | `ddof=1` (unbiased) | hardcoded |
-
-**Bekannte Vereinfachung:** Es wird *nicht* GARCH/EWMA modelliert. Bei Bedarf ist das Modul leicht erweiterbar.
+| EBA 2025 | +0.47 | +200 bp | −6.0 pp | −2.5 |
+| EBA 2023 | +0.55 | +250 bp | −6.0 pp | −2.7 |
 
 ---
 
-## §6 Risk-free rate für Merton
+## §6 Numerical Resultate (Baseline · 2026-04-30)
 
-**Methode:** Svensson-Zero-Rate auf den letzten verfügbaren Bundesbank-Handelstag, ausgewertet bei der Modell-Horizon `T`.
+### §6.1 Loan book — Top-10 EU banks by IRB EAD (June 2025)
 
-```python
-params = svensson.historical_curve(as_of, svensson_df, method="ffill")
-r      = svensson.zero_rate(T, params, as_decimal=True)
-```
-
-| Parameter | Wert | Konfiguration |
-|---|---|---|
-| Horizon `T` | 1 Jahr | `config.DEFAULT_HORIZON` |
-| `method` | `"ffill"` (letzter Handelstag) | `merton.run_dax40` |
-| Validierung | 48 060 Punkte gegen Excel-Sheet | max abs error 2.66e-14 % |
-
----
-
-## §6a Monte-Carlo-Stress-Engine
-
-**Ziel:** Statistische Verteilung der Stress-PD pro Firma über N stochastische Pfade. Im Gegensatz zu deterministischen Szenarien (Corona/Ukraine — kommt in `scenarios.py`) sind hier **alle Pfade Realisationen aus einer multivariaten Normal-Verteilung**, geschätzt aus der historischen Faktor-Statistik.
-
-### §6a.1 Schock-Vektor und Verteilung
-
-$$\mathbf{z}_t = \begin{bmatrix} r_{\text{Brent}, t} \\ \Delta r_{10y, t} \end{bmatrix} \sim \mathcal{N}\bigl(\boldsymbol{\mu}, \boldsymbol{\Sigma}\bigr)$$
-
-| Komponente | Konstruktion | Quelle |
-|---|---|---|
-| $\boldsymbol{\mu}$ | tägliches Mean der Faktor-Returns | `factor_model.factor_returns` über letzte 252 Tage |
-| $\boldsymbol{\Sigma}$ | tägliche Kovarianzmatrix | dito |
-| $\mathbf{u}_t$ | iid Standard-Normal | `numpy.random.Generator` |
-| $L L^T = \boldsymbol{\Sigma}$ | Cholesky | `np.linalg.cholesky` |
-| $\mathbf{z}_t = \boldsymbol{\mu} + L \mathbf{u}_t$ | korrelierte tägliche Schocks | vektorisiert |
-
-**Pfad am Horizont H** (Summen über H iid Tage):
-$$\mathbf{Z}_H = \sum_{t=1}^H \mathbf{z}_t \quad \Rightarrow \quad \mathbf{Z}_H \sim \mathcal{N}(H\boldsymbol{\mu}, H\boldsymbol{\Sigma})$$
-
-### §6a.2 Anwendung pro Firma & Pfad
-
-Für jede Firma mit Baseline-Inputs $(E_0, \sigma_E, L, r_0, T)$ und Faktor-Modell-Outputs $(\alpha, \beta_E^{\text{adj}}, \beta_R, \sigma_\varepsilon)$ wird pro Pfad $i$ folgendes berechnet:
-
-$$\log r_{E,H}^{(i)} = \alpha \cdot H + \beta_E^{\text{adj}} \cdot Z_{\text{Brent}}^{(i)} + \beta_R \cdot Z_{\Delta r}^{(i)} + \varepsilon^{(i)} \cdot \sqrt{H}$$
-
-mit $\varepsilon^{(i)} \sim \mathcal{N}(0, \sigma_\varepsilon)$ wenn `MC_INCLUDE_IDIO=True`.
-
-**Stressed Inputs für KMV:**
-- $E_{\text{stress}}^{(i)} = E_0 \cdot \exp\bigl(\log r_{E,H}^{(i)}\bigr)$
-- $r_{\text{stress}}^{(i)} = r_0 + Z_{\Delta r}^{(i)} / 100$ (pp → Dezimal)
-- $\sigma_E$ und $L$ bleiben unverändert (Vola-Stress in V2)
-
-→ Vektorisiertes KMV (`monte_carlo._kmv_vec`) löst $V^{(i)}, \sigma_V^{(i)}$ über alle Pfade gleichzeitig.
-
-→ Anschließend Sektor-σ_V-Multiplier wie in §4 (Banken 1.5, REITs 1.2): $\sigma_V^{\text{adj}} = m_{\text{sector}} \cdot \sigma_V$.
-
-→ Final $\text{DD}^{(i)} = \frac{\ln(V^{(i)}/L) + (r_{\text{stress}}^{(i)} - \tfrac{1}{2}\sigma_V^{\text{adj},(i)2}) T}{\sigma_V^{\text{adj},(i)} \sqrt{T}}$, $\text{PD}^{(i)} = N(-\text{DD}^{(i)})$.
-
-### §6a.3 Konsistenz mit Baseline
-
-Die Multiplier (Sektor-Energy auf $\beta_E$, Sektor-Vola auf $\sigma_V$) werden **identisch** zur Baseline angewendet — sonst wäre das Stress-Ergebnis inkonsistent zwischen den beiden Pipeline-Pfaden.
-
-### §6a.4 Mean vs. Quantile — wichtige Interpretations-Anmerkung
-
-Das **Mean** der Stress-PD-Verteilung ist **kein adverser Stress-Indikator** — bei positivem historischem μ kann Mean(Stress-PD) sogar unter der Baseline-PD liegen (Drift-Effekt). Die **adversen Indikatoren** sind die **Quantile**:
-
-| Statistik | Bedeutung |
-|---|---|
-| `StressPDMean` | Erwartungswert über alle Pfade — zentrale Tendenz |
-| `StressPDp50` | Median |
-| `StressPDp95` | 95%-Quantil — moderater Stress |
-| `StressPDp99` | **99%-Quantil — adverser 1%-Worst-Case-Pfad** |
-| `StressPDMax` | Maximum über N Pfade |
-
-Beim DAX-40-Run (Stand 2026-04-26):
-
-| Ticker | Baseline-PD | Stress-p99 | Δ(p99) |
-|---|---|---|---|
-| CBK.DE | 1.59 % | 2.04 % | **+0.45 pp** |
-| DBK.DE | 0.54 % | 0.71 % | **+0.17 pp** |
-| VNA.DE | 0.003 % | 0.020 % | +0.017 pp |
-
-Die p99-Werte zeigen die richtige Stress-Asymmetrie.
-
-### §6a.5 Konfiguration und Reproduzierbarkeit
-
-| Parameter | Wert | Konfiguration |
-|---|---|---|
-| `MC_N_SIMS` | 10 000 | `config.py` |
-| `MC_HORIZON_DAYS` | 252 (1Y) | `config.py` |
-| `MC_SEED` | 42 | `config.py` |
-| `MC_INCLUDE_IDIO` | True | `config.py` |
-| **Reproduzierbarkeit** | bit-identisch bei gleichem Seed | Test [3] in `monte_carlo.py` |
-| **Performance** | ~0.5 s für 38 Firmen × 10k Pfade × H=252 | vektorisiert via Cholesky + KMV-vec |
-
-### §6a.6 Bekannte Limitierungen
-
-| Limit | Status |
-|---|---|
-| Vola-Schock auf $\sigma_E$ | nicht modelliert (V2) |
-| Fat-Tails (t-Verteilung) | nicht modelliert; Standard-MVN |
-| Regime-Wechsel | keine Markov-Chain |
-| Asymmetrische Schocks | keine GARCH/Sprung-Komponenten |
-| Drift-freie Variante | Toggle in V2 möglich (`drift_mode='zero'`) |
-
-## §6b Portfolio-Aggregation
-
-Aggregiert Einzelfirmen-PDs zu Portfolio-Risiko-Metriken.
-
-### §6b.1 Exposure-at-Default (EAD)
-
-$$\text{EAD}_i = \text{DPT}_i = \text{ShortTermDebt}_i + 0.5 \cdot \text{LongTermDebt}_i$$
-
-**Begründung:** Konsistent mit der Default-Schwelle aus §3 — was im Default ökonomisch verloren geht, ist die Default-Punkt-Verschuldung. Konfigurierbar über `ead_col`-Parameter (alternativ: `MarketCap`, `TotalDebt`).
-
-### §6b.2 Loss Given Default (LGD)
-
-$$\text{LGD} = 0{,}45$$
-
-**Quelle:** Basel-II/III-Standard für Senior Unsecured Corporate Debt. Konstant für alle Sektoren in V1; sektor-spezifische LGD ist in V2 vorgesehen.
-
-### §6b.3 Expected Loss
-
-$$\text{EL} = \sum_i \text{EAD}_i \cdot \text{LGD} \cdot \text{PD}_i$$
-
-Ausgewertet drei Mal: mit Baseline-PD, Stress-Mean-PD und Stress-p99-PD. Letzteres ist der **adverse-Stress-Indikator**.
-
-### §6b.4 Loss-Distribution (Conditional EL pro Pfad)
-
-$$L^{(i)} = \sum_j \text{EAD}_j \cdot \text{LGD} \cdot \text{PD}_j^{(i)}$$
-
-mit $\text{PD}_j^{(i)}$ = realisierte PD von Firma $j$ auf MC-Pfad $i$ (aus `monte_carlo.stress_one_firm` mit `keep_samples=True`).
-
-**Korrelation zwischen Firmen** entsteht **automatisch** über die gemeinsamen Faktoren (Brent, Δr_10y) im MC — keine zusätzliche Copula nötig.
-
-**Optional: Bernoulli-Sampling** (`sample_defaults=True`) erzeugt zusätzlich diskrete Default-Events $D_j^{(i)} \sim \text{Bernoulli}(\text{PD}_j^{(i)})$. Liefert echte Loss-Sprünge (höhere Varianz im Tail), aber rauschiger. Default ist die **Conditional-EL-Variante**.
-
-### §6b.5 VaR und CVaR
-
-$$\text{VaR}_\alpha = \text{Quantil}_\alpha(L), \qquad \text{CVaR}_\alpha = \mathbb{E}[L \mid L \geq \text{VaR}_\alpha]$$
-
-Berechnet für $\alpha \in \{0.95, 0.99\}$. CVaR (= Expected Shortfall) ist die kohärente Risiko-Metrik nach Basel III FRTB.
-
-### §6b.6 Konzentrations-Metriken
-
-$$\text{HHI} = \sum_i w_i^2, \quad w_i = \text{EAD}_i / \sum_j \text{EAD}_j$$
-
-$$N_{\text{eff}} = 1/\text{HHI}$$
-
-Bei perfekter Gleichgewichtung: $N_{\text{eff}} = N$. Bei vollständiger Konzentration: $N_{\text{eff}} = 1$.
-
-### §6b.7 Sektor-Breakdown
-
-Pro Yahoo-Sektor werden aggregiert: Anzahl Firmen, EAD, EAD-Anteil, EL-Baseline, EL-Stress-Mean, EL-Stress-p99. Ermöglicht Sektor-Konzentrations-Analyse im Streamlit-Frontend.
-
-### §6b.8 Numerische Resultate (DAX-40, Stand 2026-04-26)
-
-| Metrik | Wert |
-|---|---|
-| Konvergierte Firmen | 36 / 38 |
-| Total EAD (Σ DPT) | 650.2 bn EUR |
-| LGD | 45 % |
-| **EL Baseline** | **611 m EUR (0.094 %)** |
-| EL Stress (Mean) | 365 m EUR (0.056 %) |
-| **EL Stress (p99)** | **794 m EUR (0.122 %)** |
-| VaR 95 | 581 m EUR |
-| CVaR 95 | 636 m EUR |
-| VaR 99 | 671 m EUR |
-| **CVaR 99** | **719 m EUR** |
-| HHI | 0.0943 |
-| Effective N | 10.6 (von 36) |
-
-**Sektor-Konzentration (Top-3 nach EAD):**
-
-| Sektor | N | EAD-Anteil | EL Baseline | EL p99 |
-|---|---|---|---|---|
-| Consumer Cyclical | 8 | 39.0 % | 0.6 m | 2.2 m |
-| Financial Services | 6 | 30.2 % | **609.9 m** | **789.7 m** |
-| Communication Services | 1 | 8.6 % | 0.0 m | 0.0 m |
-
-**Beobachtung:** Trotz dass Consumer Cyclical der EAD-grösste Sektor ist (39 %), trägt **Financial Services 99.8 % des EL** (610 m von 611 m). Das ist die Konsequenz aus den Bank-Multipliern (§4) — fachlich korrekt: der Stress-Test misst Risiko, nicht Größe. Banken haben strukturell höhere PDs als Industriefirmen.
-
-## §6c Szenario-Library (deterministische Stress-Pfade)
-
-Im Gegensatz zur stochastischen MC-Engine (§6a) werden hier **deterministische Schock-Vektoren** auf die gleiche Faktor → Equity → KMV-Pipeline angewendet. Jedes Szenario reduziert sich auf einen **Single-Pfad**:
-
-$$\mathbf{z}_{\text{scenario}} = \begin{bmatrix} \Delta\!\log P_{\text{Brent}} \\ \Delta r_{10y} \;[\text{pp}] \end{bmatrix}, \quad H \;[\text{Tage}]$$
-
-### §6c.1 Szenario-Quellen-Hierarchie
-
-| `source` | Bedeutung | Anwendung |
-|---|---|---|
-| `historical` | Kalibrierung aus realen Brent + Bundesbank-Daten über Periode `(start, end)` | für Episoden, die im Daten-Lookback liegen |
-| `literature` | Hartkodierte Werte aus akademischer Stress-Test-Literatur | für Episoden **vor** dem Daten-Lookback (z.B. Corona-Crash 2020-Q1, Brent-Daten beginnen erst 2020-04-23) |
-| `hypothetical` | Forward-looking Szenarien | What-if-Analysen |
-
-### §6c.2 Library-Inhalt (Stand 2026-04-27)
-
-| Szenario | Source | ΔBrent_log | Δr_10y | H | Bemerkung |
+| Bank | EAD bn | EL bn | RWA bn | RWA-Density | EL % |
 |---|---|---|---|---|---|
-| `corona_2020` | literature | −1.20 (≈ −70%) | −65 bp | 60 d | Brent ~$66 → ~$20 (Jan-Apr 2020), 10y Bund −65 bp |
-| `ukraine_2022` | historical | **+0.12** | **+67 bp** | 66 d | aus Bundesbank/Brent-Daten 2022-02-22 bis 2022-04-30 |
-| `ukraine_2022_peak` | historical | **+0.28** | **−15 bp** | 14 d | Initial-Peak Brent bis 2022-03-08 |
-| `iran_2026` | hypothetical | +0.55 (≈ +73%) | +50 bp | 30 d | Supply-Schock + ECB cautious |
+| Groupe Crédit Agricole | 1 646 | 9.6 | 1 038 | 63% | 0.59% |
+| BNP Paribas | 1 302 | 6.7 | 865 | 66% | 0.51% |
+| ING Groep | 928 | 4.7 | 679 | 73% | 0.50% |
+| Société Générale | 791 | 3.7 | 487 | 62% | 0.46% |
+| Groupe BPCE | 777 | 7.9 | 603 | 78% | 1.02% |
+| Deutsche Bank | 739 | 6.1 | 707 | 96% | 0.82% |
+| Crédit Mutuel | 627 | 5.3 | 451 | 72% | 0.84% |
+| Banco Santander | 595 | 4.8 | 444 | 75% | 0.80% |
+| Rabobank | 469 | 4.0 | 391 | 83% | 0.85% |
+| UniCredit | 408 | 3.2 | 366 | 90% | 0.79% |
 
-### §6c.3 Anwendung pro Firma
+Aggregate: Σ EAD 8 282 bn EUR, Σ EL 55.9 bn EUR, Σ RWA 6 031 bn EUR (density 73%).
 
-Identisch zu `monte_carlo.stress_one_firm` mit `Z_brent = ΔBrent_log` und `Z_Δr = Δr_pp`, **ohne** ε-Drift (deterministisch):
+### §6.2 Sovereign book — total system
 
-$$\log r_E^{(\text{scen})} = \alpha \cdot H + \beta_E^{\text{adj}} \cdot \Delta\!\log P_{\text{Brent}} + \beta_R \cdot \Delta r_{10y}$$
+Σ Sovereign exposure 4.01 tn EUR. Under a parallel +100 bp shock:
 
-Das Output-DataFrame enthält die **Decomposition** (`AlphaContrib`, `BrentContrib`, `RateContrib`) für eine Waterfall-Visualisierung im Streamlit.
-
-### §6c.4 Bekannte Modell-Limitation bei Bank-Szenarien
-
-**Beobachtung (Stand 2026-04-27):** Im DAX-40-Run zeigen Banken (CBK, DBK) bei Corona/Ukraine **niedrigere** Stress-PDs als Baseline.
-
-| Ticker | Baseline | corona_2020 | ukraine_2022 | iran_2026 |
-|---|---|---|---|---|
-| CBK.DE | 1.59 % | 1.39 % | 1.39 % | 1.52 % |
-| DBK.DE | 0.54 % | 0.47 % | 0.47 % | 0.51 % |
-
-**Mechanik:**
-1. $\beta_R > 0$ für Banken (Zinsanstieg → Margenexpansion → höherer Aktienkurs).
-2. $\beta_E^{\text{adj}}$ für Banken ist klein ($\text{mul} = 0.1$, §4.5) — Brent-Schock ist quasi wirkungslos.
-3. Direkt-Effekt im Merton: bei steigendem $r$ sinkt $L \cdot e^{-rT}$ → $V/L$ erhöht sich → PD sinkt.
-
-**Was das Modell NICHT erfasst** (Banken-spezifisch):
-- Kreditausfall-Wellen bei Stress (Corporate Default Domino)
-- Counterparty- und Liquiditätsrisiken
-- Vola-Sprünge bei Krisen (Equity-Vola steigt typisch um 2–3× im Stress)
-- Regulatorische Eingriffe / Notenbank-Liquiditäts-Push
-
-**Konsequenz:** Bank-Szenarien sind im Cockpit als **modell-konsistente Markt-Reaktion** zu lesen, nicht als „echtes" Bankenkrisen-Szenario. Für letzteres wäre ein anderes Modell (z.B. SRISK oder Bank-spezifisches CCAR-Framework) nötig — bewusst ausserhalb des Scope dieses Cockpits.
-
-## §6d Reverse Stress Test
-
-**Inverse Frage zu Szenarien (§6c):** Welcher Schock $\Delta\!\log P_{\text{Brent}}^*$ bzw. $\Delta r^*_{10y}$ ist nötig, damit eine Firma einen vorgegebenen PD- oder DD-Schwellenwert erreicht?
-
-### §6d.1 Methodik
-
-Für jede Firma werden vier kritische Werte über `scipy.optimize.brentq` gesucht:
-
-| Schwelle | Suchvariable | feste Variable | Default-Target |
-|---|---|---|---|
-| `CritBrent_PD5` | $\Delta\!\log P_{\text{Brent}}$ | $\Delta r = 0$ | $\text{PD} = 5\%$ |
-| `CritRate_PD5` | $\Delta r_{10y}$ | $\Delta\!\log P_{\text{Brent}} = 0$ | $\text{PD} = 5\%$ |
-| `CritBrent_DD1` | $\Delta\!\log P_{\text{Brent}}$ | $\Delta r = 0$ | $\text{DD} = 1{,}0$ |
-| `CritRate_DD1` | $\Delta r_{10y}$ | $\Delta\!\log P_{\text{Brent}} = 0$ | $\text{DD} = 1{,}0$ |
-
-Plus: `iso_pd_curve` zeichnet die 2D-Iso-PD-Linie in der $(\Delta\!\log P_{\text{Brent}}, \Delta r)$-Ebene für Cockpit-Visualisierungen.
-
-### §6d.2 Marginal Stress (kein α-Drift)
-
-Im Gegensatz zu Szenarien (§6c) wird hier $\alpha \cdot H = 0$ gesetzt:
-
-$$\log r_E = \beta_E^{\text{adj}} \cdot \Delta\!\log P_{\text{Brent}} + \beta_R \cdot \Delta r$$
-
-**Begründung:** Reverse Stress fragt _„welcher Schock kippt die Firma heute?"_ — nicht _„wo steht sie nach 252 Tagen Drift?"_. Bei Firmen mit positivem α (z.B. CBK $\alpha = 0{,}002$/Tag, also $\alpha \cdot H = +0{,}50$) würde der Drift sonst die Schwelle künstlich verschieben und der Schock müsste erst den Drift überkompensieren.
-
-### §6d.3 Such-Intervalle und Konfiguration
-
-| Parameter | Wert | Konfiguration |
-|---|---|---|
-| `REVERSE_STRESS_TARGET_PD` | 0.05 (5 %) | `config.py` |
-| `REVERSE_STRESS_TARGET_DD` | 1.0 | `config.py` |
-| `REVERSE_STRESS_BRENT_RANGE` | (−3.0, +3.0) | log-Return |
-| `REVERSE_STRESS_RATE_RANGE` | (−5.0, +5.0) | Δr in pp |
-| `REVERSE_STRESS_HORIZON_DAYS` | 252 | gleich Merton-Horizon |
-
-Die Such-Intervalle sind weit gewählt — DAX-Blue-Chips sind mit kleinen β-Werten relativ schock-resistent (siehe §6d.5).
-
-### §6d.4 NaN-Semantik
-
-Liefert eine Funktion NaN, bedeutet das **„Schwelle im Such-Intervall nicht erreichbar"** (kein Vorzeichenwechsel von $f(\text{shock}) = \text{PD}(\text{shock}) - \text{target}$). Drei mögliche Ursachen:
-
-1. **Firma zu robust:** $\beta_E^{\text{adj}}$ oder $\beta_R$ zu klein, um die Target-PD im Schock-Intervall zu erreichen (häufig bei DAX-Blue-Chips, vor allem Banken).
-2. **Baseline bereits über Target:** $\text{PD}_0 \geq \text{target}_\text{PD}$ — Comment-Spalte markiert das.
-3. **KMV-Nicht-Monotonität:** Bei extremen Schocks ($E \ll L$) wird $\sigma_V \to 0$ und DD springt zurück — kein eindeutiger Crossing.
-
-### §6d.5 Beobachtung im DAX-40-Run
-
-**Stand 2026-04-27:** Mit den Default-Targets (PD = 5 %, DD = 1.0) liefern **alle 36 konvergierten DAX-Firmen NaN** für Brent- und Rate-Schwellen.
-
-**Mechanik:**
-- Banken: $\beta_E^{\text{adj}} \approx -0.027$ (CBK), $\beta_R \approx +0.008$ — winzig. Selbst $\Delta\!\log P_{\text{Brent}} = -3$ verschiebt PD nur um $\sim 0{,}1$ pp.
-- Industriefirmen: starke $\beta$-Werte (z.B. RWE $\beta_E^{\text{adj}} = +0.087$), aber sehr niedrige Baseline-PD (≪ 0,01 %) — der Sprung auf 5 % wäre ein 500-facher PD-Anstieg.
-
-**Das ist eine Modell-Realität, kein Bug.** DAX-Blue-Chips sind im 2-Faktor-Markt-Modell tatsächlich gegen reine Brent/Δr-Schocks robust. Echte Default-Risiken kommen aus anderen Kanälen (Counterparty, Liquidity, Asset-Vola-Sprünge, Bilanz-Stress) — bewusst out of scope (§4 / §6c.4).
-
-**Cockpit-Strategie:** Adaptive Targets pro Firma (z.B. `target_pd = max(2·Baseline, 1%)`) liefern sinnvollere Schwellen für die Visualisierung. Implementierung als Streamlit-Filter.
-
-## §7 KMV-Iteration
-
-**Fixpunkt-System** (für jede Firma einzeln gelöst):
-
-$$E = V \cdot N(d_1) - L \cdot e^{-rT} \cdot N(d_2), \qquad \sigma_E \cdot E = \sigma_V \cdot V \cdot N(d_1)$$
-
-mit $d_1 = \frac{\ln(V/L) + (r + \tfrac{1}{2}\sigma_V^2)T}{\sigma_V\sqrt{T}}$, $d_2 = d_1 - \sigma_V\sqrt{T}$.
-
-| Parameter | Wert |
+| Metric | Value |
 |---|---|
-| Init | `V₀ = E + L`, `σ_V0 = σ_E · E / V₀` |
-| Konvergenz-Toleranz | `tol = 1e-8` (relative Änderung in V und σ_V) |
-| Max-Iterationen | `max_iter = 200` |
-| Beobachtete Konvergenz-Rate | < 50 Iter für realistische Inputs |
+| System Mark-to-Market P&L | **−247 bn EUR** |
+| Hardest hit | BNP Paribas (−21 bn) |
+| #2 / #3 | Société Générale (−15) / Deutsche Bank (−13) |
 
-**Output:**
-$$\text{DD} = \frac{\ln(V/L) + (r - \tfrac{1}{2}\sigma_V^2)T}{\sigma_V\sqrt{T}}, \qquad \text{PD} = N(-\text{DD})$$
+Doom-loop concentration is most pronounced for French (BPCE 70% domestic), Italian (UniCredit ~70%), Spanish (CaixaBank, BBVA ~70%) and Polish banks.
 
 ---
 
-## §8 Bekannte Limitationen
+## §7 Reproducibility & Validation
 
-| Limit | Beschreibung | Mitigation |
-|---|---|---|
-| **Banken-Eignung** | Merton ist für Banken konzeptuell ungeeignet (Einlagen ≠ klassische Schuldverpflichtungen). | Sektor-Multiplier 1.5 — pragmatischer Workaround, kein Ersatz für ein bankspezifisches Modell. |
-| **yfinance Datenqualität** | Lückenhafte Bilanzdaten; einzelne Firmen ohne sauberen `TotalDebt`-Eintrag. | Skip-Mechanismus mit Tagging in `DebtSource`. Aktuell betroffen (2026-04): EOAN.DE, 1COV.DE. |
-| **Konstante Vola** | Kein zeitvariabler Vola-Prozess (GARCH/EWMA). | Sample-σ über 252 Tage als robuste Approximation. |
-| **Single-Snapshot** | Bilanzdaten sind quartalsweise; PD wird gegen aktuelle Marktdaten gerechnet → Mismatch in Stichtagen. | Akzeptiert, weil die Stress-Szenarien dieselbe Asymmetrie haben. |
-| **Fehlende Recovery-Modellierung** | LGD ist konstant (Basel-Standard 0.45); kein Sektor-spezifisches Recovery. | `config.DEFAULT_LGD` ist override-bar im Portfolio-Aggregator. |
-| **Keine Korrelationsstruktur firmenseitig** | Merton wird firma-individuell gelöst, ohne zwischen-Firmen-Korrelationen. | Korrelationen kommen über das Faktor-Modell (Brent + Δr) und MC-Engine. |
-
----
-
-## §9 Reproduzierbarkeit
-
-Jedes Backend-Modul hat einen `__main__`-Block mit Validierungstests, der ohne Argumente läuft:
+Each backend module has a `__main__` validation block:
 
 ```bash
 cd "Risk management"
-python backend/svensson.py     # 6 Test-Blöcke (Spot, Limits, Shifts, Lookup, Excel, Round-Trip)
-python backend/merton.py       # 6 Test-Blöcke (Round-Trip, Hull, Monoton, Boundary, Multiplier, DAX)
+python backend/svensson.py        # Svensson Excel cross-check + 6 test blocks
+python backend/vasicek.py         # 6 ASRF / IRB tests (incl BCBS reference)
+python backend/eba_loader.py      # Synthetic + real-loader smoke tests
+python backend/macro_factor.py    # 6 anchor + data-route tests
 ```
 
-Erwartete Ausgabe: `[PASS] Alle N Test-Blöcke bestanden.`
+Expected output: `[PASS] All tests passed.`
 
-**Excel-Validierung Svensson** (`Risk Free Rates`-Sheet):
-- 48 060 Datenpunkte verglichen
-- Max abs error: 2.66e-14 %  → mathematisch identisch zur Excel-Formel
-
-**Hull-Spot-Test Merton** (Hull, *Risk Management & Financial Institutions*, 4. Aufl.):
-- E=3, L=10, σ_E=0.80, r=0.05, T=1
-- Erwartung: V≈12.40, PD ≈ 12–13 %
-- Beobachtet: V=12.395, PD=12.70 % ✓
+Every page also boots cleanly under `streamlit.testing.v1.AppTest`.
 
 ---
 
-## §10 Änderungs-Log
+## §8 Known Limitations
 
-| Datum | Änderung | Begründung |
+| Limit | Description | Mitigation |
 |---|---|---|
-| 2026-04-25 | `svensson.py` initial | Excel-Sweep validiert |
-| 2026-04-25 | `merton.py` initial (TotalDebt, kein Multiplier) | Erste KMV-Implementierung |
-| 2026-04-26 | DPT-Switch (Moody's KMV Standard) + Sektor-σ_V-Multiplier (1.5 Banken / 1.2 REITs) | Akademisch sauberere Default-Schwelle; Banken-PDs realistisch nach §4 |
-| 2026-04-26 | `factor_model.py` initial (2-Faktor: Brent + Δr_10y) + Sektor-Energy-Multiplier nach E/U-Methodik (§4.5) | Stress-Cockpit braucht strukturelle Energie-Exposition pro Sektor |
-| 2026-04-26 | `monte_carlo.py` initial (MVN Pfade × vektorisierter KMV) | Stochastische Stress-Distribution mit Konsistenz zu Sektor-Multipliern |
-| 2026-04-27 | `portfolio.py` initial (EL/VaR/CVaR/HHI + Sektor-Breakdown, EAD = DPT, LGD = 45 %) | Aggregations-Layer: Einzelfirmen-PDs zu Portfolio-Metriken |
-| 2026-04-27 | `scenarios.py` initial (Library: corona_2020, ukraine_2022, ukraine_2022_peak, iran_2026; historical/literature/hypothetical Quellen) | Deterministische Stress-Pfade mit Waterfall-Decomposition; Modell-Limitation bei Banken in §6c.4 dokumentiert |
-| 2026-04-27 | `reverse_stress.py` initial (CritBrent / CritRate für PD=5% bzw. DD=1.0; iso_pd_curve; brentq) | Inverse zu Szenarien — kritische Schwellen für Cockpit. Marginal Stress (kein α-Drift), §6d. DAX-Blue-Chips meist NaN — Modell-Realität dokumentiert |
+| Implied PD = backward-looking default ratio | Stock measure of current default quote, not forward-looking 1Y PD | Stress sensitivity remains correct; absolute level conservative |
+| F-IRB LGD assumptions | A-IRB banks use internal LGD models that EBA does not publish | F-IRB defaults are a regulator-citable workaround |
+| Single-factor Vasicek | One systematic factor — no sector / region clusters | Multi-factor CreditRisk+ would be V3 |
+| Constant LGD across stress | LGD held fixed under shock | Downturn-LGD add-on is V2 |
+| Anchor-only adverse scenario | EBA anchor is a single point — no distribution information | Hybrid with Mahalanobis covers data side |
+| Sovereign: parallel-shift only | Δy uniform across maturities — no slope / curvature stress on sovereign book | Slope / curvature shifts in sidebar already drive the loan-book channel via Δr_10y |
+| Sovereign: Mark-to-Market only | Realized losses for FVTPL / HfT only; HtM stays at amortised cost | EBA aggregate Accounting_portfolio = 0 only (no breakdown) |
+| Sovereign: no credit-spread component | Pure rate sensitivity, no Italy-vs-Bund spread risk | Multi-country yield curves would be V3 |
+| EBA stress-test 2025 file password-protected | Anchor values hardcoded from methodology note | Acceptable single source of truth |
+
+---
+
+## §9 Change Log
+
+| Date | Change | Reason |
+|---|---|---|
+| 2026-04-29 | Vasicek/ASRF engine (`vasicek.py`), EBA loader scaffold (`eba_loader.py`), macro→M mapping (`macro_factor.py`) — initial Tier-2 stack | Regulatory tier alongside the original structural model |
+| 2026-04-29 | Real EBA loader: streams `tr_cre.csv` (123 MB) chunk-wise, pivots IRB items to Vasicek classes, derives implied PD from the default ratio | Migration off synthetic universe — real EBA Transparency 2025 |
+| 2026-04-29 | Empirical factor Σ in macro→M mapping (was synthetic 2×2). Anchor / data routes now agree within ~0.5σ instead of ~8σ | Hybrid mapping is now mutually validating |
+| 2026-04-29 | Sovereign loader (`tr_sov.csv`), doom-loop heatmap, modified-duration P&L | Second risk channel — same Δr_10y drives both loan-book Vasicek M and sovereign Mark-to-Market |
+| 2026-04-29 | McKinsey-aesthetic UI: navy / bright-blue / crimson palette, Source-Serif / Inter typography, Plotly custom template, click-through page-link cards | High-end consulting visual standard |
+| 2026-04-30 | Tier-1 cleanup: removed Merton/KMV, factor model, Monte Carlo, scenario library, reverse stress, portfolio aggregator, DAX-40 fetchers and cache. Renumbered pages. Trimmed `config.py`, `data_loader.py`, `sidebar.py`. | Cockpit focuses on the regulatory tier only |

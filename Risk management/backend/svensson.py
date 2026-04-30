@@ -465,8 +465,11 @@ def _round_trip_with_real_data() -> bool:
 
 
 if __name__ == "__main__":
+    import sys as _sys
+    if _sys.platform == "win32":
+        _sys.stdout.reconfigure(encoding="utf-8")
     print("=" * 70)
-    print(" svensson.py · Validierung")
+    print(" svensson.py · Validation")
     print("=" * 70)
 
     results = [

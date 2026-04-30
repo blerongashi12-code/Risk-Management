@@ -1,9 +1,9 @@
-"""Helper: macht backend/ und das Repo-Root für Imports verfügbar.
+"""Helper: makes backend/ and the repo root importable for the pages.
 
-Wird in jeder Streamlit-Page als erstes importiert:
+Used at the top of every Streamlit page:
     from components.backend_path import setup
     setup()
-    from merton import run_dax40 as run_merton
+    from vasicek import asset_correlation
 """
 import sys
 from pathlib import Path
