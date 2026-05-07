@@ -859,6 +859,230 @@ def rate_shock_pnl_per_bucket(
 
 
 # ============================================================================
+# 5c. CET1 Capital + RWA Loader (tr_oth.csv)
+# ============================================================================
+# Item codes (TR_2025 — current vintage). Phase 5 backtest will resolve
+# vintage-specific codes via the SDD translation table.
+ITEM_CET1_CAPITAL    = 2520102   # Common Equity Tier 1 Capital
+ITEM_OCI             = 2520105   # Accumulated Other Comprehensive Income
+ITEM_CR_RWA          = 2520201   # Credit Risk RWA (excl. CCR & Securitisations)
+ITEM_MR_RWA          = 2520210   # Market Risk RWA (Position, FX, Commodities)
+ITEM_OP_RWA          = 2520215   # Operational Risk RWA
+ITEM_TOTAL_RWA       = 2520220   # Total Risk Exposure Amount
+ITEM_TB_PNL          = 2520311   # Gains/losses on financial assets HFT (P&L)
+
+
+def parse_capital_overview(
+    csv_path: Path,
+    *,
+    period: int = 202506,
+    chunksize: int = 500_000,
+) -> pd.DataFrame:
+    """Streamt tr_oth.csv und extrahiert per-Bank Capital + RWA-Breakdown.
+
+    Output (eine Zeile pro Bank):
+      LEI_Code, cet1_eur, oci_eur, rwa_credit_eur, rwa_market_eur,
+      rwa_operational_eur, rwa_total_eur, tb_pnl_eur
+
+    Werte in EUR (Input ist m EUR → ×1e6).
+    """
+    keep_items = {
+        ITEM_CET1_CAPITAL, ITEM_OCI, ITEM_CR_RWA, ITEM_MR_RWA,
+        ITEM_OP_RWA, ITEM_TOTAL_RWA, ITEM_TB_PNL,
+    }
+    chunks = []
+    for chunk in pd.read_csv(csv_path, chunksize=chunksize, low_memory=False):
+        sub = chunk[
+            (chunk["Period"] == period)
+            & chunk["Item"].isin(keep_items)
+        ]
+        if len(sub):
+            chunks.append(sub[["LEI_Code", "Item", "Amount"]])
+    if not chunks:
+        return pd.DataFrame()
+
+    raw = pd.concat(chunks, ignore_index=True)
+    # Pivot: rows = bank, columns = item
+    pivot = raw.pivot_table(
+        index="LEI_Code", columns="Item", values="Amount",
+        aggfunc="first", fill_value=0.0,
+    )
+
+    # Map item codes to readable column names
+    rename_map = {
+        ITEM_CET1_CAPITAL:  "cet1_m_eur",
+        ITEM_OCI:           "oci_m_eur",
+        ITEM_CR_RWA:        "rwa_credit_m_eur",
+        ITEM_MR_RWA:        "rwa_market_m_eur",
+        ITEM_OP_RWA:        "rwa_operational_m_eur",
+        ITEM_TOTAL_RWA:     "rwa_total_m_eur",
+        ITEM_TB_PNL:        "tb_pnl_m_eur",
+    }
+    pivot = pivot.rename(columns=rename_map).reset_index()
+
+    # Ensure all expected columns exist
+    for col in rename_map.values():
+        if col not in pivot.columns:
+            pivot[col] = 0.0
+
+    # Convert to EUR
+    for col_m in rename_map.values():
+        col_eur = col_m.replace("_m_eur", "_eur")
+        pivot[col_eur] = pivot[col_m] * 1e6
+
+    out_cols = ["LEI_Code"] + [c.replace("_m_eur", "_eur") for c in rename_map.values()]
+    return pivot[out_cols]
+
+
+# ============================================================================
+# 5d. Trading Book Market-Risk Stress Channel
+# ============================================================================
+def trading_book_stress(
+    capital_df: pd.DataFrame,
+    *,
+    m_factor: float,
+    mr_rwa_uplift_at_m_minus_2_5: float = 0.30,
+    tb_pnl_haircut_at_m_minus_2_5: float = 0.50,
+) -> pd.DataFrame:
+    """Stress-elastische Market-Risk-RWA und Trading-Book-P&L.
+
+    Zwei Effekte unter adversem Stress (M < 0):
+
+    (a) Market-Risk-RWA wächst, weil VaR/SVaR-Multiplikatoren in volatileren
+        Märkten steigen (FRTB-konsistent):
+            RWA_MR_stress = RWA_MR_base · (1 + λ_RWA · max(-M, 0))
+        Default λ_RWA = 0.30/2.5 = 0.12 — d.h. +30% MR-RWA bei M = -2.5.
+
+    (b) Trading-Book-P&L wird gekürzt — die Annahme: laufende Q-Erträge
+        aus HFT/FVTPL fallen unter Stress aus (Liquiditäts-/Spread-Schocks):
+            TB_PnL_stress = TB_PnL_base · (1 - λ_PnL · max(-M, 0))
+        Default λ_PnL = 0.50/2.5 = 0.20 — d.h. P&L halbiert bei M = -2.5.
+
+    Beide λ sind hardcoded V1-Parameter (Klasse 'assumption' im
+    Approximations-Inventar A-04 erweitert) und in V2 kalibrierbar gegen
+    historische EBA-Stresstest-Auswirkungen.
+
+    Returns
+    -------
+    DataFrame mit zusätzlichen Spalten:
+        rwa_market_eur_stress, delta_rwa_market_eur,
+        tb_pnl_eur_stress,    delta_tb_pnl_eur
+    """
+    out = capital_df.copy()
+    if m_factor < 0:
+        m_abs = abs(m_factor)
+        rwa_mul = 1.0 + (mr_rwa_uplift_at_m_minus_2_5 / 2.5) * m_abs
+        pnl_mul = 1.0 - (tb_pnl_haircut_at_m_minus_2_5 / 2.5) * m_abs
+        # Cap pnl_mul at 0 (no negative scaling)
+        pnl_mul = max(pnl_mul, 0.0)
+    else:
+        rwa_mul = 1.0
+        pnl_mul = 1.0
+
+    out["rwa_market_eur_stress"] = out["rwa_market_eur"] * rwa_mul
+    out["delta_rwa_market_eur"]  = out["rwa_market_eur_stress"] - out["rwa_market_eur"]
+    out["tb_pnl_eur_stress"]     = out["tb_pnl_eur"] * pnl_mul
+    out["delta_tb_pnl_eur"]      = out["tb_pnl_eur_stress"] - out["tb_pnl_eur"]
+    return out
+
+
+# ============================================================================
+# 5e. CET1-Ratio Bridge (3-channel decomposition)
+# ============================================================================
+def cet1_ratio_bridge(
+    capital_df: pd.DataFrame,
+    loan_book_bridge_per_bank: dict[str, dict],
+    sovereign_pnl_per_bank: dict[str, float],
+    tb_stress_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Vollständige Drei-Kanal-CET1-Ratio-Decomposition pro Bank.
+
+    Architektur:
+      Numerator (CET1):
+        CET1_stress = CET1_base
+                      − ΔEL_loan_book          (Loan-Book Provisions-Hit)
+                      − Δ_sovereign_MtM         (Sovereign FVOCI/AfS via OCI)
+                      + Δ_tb_pnl                (Trading-Book P&L change, signed)
+
+      Denominator (Total RWA):
+        RWA_stress = RWA_base
+                     + ΔRWA_credit_loan_book   (from loan_book bridge)
+                     + ΔRWA_market_TB          (from tb_stress)
+                     + RWA_operational_base    (unchanged)
+
+    Parameters
+    ----------
+    capital_df : Output von parse_capital_overview
+                 (per-bank CET1, RWA-Breakdown, OCI, TB-PnL)
+    loan_book_bridge_per_bank : dict {LEI: bridge dict from
+                 BankPortfolio.capital_bridge}
+    sovereign_pnl_per_bank : dict {LEI: signed P&L EUR from
+                 rate_shock_pnl}
+    tb_stress_df : Output von trading_book_stress
+
+    Returns
+    -------
+    DataFrame mit Spalten:
+        LEI_Code, cet1_base, cet1_stress, cet1_ratio_base, cet1_ratio_stress,
+        delta_cet1_loan, delta_cet1_sovereign, delta_cet1_tb,
+        delta_rwa_credit, delta_rwa_market, rwa_total_base, rwa_total_stress
+    """
+    df = capital_df.merge(
+        tb_stress_df[["LEI_Code", "delta_rwa_market_eur", "delta_tb_pnl_eur"]],
+        on="LEI_Code", how="left",
+    )
+
+    rows = []
+    for _, r in df.iterrows():
+        lei = r["LEI_Code"]
+        cet1_base = float(r["cet1_eur"])
+        rwa_base  = float(r["rwa_total_eur"])
+
+        # Channel 1 — Loan Book (ΔRWA_credit + ΔEL into provisions)
+        lb = loan_book_bridge_per_bank.get(lei)
+        if lb is None:
+            d_rwa_credit = 0.0
+            d_el_loan    = 0.0
+        else:
+            d_rwa_credit = float(lb["delta_rwa"])
+            d_el_loan    = float(lb["delta_el"])
+
+        # Channel 2 — Sovereign MtM (negative = loss; flow through OCI)
+        d_sov_mtm = float(sovereign_pnl_per_bank.get(lei, 0.0))
+
+        # Channel 3 — Trading Book (signed P&L change + RWA uplift)
+        d_tb_pnl     = float(r.get("delta_tb_pnl_eur", 0.0) or 0.0)
+        d_rwa_market = float(r.get("delta_rwa_market_eur", 0.0) or 0.0)
+
+        # Numerator effect
+        cet1_stress = cet1_base - d_el_loan + d_sov_mtm + d_tb_pnl
+        # (note: d_sov_mtm is signed — negative under adverse rate-up)
+
+        # Denominator effect
+        rwa_total_stress = rwa_base + d_rwa_credit + d_rwa_market
+
+        ratio_base   = cet1_base / rwa_base       if rwa_base > 0 else float("nan")
+        ratio_stress = cet1_stress / rwa_total_stress if rwa_total_stress > 0 else float("nan")
+
+        rows.append({
+            "LEI_Code":           lei,
+            "cet1_base":          cet1_base,
+            "delta_cet1_loan":    -d_el_loan,
+            "delta_cet1_sovereign": d_sov_mtm,
+            "delta_cet1_tb":      d_tb_pnl,
+            "cet1_stress":        cet1_stress,
+            "rwa_total_base":     rwa_base,
+            "delta_rwa_credit":   d_rwa_credit,
+            "delta_rwa_market":   d_rwa_market,
+            "rwa_total_stress":   rwa_total_stress,
+            "cet1_ratio_base":    ratio_base,
+            "cet1_ratio_stress":  ratio_stress,
+            "delta_cet1_ratio_pp": (ratio_stress - ratio_base) * 100,
+        })
+    return pd.DataFrame(rows)
+
+
+# ============================================================================
 # 6. Public API (unchanged)
 # ============================================================================
 def load_eba_universe(

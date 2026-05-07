@@ -154,14 +154,20 @@ Mark-to-Market on the sovereign portfolio. Per-bank maturity ladders
 from the EBA Transparency Exercise yield the modified-duration approxi-
 mation P&L = −D · Δy · Exposure, summed across the seven maturity
 buckets.
+
+**Trading-book channel.** A third channel scales the published Market-
+Risk RWA (Item 2520210) under stress (FRTB-style multiplier on VaR/SVaR)
+and applies a Trading-Book P&L haircut. All three channels feed the
+CET1-Ratio numerator and denominator on the Capital Adequacy page.
 """)
 
 with arch_r:
     insight(
-        "<strong>Two-channel consistency.</strong> The same Δr_10y drives "
-        "Loan-Book PDs (Vasicek M) and Sovereign-Book Mark-to-Market "
-        "(modified duration) — a single shock, two independent risk "
-        "lenses. Cross-channel comparison is the value-add."
+        "<strong>Three-channel consistency.</strong> The same Δr_10y drives "
+        "Loan-Book PDs (Vasicek M), Sovereign-Book Mark-to-Market "
+        "(modified duration), and Trading-Book Market-RWA + P&L. "
+        "Three independent risk lenses, one shock — converging on the "
+        "regulatory CET1 ratio."
     )
     insight(
         "<strong>Why Vasicek?</strong> It is the literal regulatory model: "
@@ -182,7 +188,7 @@ st.markdown(
     "</div>",
     unsafe_allow_html=True,
 )
-nav1 = st.columns(2, gap="small")
+nav1 = st.columns(3, gap="small")
 with nav1[0]:
     st.page_link("pages/1_Bank_Portfolio.py", label="Bank Portfolio",
                  help="EBA Top-N banks · IRB capital under macro stress",
@@ -190,6 +196,11 @@ with nav1[0]:
 with nav1[1]:
     st.page_link("pages/2_Sovereign_Risk.py", label="Sovereign Risk",
                  help="Doom-loop concentration · duration-shock P&L",
+                 use_container_width=True)
+with nav1[2]:
+    st.page_link("pages/3_Capital_Adequacy.py", label="Capital Adequacy",
+                 help="Three-channel CET1 ratio · Loan + Sovereign + "
+                      "Trading Book",
                  use_container_width=True)
 
 st.markdown(
@@ -201,17 +212,17 @@ st.markdown(
 )
 nav2 = st.columns(3, gap="small")
 with nav2[0]:
-    st.page_link("pages/3_Yield_Curve.py", label="Yield Curve",
+    st.page_link("pages/4_Yield_Curve.py", label="Yield Curve",
                  help="Bundesbank Svensson · multi-maturity shifts · "
                       "factor history",
                  use_container_width=True)
 with nav2[1]:
-    st.page_link("pages/4_Annahmen.py", label="Annahmen & Datenbasis",
+    st.page_link("pages/5_Annahmen.py", label="Annahmen & Datenbasis",
                  help="Three-tier governance disclosure · "
                       "Executive · Validator · Quant",
                  use_container_width=True)
 with nav2[2]:
-    st.page_link("pages/5_Methodology.py", label="Methodology",
+    st.page_link("pages/6_Methodology.py", label="Methodology",
                  help="Full assumptions document · all formulas + sources",
                  use_container_width=True)
 
