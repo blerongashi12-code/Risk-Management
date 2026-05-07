@@ -1,66 +1,85 @@
-# DAX Credit Stress · Streamlit Frontend
+# EU Banking Credit Stress Cockpit · Streamlit Frontend
 
-Interaktives Cockpit für das Backend-Modell.
+Interaktives Cockpit für das Vasicek/ASRF + EBA-Transparency Credit-Risk-Modell.
 
 ## Setup
 
 ```bash
-# 1) Daten-Layer einmalig bauen (vom Repo-Root, nicht hier!)
-cd ..
-python 00_build_data_layer.py
+# Aus dem 'Risk management/'-Verzeichnis:
 
-# 2) Streamlit-Abhängigkeiten installieren
+# 1) Dependencies installieren
 pip install -r streamlit_app/requirements.txt
 
-# 3) App starten
-streamlit run streamlit_app/app.py
+# 2) Cockpit starten — robuste Variante (räumt stale __pycache__ auf)
+python run_clean.py
+
+# Alternativ direkt:
+# streamlit run streamlit_app/app.py
 ```
 
-App läuft auf http://localhost:8501.
+App läuft auf <http://localhost:8501>.
 
 ## Struktur
 
 ```
 streamlit_app/
-├── app.py                          # Welcome-Page + globale Sidebar
+├── app.py                          # Landing-Page + globale Sidebar
 ├── requirements.txt
+├── .streamlit/config.toml          # Theme-Primaries
+├── static/
+│   └── mckinsey.css                # Konsulting-Stil-CSS (Navy / Crimson)
 ├── components/
 │   ├── backend_path.py             # sys.path-Setup für backend/
-│   ├── sidebar.py                  # globale Stress-Slider
-│   ├── data_loader.py              # cached Backend-Calls
-│   ├── stress_engine.py            # Custom-Scenario, MC, Decomposition
-│   └── charts.py                   # Plotly-Helpers
+│   ├── sidebar.py                  # globale Macro-Stress-Slider
+│   ├── data_loader.py              # cached Brent + Svensson
+│   ├── theme.py                    # apply_theme + Plotly-Template
+│   └── methodology.py              # collapsible Methodik-Boxen
 └── pages/
-    ├── 1_📊_Overview.py            # KPIs, Waterfall, Heatmaps, Top-N
-    ├── 2_🔍_Firm_Drilldown.py     # Stub
-    ├── 3_🔥_Scenario_Heatmap.py   # Library-Heatmap
-    ├── 4_⚡_Reverse_Stress.py      # Stub
-    ├── 5_📈_Yield_Curve.py        # Live-Svensson + Slider-Shifts
-    └── 6_📚_Methodology.py        # rendert MODEL_ASSUMPTIONS.md
+    ├── 1_Credit_Risk.py            # Vasicek IRB + NPL + CET1-Strip
+    ├── 2_Bonds.py                  # 3 Sub-Tabs: Sov · BB-Bonds · TB+ABS
+    ├── 3_Capital_Adequacy.py       # 3-Channel CET1-Ratio
+    ├── 4_Yield_Curve.py            # Bundesbank Svensson + β-Shifts
+    ├── 5_Backtesting.py            # Forecast vs Realized (22 Quartale)
+    ├── 6_Annahmen.py               # Governance-Doku (3 Layer)
+    └── 7_Methodology.py            # Vollständige MODEL_ASSUMPTIONS.md
 ```
 
 ## Live-Slider (Sidebar)
 
 | Slider | Bereich | Bedeutung |
 |---|---|---|
-| ΔBrent | -2.0 … +2.0 | log-Return Brent kumuliert |
-| Δβ₀ … Δβ₃ | -3.0 … +3.0 | Svensson-Parameter-Shifts (Level/Slope/Curvature) |
-| Korrelation Brent ↔ Δr | -0.95 … +0.95 | Override historische Σ |
-| Time Horizon | 30 … 504 d | MC-Pfad-Länge |
-| Monte-Carlo-Pfade | 1k … 100k | N für Quantil-Stabilität |
+| ΔBrent (log) | −2.0 … +2.0 | Kumulativer Brent log-Return |
+| Δβ₀ … Δβ₃ | −3.0 … +3.0 | Svensson-Parameter-Shifts (Level/Slope/Curvature) |
+| Quick-Scenarios | — | Corona 2020 · Ukraine 2022 · Iran 2026 · EBA 2025 adverse |
 
-Quick-Presets: Corona 2020, Ukraine 2022, Iran 2026.
+Implied Δr_10y wird live aus Δβ-Shifts via Svensson-Funktion berechnet und unten in der Sidebar angezeigt.
 
 ## Performance
 
-- Statische Daten + Baseline werden via `@st.cache_data(ttl=24h)` gecached.
-- Custom-Scenario: ~0.3 s
-- Custom-MC mit 10k Pfaden: ~0.5 s
-- 100k Pfaden: ~5 s
-- Slider-Move triggert Re-Compute der abhängigen Schritte (cached, schnell).
+- Statische Daten via `@st.cache_data(ttl=24h)` gecached.
+- Initialer EBA-Load (tr_cre + tr_sov + tr_oth, ~150 MB): ~5–10 s.
+- Slider-Move triggert nur die abhängigen Compute-Schritte (~0.3–1 s).
 
-## Bekannte V1-Limitationen
+## Falls Pages nicht öffnen / "nicht erreichbar"
 
-- Pages 2 (Drilldown) und 4 (Reverse Stress) sind Stubs.
-- Sektor-Heatmap nutzt gleichgewichteten Sektor-Mittel statt EAD-Gewichtung.
-- Korrelations-Override greift nur in `run_custom_mc`, nicht in `run_scenarios`.
+In Reihenfolge der Wahrscheinlichkeit:
+
+1. **Stale `__pycache__/`** (häufigste Ursache nach Page-Renamings)
+   ```bash
+   python run_clean.py
+   ```
+   räumt automatisch auf und startet.
+
+2. **Port 8501 belegt**
+   ```bash
+   streamlit run streamlit_app/app.py --server.port 8502
+   ```
+
+3. **Firewall / VPN blockt localhost** — temporär deaktivieren.
+
+4. **Streamlit nicht installiert oder veraltet**
+   ```bash
+   pip install --upgrade streamlit pandas pyarrow plotly
+   ```
+
+5. **Browser-Cache mit alten URLs** — `Ctrl+F5` für Hard-Refresh.
