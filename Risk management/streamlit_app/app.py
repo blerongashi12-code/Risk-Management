@@ -199,14 +199,19 @@ st.markdown(
     "</div>",
     unsafe_allow_html=True,
 )
-nav2 = st.columns(2, gap="small")
+nav2 = st.columns(3, gap="small")
 with nav2[0]:
     st.page_link("pages/3_Yield_Curve.py", label="Yield Curve",
                  help="Bundesbank Svensson · multi-maturity shifts · "
                       "factor history",
                  use_container_width=True)
 with nav2[1]:
-    st.page_link("pages/4_Methodology.py", label="Methodology",
+    st.page_link("pages/4_Annahmen.py", label="Annahmen & Datenbasis",
+                 help="Three-tier governance disclosure · "
+                      "Executive · Validator · Quant",
+                 use_container_width=True)
+with nav2[2]:
+    st.page_link("pages/5_Methodology.py", label="Methodology",
                  help="Full assumptions document · all formulas + sources",
                  use_container_width=True)
 
