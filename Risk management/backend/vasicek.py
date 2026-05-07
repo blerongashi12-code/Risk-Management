@@ -214,6 +214,45 @@ def asrf_loss_quantile(
     return np.asarray(lgd) * cond
 
 
+# ============================================================================
+# 3a. Downturn-LGD (stress-elastische LGD)
+# ============================================================================
+def downturn_lgd(
+    lgd_base: float | np.ndarray,
+    m_factor: float,
+    kappa: float = 0.3,
+) -> float | np.ndarray:
+    """Stress-elastische LGD nach EBA-Stresstest-Konvention.
+
+    Konzept (EBA 2023 Methodology, BCBS 2017): unter adversem Stress
+    steigt LGD über die Baseline-Annahme hinaus, weil Sicherheiten-Werte
+    (Immobilien, Aktien) korreliert mit dem Default-Ereignis fallen
+    (Wrong-Way-Risk, downturn-LGD-Floor in CRR Art. 181).
+
+    Funktionale Form: linear in |M| sofern M < 0:
+        LGD_stress = LGD_base · (1 + κ · max(-M, 0))
+
+    Konsequenz:
+        M = 0    → LGD_stress = LGD_base       (no stress)
+        M = -1   → LGD_stress = LGD_base · 1.30
+        M = -2.5 → LGD_stress = LGD_base · 1.75 (EBA 2025 adverse anchor)
+        M > 0    → LGD_stress = LGD_base       (benign — keine LGD-Reduktion
+                                                 in der Konvention)
+
+    Cap bei 100% (LGD ≤ 1.0).
+
+    κ = 0.3 ist EBA-2023-Stresstest-konsistent für Corporate-Klassen;
+    für Mortgage tendenziell niedriger (~0.15-0.2), für Retail höher
+    (~0.3-0.4). V1 nutzt κ uniform; sektor-spezifisches κ ist V2.
+    """
+    if m_factor >= 0:
+        return lgd_base
+    multiplier = 1.0 + kappa * abs(m_factor)
+    if isinstance(lgd_base, np.ndarray):
+        return np.minimum(lgd_base * multiplier, 1.0)
+    return min(float(lgd_base) * multiplier, 1.0)
+
+
 def irb_capital_requirement(
     pd_value: np.ndarray | float,
     lgd: np.ndarray | float,
@@ -341,42 +380,61 @@ class BankPortfolio:
         }
 
     def stressed_metrics(
-        self, z_factor: float, confidence: float = 0.999,
+        self, z_factor: float,
+        *,
+        confidence: float = 0.999,
+        kappa_lgd: float = 0.3,
     ) -> pd.DataFrame:
         """Portfolio-Metriken unter Systemfaktor-Schock M = z_factor.
 
-        z_factor < 0 → adverse Stress. Pro Segment wird die *bedingte* PD
-        berechnet, dann erneut Vasicek/IRB darauf — d.h. die Stress-PDs
-        liefern die "neue Baseline", auf der ein zusätzliches 99.9-%-
-        Quantil draufkommt.
+        Beide Risiko-Parameter werden gestresst:
+          - PD via Vasicek conditional PD (siehe §11.1)
+          - LGD via downturn-LGD-Funktion (siehe §11.x):
+              LGD_stress = LGD_base · (1 + κ · max(-M, 0))
+
+        Damit ist die volle Wirkungskette Macro → (PD, LGD) → IRB-K
+        konsistent abgebildet (regulatorische Wirkungskette nach
+        BCBS 2017 / EBA GL 14).
         """
         rows = []
         for s in self.segments:
             rho = asset_correlation(s.pd, s.exposure_class, s.sales_m_eur)
             stressed_pd = float(conditional_pd(s.pd, rho, z_factor))
+            stressed_lgd = float(downturn_lgd(s.lgd, z_factor, kappa=kappa_lgd))
             stressed_seg = PortfolioSegment(
                 name=s.name, exposure_class=s.exposure_class,
-                ead=s.ead, pd=stressed_pd, lgd=s.lgd,
+                ead=s.ead, pd=stressed_pd, lgd=stressed_lgd,
                 maturity_years=s.maturity_years, sales_m_eur=s.sales_m_eur,
             )
             row = stressed_seg.basel_metrics(confidence)
-            row["pd_baseline"] = s.pd
-            row["pd_stressed"] = stressed_pd
-            row["delta_pd"] = stressed_pd - s.pd
+            row["pd_baseline"]  = s.pd
+            row["pd_stressed"]  = stressed_pd
+            row["delta_pd"]     = stressed_pd - s.pd
+            row["lgd_baseline"] = s.lgd
+            row["lgd_stressed"] = stressed_lgd
+            row["delta_lgd"]    = stressed_lgd - s.lgd
             rows.append(row)
         df = pd.DataFrame(rows)
         if not df.empty:
             df["ead_share"] = df["ead"] / df["ead"].sum()
         return df
 
-    def stressed_kpis(self, z_factor: float, confidence: float = 0.999) -> dict:
-        df = self.stressed_metrics(z_factor, confidence)
+    def stressed_kpis(
+        self, z_factor: float,
+        *,
+        confidence: float = 0.999,
+        kappa_lgd: float = 0.3,
+    ) -> dict:
+        df = self.stressed_metrics(
+            z_factor, confidence=confidence, kappa_lgd=kappa_lgd,
+        )
         if df.empty:
             return {}
         baseline_kpis = self.portfolio_kpis(confidence)
         return {
             "name":          self.name,
             "z_factor":      z_factor,
+            "kappa_lgd":     kappa_lgd,
             "n_segments":    len(self.segments),
             "total_ead":     float(df["ead"].sum()),
             "el_eur":        float(df["el_eur"].sum()),
@@ -386,6 +444,116 @@ class BankPortfolio:
             "el_pct":        float(df["el_eur"].sum() / df["ead"].sum()),
             "delta_el_eur":  float(df["el_eur"].sum() - baseline_kpis["el_eur"]),
             "delta_rwa":     float(df["rwa"].sum() - baseline_kpis["rwa"]),
+        }
+
+    # ------------------------------------------------------------------
+    # Capital Bridge · sequential decomposition of ΔK and ΔRWA
+    # ------------------------------------------------------------------
+    def capital_bridge(
+        self, z_factor: float,
+        *,
+        confidence: float = 0.999,
+        kappa_lgd: float = 0.3,
+    ) -> dict:
+        """Sequentielle Aktivierung der zwei Stress-Channels.
+
+        Zerlegt ΔK = K_stress − K_base in additive Komponenten durch
+        sequenzielles Anschalten der Stresses:
+
+          Stage 0:  (PD_base, LGD_base)        → K_base
+          Stage 1:  (PD(M),   LGD_base)        → K_pd_only
+          Stage 2:  (PD(M),   LGD(M))          → K_stress
+
+        Dann gilt:
+          ΔK_PD  = K_pd_only - K_base   ← Beitrag PD-Shift (LGD fix)
+          ΔK_LGD = K_stress  - K_pd_only ← Beitrag LGD-Shift (PD bereits stress)
+          ΔK     = ΔK_PD + ΔK_LGD        ← exakt additiv
+
+        Returns
+        -------
+        dict mit
+          K_base, K_pd_only, K_stress      (jeweils EUR, gewichtet mit EAD)
+          delta_K_pd, delta_K_lgd, delta_K (EUR)
+          rwa_base, rwa_pd_only, rwa_stress, delta_rwa_*  (EUR)
+          el_base, el_pd_only, el_stress, delta_el_*       (EUR)
+          per_segment: DataFrame mit Stage-by-Stage Werten pro Segment
+        """
+        rows = []
+        for s in self.segments:
+            rho = asset_correlation(s.pd, s.exposure_class, s.sales_m_eur)
+            pd_stress  = float(conditional_pd(s.pd, rho, z_factor))
+            lgd_stress = float(downturn_lgd(s.lgd, z_factor, kappa=kappa_lgd))
+
+            def _metrics(pd_v: float, lgd_v: float) -> tuple[float, float, float]:
+                """Return (K, RWA, EL) in EUR for this segment."""
+                m = irb_capital_requirement(
+                    pd_v, lgd_v, s.exposure_class,
+                    maturity_years=s.maturity_years,
+                    sales_m_eur=s.sales_m_eur,
+                    confidence=confidence,
+                )
+                K   = float(m["K"])           * s.ead
+                RWA = float(m["rwa_density"]) * s.ead
+                EL  = float(m["EL"])          * s.ead
+                return K, RWA, EL
+
+            K0, RWA0, EL0 = _metrics(s.pd,        s.lgd)
+            K1, RWA1, EL1 = _metrics(pd_stress,   s.lgd)
+            K2, RWA2, EL2 = _metrics(pd_stress,   lgd_stress)
+
+            rows.append({
+                "name":           s.name,
+                "exposure_class": s.exposure_class,
+                "ead":            s.ead,
+                "pd_base":        s.pd,
+                "pd_stress":      pd_stress,
+                "lgd_base":       s.lgd,
+                "lgd_stress":     lgd_stress,
+                # K
+                "K_base":         K0,
+                "K_pd_only":      K1,
+                "K_stress":       K2,
+                "dK_pd":          K1 - K0,
+                "dK_lgd":         K2 - K1,
+                # RWA
+                "RWA_base":       RWA0,
+                "RWA_pd_only":    RWA1,
+                "RWA_stress":     RWA2,
+                "dRWA_pd":        RWA1 - RWA0,
+                "dRWA_lgd":       RWA2 - RWA1,
+                # EL
+                "EL_base":        EL0,
+                "EL_pd_only":     EL1,
+                "EL_stress":      EL2,
+                "dEL_pd":         EL1 - EL0,
+                "dEL_lgd":        EL2 - EL1,
+            })
+
+        seg_df = pd.DataFrame(rows)
+
+        # Totals across all segments
+        return {
+            "z_factor":      z_factor,
+            "kappa_lgd":     kappa_lgd,
+            "K_base":        float(seg_df["K_base"].sum()),
+            "K_pd_only":     float(seg_df["K_pd_only"].sum()),
+            "K_stress":      float(seg_df["K_stress"].sum()),
+            "delta_K_pd":    float(seg_df["dK_pd"].sum()),
+            "delta_K_lgd":   float(seg_df["dK_lgd"].sum()),
+            "delta_K":       float(seg_df["K_stress"].sum() - seg_df["K_base"].sum()),
+            "rwa_base":      float(seg_df["RWA_base"].sum()),
+            "rwa_pd_only":   float(seg_df["RWA_pd_only"].sum()),
+            "rwa_stress":    float(seg_df["RWA_stress"].sum()),
+            "delta_rwa_pd":  float(seg_df["dRWA_pd"].sum()),
+            "delta_rwa_lgd": float(seg_df["dRWA_lgd"].sum()),
+            "delta_rwa":     float(seg_df["RWA_stress"].sum() - seg_df["RWA_base"].sum()),
+            "el_base":       float(seg_df["EL_base"].sum()),
+            "el_pd_only":    float(seg_df["EL_pd_only"].sum()),
+            "el_stress":     float(seg_df["EL_stress"].sum()),
+            "delta_el_pd":   float(seg_df["dEL_pd"].sum()),
+            "delta_el_lgd":  float(seg_df["dEL_lgd"].sum()),
+            "delta_el":      float(seg_df["EL_stress"].sum() - seg_df["EL_base"].sum()),
+            "per_segment":   seg_df,
         }
 
 
@@ -468,6 +636,54 @@ def _test_stress_increases_pd():
     assert stress["delta_el_eur"] > 0
 
 
+def _test_downturn_lgd():
+    """Downturn-LGD: linear in |M|, no effect for benign M, capped at 1."""
+    # Benign / no stress
+    assert downturn_lgd(0.45, m_factor=0.0) == 0.45
+    assert downturn_lgd(0.45, m_factor=+1.0) == 0.45
+    # Adverse stress
+    assert abs(downturn_lgd(0.45, m_factor=-1.0, kappa=0.3) - 0.45*1.30) < 1e-9
+    assert abs(downturn_lgd(0.45, m_factor=-2.5, kappa=0.3) - 0.45*1.75) < 1e-9
+    # Cap at 1.0
+    assert downturn_lgd(0.95, m_factor=-3.0, kappa=0.5) == 1.0
+    # Linearity in |M|
+    a = downturn_lgd(0.45, m_factor=-1.0, kappa=0.3)
+    b = downturn_lgd(0.45, m_factor=-2.0, kappa=0.3)
+    assert abs((b - 0.45) - 2 * (a - 0.45)) < 1e-9, "Should be linear in |M|"
+
+
+def _test_capital_bridge_additivity():
+    """Capital Bridge: ΔK_PD + ΔK_LGD = ΔK_total exakt (sequenzielle Aktiv.)."""
+    p = BankPortfolio("TestBank").add(
+        PortfolioSegment("Corp",  "corporate",  ead=100e9, pd=0.015, lgd=0.45),
+        PortfolioSegment("Mortg", "mortgage",   ead=80e9,  pd=0.008, lgd=0.20),
+        PortfolioSegment("QRRE",  "qrre",       ead=20e9,  pd=0.030, lgd=0.65),
+    )
+    bridge = p.capital_bridge(z_factor=-2.0, kappa_lgd=0.3)
+    # Additivity check
+    sum_decomp = bridge["delta_K_pd"] + bridge["delta_K_lgd"]
+    assert abs(sum_decomp - bridge["delta_K"]) < 1.0, \
+        f"Bridge not additive: {sum_decomp:.2f} vs {bridge['delta_K']:.2f}"
+    # Same for RWA, EL
+    assert abs((bridge["delta_rwa_pd"] + bridge["delta_rwa_lgd"]) - bridge["delta_rwa"]) < 1.0
+    assert abs((bridge["delta_el_pd"]  + bridge["delta_el_lgd"])  - bridge["delta_el"])  < 1.0
+    # Both contributions positive under adverse stress
+    assert bridge["delta_K_pd"] > 0,  "PD shift should raise K"
+    assert bridge["delta_K_lgd"] > 0, "LGD shift should raise K"
+
+
+def _test_capital_bridge_zero_at_baseline():
+    """Bei z_factor=0 sollte ΔK ≈ 0 sein (downturn-LGD nicht aktiv, conditional PD aber > base)."""
+    p = BankPortfolio("TestBank").add(
+        PortfolioSegment("Corp", "corporate", ead=100e9, pd=0.015, lgd=0.45),
+    )
+    bridge = p.capital_bridge(z_factor=0.0, kappa_lgd=0.3)
+    # At z=0: LGD unchanged, but conditional_pd(PD, ρ, 0) > PD because √(1−ρ)<1
+    # So ΔK_LGD must be exactly 0 (no LGD movement at z=0)
+    assert abs(bridge["delta_K_lgd"]) < 1e-6, \
+        f"LGD-channel must be silent at z=0, got {bridge['delta_K_lgd']}"
+
+
 if __name__ == "__main__":
     import sys
     # Force UTF-8 output on Windows
@@ -483,6 +699,9 @@ if __name__ == "__main__":
         ("E_M[PD(M)] = unconditional PD", _test_unconditional_via_integral),
         ("Portfolio aggregation sanity", _test_portfolio_aggregation),
         ("Adverse stress increases EL & RWA", _test_stress_increases_pd),
+        ("Downturn-LGD function", _test_downturn_lgd),
+        ("Capital Bridge additivity", _test_capital_bridge_additivity),
+        ("Capital Bridge silent at z=0 LGD-channel", _test_capital_bridge_zero_at_baseline),
     ]
     for label, fn in tests:
         try:

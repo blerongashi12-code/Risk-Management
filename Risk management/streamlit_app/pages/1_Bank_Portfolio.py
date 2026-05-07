@@ -23,6 +23,7 @@ from macro_factor import (                                       # type: ignore
     anchor_from_eba, hybrid_mapping, factor_stats,
 )
 from vasicek import conditional_pd, asset_correlation            # type: ignore
+from config import KAPPA_DOWNTURN_LGD                             # type: ignore
 
 st.set_page_config(page_title="Bank portfolio · Vasicek", layout="wide")
 apply_theme()
@@ -117,14 +118,19 @@ if abs(m_used) < 1e-3:
     insight(
         f"<strong>No macro shock applied.</strong> Metrics below reflect the "
         f"regulatory baseline derived from {source_tag}. Move the sliders in "
-        f"the sidebar to see the Vasicek conditional-PD response."
+        f"the sidebar to see the full transmission chain "
+        f"<strong>Macro → (PD, LGD) → IRB Capital → ΔRWA</strong>."
     )
 else:
     direction = "adverse" if m_used < 0 else "benign"
+    lgd_uplift_pct = KAPPA_DOWNTURN_LGD * abs(min(m_used, 0)) * 100
     insight(
         f"Mapped to <strong>M = {m_used:+.2f}</strong> ({direction}) on top of "
-        f"{source_tag}. Conditional PDs below are computed from Vasicek's "
-        f"P(default | M) = N((N⁻¹(PD) − √ρ · M) / √(1−ρ))."
+        f"{source_tag}. Two risk channels are stressed: "
+        f"<strong>PD</strong> via Vasicek conditional-PD "
+        f"P(default | M) = N((N⁻¹(PD) − √ρ · M) / √(1−ρ)), and "
+        f"<strong>LGD</strong> via downturn-LGD with κ = {KAPPA_DOWNTURN_LGD:.2f} "
+        f"(LGD lifted by ≈ {lgd_uplift_pct:.0f}% of base under adverse shock)."
     )
 
 st.divider()
@@ -249,6 +255,129 @@ fig.update_layout(
     bargap=0.25,
 )
 st.plotly_chart(fig, use_container_width=True)
+
+st.divider()
+
+# === Capital Bridge · Wirkungskette pro Bank ==========================
+eyebrow("Wirkungskette · Capital Bridge per bank")
+st.caption(
+    "End-to-end transmission chain  Macro shock → conditional PD + downturn "
+    "LGD → IRB Capital. Sequential activation: first the PD shift (LGD held "
+    "at base), then the LGD shift (PD already stressed). The two contributions "
+    "sum exactly to ΔK by construction."
+)
+
+bridge_bank = st.selectbox(
+    "Bank",
+    list(universe.banks.keys()),
+    index=0,
+    format_func=lambda n: f"{n}  (€{universe.banks[n].total_ead/1e9:.0f} bn EAD)",
+    label_visibility="collapsed",
+    key="bridge_bank",
+)
+
+bridge_portfolio = universe.banks[bridge_bank]
+if abs(m_used) > 1e-9:
+    bridge = bridge_portfolio.capital_bridge(
+        z_factor=m_used,
+        kappa_lgd=KAPPA_DOWNTURN_LGD,
+        confidence=0.999,
+    )
+
+    bcol_l, bcol_r = st.columns([3, 2], gap="medium")
+
+    with bcol_l:
+        # Waterfall: K_base → +ΔK_PD → +ΔK_LGD → K_stress
+        wf = go.Figure(go.Waterfall(
+            orientation="v",
+            measure=["absolute", "relative", "relative", "total"],
+            x=["K base",
+               "+ ΔK from PD shift",
+               "+ ΔK from LGD shift",
+               "K stress"],
+            text=[f"€{bridge['K_base']/1e9:.2f} bn",
+                  f"€{bridge['delta_K_pd']/1e9:+.2f} bn",
+                  f"€{bridge['delta_K_lgd']/1e9:+.2f} bn",
+                  f"€{bridge['K_stress']/1e9:.2f} bn"],
+            textposition="outside",
+            textfont=dict(size=11, color=COLORS["navy"]),
+            y=[bridge["K_base"]    / 1e9,
+               bridge["delta_K_pd"]  / 1e9,
+               bridge["delta_K_lgd"] / 1e9,
+               bridge["K_stress"]  / 1e9],
+            connector={"line": {"color": COLORS["hairline"], "width": 1}},
+            increasing={"marker": {"color": COLORS["crimson"]}},
+            decreasing={"marker": {"color": COLORS["teal"]}},
+            totals     ={"marker": {"color": COLORS["navy"]}},
+        ))
+        wf.update_layout(
+            title=f"{bridge_bank} · IRB Capital decomposition",
+            yaxis_title="Capital requirement K [bn EUR]",
+            height=400,
+            showlegend=False,
+        )
+        st.plotly_chart(wf, use_container_width=True)
+
+    with bcol_r:
+        # Numerical summary table
+        eyebrow("Channel contributions")
+        contrib_df = pd.DataFrame([
+            {"Metric": "K (Capital)",
+             "Base bn":     bridge["K_base"]    / 1e9,
+             "PD shift":    bridge["delta_K_pd"]  / 1e9,
+             "LGD shift":   bridge["delta_K_lgd"] / 1e9,
+             "Stress bn":   bridge["K_stress"]  / 1e9,
+             "Δ total bn":  bridge["delta_K"]    / 1e9},
+            {"Metric": "RWA",
+             "Base bn":     bridge["rwa_base"]   / 1e9,
+             "PD shift":    bridge["delta_rwa_pd"]  / 1e9,
+             "LGD shift":   bridge["delta_rwa_lgd"] / 1e9,
+             "Stress bn":   bridge["rwa_stress"] / 1e9,
+             "Δ total bn":  bridge["delta_rwa"]   / 1e9},
+            {"Metric": "EL",
+             "Base bn":     bridge["el_base"]    / 1e9,
+             "PD shift":    bridge["delta_el_pd"]  / 1e9,
+             "LGD shift":   bridge["delta_el_lgd"] / 1e9,
+             "Stress bn":   bridge["el_stress"]  / 1e9,
+             "Δ total bn":  bridge["delta_el"]    / 1e9},
+        ])
+        for col in ["Base bn", "PD shift", "LGD shift", "Stress bn", "Δ total bn"]:
+            contrib_df[col] = contrib_df[col].map(lambda v: f"{v:+.2f}" if abs(v) < 100 else f"{v:+.0f}")
+        st.dataframe(contrib_df, use_container_width=True, hide_index=True,
+                     height=170)
+
+        # Share-of-stress note
+        if abs(bridge["delta_K"]) > 1.0:
+            pd_share = bridge["delta_K_pd"] / bridge["delta_K"] * 100
+            lgd_share = bridge["delta_K_lgd"] / bridge["delta_K"] * 100
+            st.caption(
+                f"Of the total ΔK = €{bridge['delta_K']/1e9:+.1f} bn, the "
+                f"PD channel contributes **{pd_share:.0f}%** and the LGD "
+                f"channel **{lgd_share:.0f}%** — confirms that both risk "
+                f"parameters are jointly transmitted into capital under "
+                f"the regulatory IRB formula."
+            )
+
+    # Per-segment breakdown (collapsible — useful for auditors/validators)
+    with st.expander("Segment-level decomposition", expanded=False):
+        seg = bridge["per_segment"].copy()
+        disp = pd.DataFrame({
+            "Segment":      seg["name"],
+            "EAD bn":       (seg["ead"] / 1e9).round(1),
+            "PD base":      (seg["pd_base"] * 100).map(lambda v: f"{v:.2f}%"),
+            "PD stress":    (seg["pd_stress"] * 100).map(lambda v: f"{v:.2f}%"),
+            "LGD base":     (seg["lgd_base"] * 100).map(lambda v: f"{v:.0f}%"),
+            "LGD stress":   (seg["lgd_stress"] * 100).map(lambda v: f"{v:.0f}%"),
+            "K base m":     (seg["K_base"] / 1e6).round(0).astype(int),
+            "ΔK PD m":      (seg["dK_pd"] / 1e6).round(0).astype(int),
+            "ΔK LGD m":     (seg["dK_lgd"] / 1e6).round(0).astype(int),
+            "K stress m":   (seg["K_stress"] / 1e6).round(0).astype(int),
+        })
+        st.dataframe(disp, use_container_width=True, hide_index=True,
+                     height=260)
+else:
+    st.info("Apply a macro shock in the sidebar to view the capital "
+            "bridge decomposition.")
 
 st.divider()
 

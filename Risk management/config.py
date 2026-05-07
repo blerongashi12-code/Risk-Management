@@ -84,6 +84,12 @@ VASICEK_DEFAULT_MATURITY_YEARS = 2.5
 # Default LGD for the bank-portfolio aggregate (override per segment).
 VASICEK_DEFAULT_LGD = 0.45
 
+# Downturn-LGD shock factor (CRR Art. 181, EBA GL 14):
+#     LGD_stress = LGD_base · (1 + κ · max(-M, 0))
+# κ = 0.30 is EBA-2023-Stress-Test-consistent for Corporate / SME / Sovereign.
+# Higher under retail / lower under mortgage in reality; V1 applies κ uniformly.
+KAPPA_DOWNTURN_LGD = 0.30
+
 
 # ----------------------------------------------------------------------
 # 5. EBA macro→M routing
