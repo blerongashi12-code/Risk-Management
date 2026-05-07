@@ -15,6 +15,7 @@ from components.theme import (apply_theme, hero, eyebrow, insight, footer,
                               COLORS, PALETTE_DISCRETE)
 from components.sidebar import render_sidebar
 from components.data_loader import load_data_layer
+from components.methodology import render_loan_methodology
 from components.backend_path import setup
 setup()
 
@@ -132,6 +133,11 @@ else:
         f"<strong>LGD</strong> via downturn-LGD with κ = {KAPPA_DOWNTURN_LGD:.2f} "
         f"(LGD lifted by ≈ {lgd_uplift_pct:.0f}% of base under adverse shock)."
     )
+
+st.divider()
+
+# === Methodology disclosure boxes (Critique 2 + 3) ====================
+render_loan_methodology(kappa_lgd=KAPPA_DOWNTURN_LGD)
 
 st.divider()
 
@@ -284,79 +290,121 @@ if abs(m_used) > 1e-9:
         confidence=0.999,
     )
 
-    bcol_l, bcol_r = st.columns([3, 2], gap="medium")
-
-    with bcol_l:
-        # Waterfall: K_base → +ΔK_PD → +ΔK_LGD → K_stress
+    def _bridge_chart(metric_label: str, base: float, dpd: float, dlgd: float,
+                      stress: float, color_axis: str = "Capital requirement K") -> go.Figure:
+        """Build a 4-bar waterfall for a given decomposition triplet."""
         wf = go.Figure(go.Waterfall(
             orientation="v",
             measure=["absolute", "relative", "relative", "total"],
-            x=["K base",
-               "+ ΔK from PD shift",
-               "+ ΔK from LGD shift",
-               "K stress"],
-            text=[f"€{bridge['K_base']/1e9:.2f} bn",
-                  f"€{bridge['delta_K_pd']/1e9:+.2f} bn",
-                  f"€{bridge['delta_K_lgd']/1e9:+.2f} bn",
-                  f"€{bridge['K_stress']/1e9:.2f} bn"],
+            x=[f"{metric_label} base",
+               "+ Δ from PD shift",
+               "+ Δ from LGD shift",
+               f"{metric_label} stress"],
+            text=[f"€{base/1e9:.2f} bn",
+                  f"€{dpd/1e9:+.2f} bn",
+                  f"€{dlgd/1e9:+.2f} bn",
+                  f"€{stress/1e9:.2f} bn"],
             textposition="outside",
             textfont=dict(size=11, color=COLORS["navy"]),
-            y=[bridge["K_base"]    / 1e9,
-               bridge["delta_K_pd"]  / 1e9,
-               bridge["delta_K_lgd"] / 1e9,
-               bridge["K_stress"]  / 1e9],
+            y=[base/1e9, dpd/1e9, dlgd/1e9, stress/1e9],
             connector={"line": {"color": COLORS["hairline"], "width": 1}},
             increasing={"marker": {"color": COLORS["crimson"]}},
             decreasing={"marker": {"color": COLORS["teal"]}},
             totals     ={"marker": {"color": COLORS["navy"]}},
         ))
         wf.update_layout(
-            title=f"{bridge_bank} · IRB Capital decomposition",
-            yaxis_title="Capital requirement K [bn EUR]",
-            height=400,
+            title=f"{bridge_bank} · {metric_label} decomposition",
+            yaxis_title=f"{color_axis} [bn EUR]",
+            height=380,
             showlegend=False,
         )
-        st.plotly_chart(wf, use_container_width=True)
+        return wf
 
-    with bcol_r:
-        # Numerical summary table
-        eyebrow("Channel contributions")
-        contrib_df = pd.DataFrame([
-            {"Metric": "K (Capital)",
-             "Base bn":     bridge["K_base"]    / 1e9,
-             "PD shift":    bridge["delta_K_pd"]  / 1e9,
-             "LGD shift":   bridge["delta_K_lgd"] / 1e9,
-             "Stress bn":   bridge["K_stress"]  / 1e9,
-             "Δ total bn":  bridge["delta_K"]    / 1e9},
-            {"Metric": "RWA",
-             "Base bn":     bridge["rwa_base"]   / 1e9,
-             "PD shift":    bridge["delta_rwa_pd"]  / 1e9,
-             "LGD shift":   bridge["delta_rwa_lgd"] / 1e9,
-             "Stress bn":   bridge["rwa_stress"] / 1e9,
-             "Δ total bn":  bridge["delta_rwa"]   / 1e9},
-            {"Metric": "EL",
-             "Base bn":     bridge["el_base"]    / 1e9,
-             "PD shift":    bridge["delta_el_pd"]  / 1e9,
-             "LGD shift":   bridge["delta_el_lgd"] / 1e9,
-             "Stress bn":   bridge["el_stress"]  / 1e9,
-             "Δ total bn":  bridge["delta_el"]    / 1e9},
-        ])
-        for col in ["Base bn", "PD shift", "LGD shift", "Stress bn", "Δ total bn"]:
-            contrib_df[col] = contrib_df[col].map(lambda v: f"{v:+.2f}" if abs(v) < 100 else f"{v:+.0f}")
-        st.dataframe(contrib_df, use_container_width=True, hide_index=True,
-                     height=170)
+    def _share_caption(metric_label: str, total: float, dpd: float, dlgd: float):
+        """Render share-of-stress caption if there is a meaningful change."""
+        if abs(total) < 1.0:
+            return
+        pd_share = dpd / total * 100
+        lgd_share = dlgd / total * 100
+        st.caption(
+            f"Of the total Δ{metric_label} = €{total/1e9:+.1f} bn, the "
+            f"PD channel contributes **{pd_share:.0f}%** and the LGD "
+            f"channel **{lgd_share:.0f}%**."
+        )
 
-        # Share-of-stress note
-        if abs(bridge["delta_K"]) > 1.0:
-            pd_share = bridge["delta_K_pd"] / bridge["delta_K"] * 100
-            lgd_share = bridge["delta_K_lgd"] / bridge["delta_K"] * 100
-            st.caption(
-                f"Of the total ΔK = €{bridge['delta_K']/1e9:+.1f} bn, the "
-                f"PD channel contributes **{pd_share:.0f}%** and the LGD "
-                f"channel **{lgd_share:.0f}%** — confirms that both risk "
-                f"parameters are jointly transmitted into capital under "
-                f"the regulatory IRB formula."
+    tab_K, tab_RWA, tab_EL = st.tabs([
+        "Capital (K)",
+        "RWA",
+        "Expected Loss (EL)",
+    ])
+
+    with tab_K:
+        bcol_l, bcol_r = st.columns([3, 2], gap="medium")
+        with bcol_l:
+            st.plotly_chart(
+                _bridge_chart("K", bridge["K_base"], bridge["delta_K_pd"],
+                              bridge["delta_K_lgd"], bridge["K_stress"],
+                              "Capital requirement K"),
+                use_container_width=True,
             )
+        with bcol_r:
+            st.markdown(r"""
+**Formula** &nbsp;
+$K = (L_\alpha - \text{PD}\!\cdot\!\text{LGD}) \cdot \text{MA}(M_{\text{eff}})$
+&nbsp;·&nbsp; $L_\alpha$ ist das ASRF-99.9%-Loss-Quantil aus Vasicek 2002.
+
+**Reading the bridge.** Stage 1 lifts only PD via Conditional-PD;
+LGD bleibt auf Baseline. Stage 2 hebt zusätzlich LGD via Downturn-LGD-
+Funktion. Beide Beiträge sind exakt additiv zu ΔK.
+""")
+            _share_caption("K", bridge["delta_K"],
+                           bridge["delta_K_pd"], bridge["delta_K_lgd"])
+
+    with tab_RWA:
+        bcol_l, bcol_r = st.columns([3, 2], gap="medium")
+        with bcol_l:
+            st.plotly_chart(
+                _bridge_chart("RWA", bridge["rwa_base"], bridge["delta_rwa_pd"],
+                              bridge["delta_rwa_lgd"], bridge["rwa_stress"],
+                              "Risk-weighted assets"),
+                use_container_width=True,
+            )
+        with bcol_r:
+            st.markdown(r"""
+**Formula** &nbsp; $\text{RWA} = K \cdot 12{.}5 \cdot \text{EAD}$
+
+**Reading.** RWA folgt strukturell der gleichen Decomposition wie K
+(EAD ist konstant pro Segment unter dem V1-Modell). Diese Größe ist
+relevant für die regulatorische Eigenkapitalquote — sie steht im
+**Nenner der CET1-Ratio**.
+""")
+            _share_caption("RWA", bridge["delta_rwa"],
+                           bridge["delta_rwa_pd"], bridge["delta_rwa_lgd"])
+
+    with tab_EL:
+        bcol_l, bcol_r = st.columns([3, 2], gap="medium")
+        with bcol_l:
+            st.plotly_chart(
+                _bridge_chart("EL", bridge["el_base"], bridge["delta_el_pd"],
+                              bridge["delta_el_lgd"], bridge["el_stress"],
+                              "Expected loss"),
+                use_container_width=True,
+            )
+        with bcol_r:
+            st.markdown(r"""
+**Formula** &nbsp; $\text{EL} = \text{PD} \cdot \text{LGD} \cdot \text{EAD}$
+&nbsp;·&nbsp; ΔEL exakt zerlegbar in (siehe Methodology box):
+
+$$\Delta\text{EL} = (\text{PD}^*\!-\!\text{PD})\,\text{LGD}\,\text{EAD}
++ \text{PD}^*\,(\text{LGD}^*\!-\!\text{LGD})\,\text{EAD}$$
+
+**Reading.** EL ist der Erwartungswert (P&L-Vorsorge). Die Capital-
+Charge im Tab links hingegen ist die **Unexpected-Loss-Komponente**
+oberhalb von EL — beide werden gemeinsam für die Risiko-Bilanz
+gebraucht.
+""")
+            _share_caption("EL", bridge["delta_el"],
+                           bridge["delta_el_pd"], bridge["delta_el_lgd"])
 
     # Per-segment breakdown (collapsible — useful for auditors/validators)
     with st.expander("Segment-level decomposition", expanded=False):
@@ -377,7 +425,7 @@ if abs(m_used) > 1e-9:
                      height=260)
 else:
     st.info("Apply a macro shock in the sidebar to view the capital "
-            "bridge decomposition.")
+            "bridge decomposition (3 tabs: Capital · RWA · Expected Loss).")
 
 st.divider()
 

@@ -14,6 +14,7 @@ import streamlit as st
 from components.theme import (apply_theme, hero, eyebrow, insight, footer,
                               COLORS, PALETTE_DISCRETE, SEQ_COOL_TO_WARM)
 from components.sidebar import render_sidebar
+from components.methodology import render_sovereign_methodology
 from components.backend_path import setup
 setup()
 
@@ -67,6 +68,11 @@ hero(
          "through a duration-weighted Mark-to-Market lens on the EU "
          "sovereign book.",
 )
+
+# === Methodology disclosure boxes (Critique 2 + 3) ====================
+render_sovereign_methodology()
+
+st.divider()
 
 # === Aggregate KPI strip ==============================================
 total_exposure = float(conc["exposure_eur"].sum())
