@@ -1,4 +1,4 @@
-"""Bank Portfolio · Vasicek/ASRF view of EBA-anchored European banks."""
+"""Credit Risk · Loan Book · Vasicek/ASRF + NPL ratios + CET1 impact strip."""
 import sys
 from pathlib import Path
 
@@ -19,24 +19,30 @@ from components.methodology import render_loan_methodology
 from components.backend_path import setup
 setup()
 
-from eba_loader import load_eba_universe                        # type: ignore
+from eba_loader import (load_eba_universe,                       # type: ignore
+                         parse_credit_risk_csv, loan_book_class_breakdown,
+                         parse_capital_overview, trading_book_stress,
+                         cet1_ratio_bridge, load_bank_directory,
+                         parse_sovereign_csv, sovereign_maturity_ladder,
+                         rate_shock_pnl)
 from macro_factor import (                                       # type: ignore
     anchor_from_eba, hybrid_mapping, factor_stats,
 )
 from vasicek import conditional_pd, asset_correlation            # type: ignore
-from config import KAPPA_DOWNTURN_LGD                             # type: ignore
+from config import KAPPA_DOWNTURN_LGD, EBA_RAW_DIR                # type: ignore
 
-st.set_page_config(page_title="Bank portfolio · Vasicek", layout="wide")
+st.set_page_config(page_title="Credit Risk · Loan Book", layout="wide")
 apply_theme()
 config = render_sidebar()
 
 hero(
-    "Bank Portfolio View",
-    eyebrow="Tier 2 · Regulatory · Vasicek/ASRF",
-    deck="Top-10 European banks by IRB exposure under macroeconomic stress. "
-         "Basel III IRB capital formulas applied segment-by-segment; the macro "
-         "shock is mapped onto the Vasicek systematic factor M via an EBA "
-         "stress-test anchor.",
+    "Credit Risk · Loan Book",
+    eyebrow="Tier 2 · Vasicek/ASRF · Basel III IRB",
+    deck="Banking-Book-Loan-Exposures der Top-N EU-Banken unter "
+         "makroökonomischem Stress. Basel-III-IRB-Capital-Formeln Segment-"
+         "by-Segment angewandt; Macro→M via EBA-Stress-Test-Anker. Inklusive "
+         "PD/LGD/EAD-Methodik, NPL-Quoten pro Exposure-Class und kompaktem "
+         "CET1-Impact-Strip am Ende.",
 )
 
 # === Load universe + map macro shock to M =============================
@@ -555,6 +561,150 @@ fig_curve.update_layout(
     showlegend=False,
 )
 st.plotly_chart(fig_curve, use_container_width=True)
+
+st.divider()
+
+# =====================================================================
+# NPL ratios per Exposure-Class (Critique 2 — explicit derivation)
+# =====================================================================
+eyebrow("NPL-Quoten pro Exposure-Class (Critique 2 transparenz)")
+
+st.caption(
+    "**Datenbasis:** EBA Items 2520512 (defaulted exposure, Status=2) ÷ "
+    "2520502 (original exposure, Status=0), Reporting Juni 2025. Diese "
+    "Größen sind 1:1 die Inputs unserer impliziten PD pro Class. NPL-"
+    "Quote = bilanzielle Default-Ratio = backward-looking Forward-PD-"
+    "Approximation."
+)
+
+@st.cache_data(ttl=24*3600, show_spinner=False)
+def _load_class_breakdown():
+    cre_raw = parse_credit_risk_csv(EBA_RAW_DIR / "tr_cre.csv", period=202506)
+    return loan_book_class_breakdown(cre_raw, period=202506)
+
+
+lb = _load_class_breakdown()
+if not lb.empty:
+    bd = load_bank_directory(EBA_RAW_DIR / "TR_Metadata.xlsx")
+    sys_npl = (lb.groupby("bond_category", as_index=False)
+                 .agg(ead_eur=("ead_eur","sum"),
+                      oe_eur=("oe_eur","sum"),
+                      defaulted_eur=("defaulted_eur","sum"),
+                      rwa_eur=("rwa_eur","sum")))
+    sys_npl["npl_ratio"] = sys_npl["defaulted_eur"] / sys_npl["oe_eur"].replace(0, pd.NA)
+    sys_npl["rwa_density"] = sys_npl["rwa_eur"] / sys_npl["ead_eur"].replace(0, pd.NA)
+    n_l, n_r = st.columns([1, 2], gap="medium")
+    with n_l:
+        disp = pd.DataFrame({
+            "Exposure-Class": sys_npl["bond_category"],
+            "EAD bn":         (sys_npl["ead_eur"]/1e9).round(0).astype(int),
+            "Defaulted bn":   (sys_npl["defaulted_eur"]/1e9).round(2),
+            "NPL-Quote":      (sys_npl["npl_ratio"]*100).round(2).astype(str)+"%",
+            "RWA-Density":    (sys_npl["rwa_density"]*100).round(0).astype(str)+"%",
+        })
+        st.dataframe(disp, use_container_width=True, hide_index=True,
+                     height=180)
+    with n_r:
+        # NPL ratio bar chart
+        fig_npl = go.Figure(go.Bar(
+            x=sys_npl["bond_category"],
+            y=sys_npl["npl_ratio"]*100,
+            marker_color=COLORS["mid_blue"], marker_line_width=0,
+            text=[f"{v*100:.2f}%" for v in sys_npl["npl_ratio"]],
+            textposition="outside",
+            textfont=dict(size=11, color=COLORS["navy"]),
+        ))
+        fig_npl.update_layout(
+            title="System-aggregate NPL-Quoten pro Exposure-Class",
+            yaxis_title="NPL Ratio [%]",
+            height=320, bargap=0.4,
+        )
+        st.plotly_chart(fig_npl, use_container_width=True)
+
+st.divider()
+
+# =====================================================================
+# Compact CET1 Impact strip (Phase 4 logic in summary form)
+# =====================================================================
+eyebrow("CET1-Impact (kompakt) · alle Channels integriert")
+
+st.caption(
+    "Kompakte Sicht: Loan-Book-EL + Sovereign-MtM + Trading-Book-P&L "
+    "→ ΔCET1 → ΔRWA → CET1-Quote vorher/nachher. Volle 3-Channel-"
+    "Decomposition mit Bridge-Chart und Threshold-Linien auf der "
+    "**Capital Adequacy**-Page."
+)
+
+if abs(m_used) > 1e-9:
+    @st.cache_data(ttl=24*3600, show_spinner=False)
+    def _load_cap_overview():
+        return parse_capital_overview(EBA_RAW_DIR / "tr_oth.csv", period=202506)
+
+    @st.cache_data(ttl=24*3600, show_spinner=False)
+    def _load_sov_mat():
+        sov_raw = parse_sovereign_csv(EBA_RAW_DIR / "tr_sov.csv", period=202506)
+        return sovereign_maturity_ladder(sov_raw, period=202506)
+
+    cap_over = _load_cap_overview()
+    sov_mat  = _load_sov_mat()
+    bd       = load_bank_directory(EBA_RAW_DIR / "TR_Metadata.xlsx")
+
+    # Match bank names to LEIs
+    name_to_lei = {}
+    loan_bridges_lei = {}
+    for bank_name, portfolio in universe.banks.items():
+        rows = bd[bd["bank_name"] == bank_name]
+        if rows.empty:
+            continue
+        lei = rows["lei"].iloc[0]
+        name_to_lei[bank_name] = lei
+        loan_bridges_lei[lei] = portfolio.capital_bridge(
+            z_factor=m_used, kappa_lgd=KAPPA_DOWNTURN_LGD, confidence=0.999,
+        )
+
+    sov_pnl_df = (rate_shock_pnl(sov_mat, delta_r_pp=config["d_r_10y_pp"]*100)
+                  if abs(config["d_r_10y_pp"]) > 1e-5 else
+                  pd.DataFrame(columns=["LEI_Code","delta_pnl_eur"]))
+    sov_lookup = dict(zip(sov_pnl_df.get("LEI_Code", []),
+                          sov_pnl_df.get("delta_pnl_eur", [])))
+
+    tb_stress = trading_book_stress(cap_over, m_factor=m_used)
+    universe_leis = list(name_to_lei.values())
+    cap_uni = cap_over[cap_over["LEI_Code"].isin(universe_leis)]
+    tb_uni  = tb_stress[tb_stress["LEI_Code"].isin(universe_leis)]
+    bridge = cet1_ratio_bridge(cap_uni, loan_bridges_lei, sov_lookup, tb_uni)
+
+    # Aggregate KPI strip
+    cet1_b   = bridge["cet1_base"].sum()
+    cet1_s   = bridge["cet1_stress"].sum()
+    rwa_b    = bridge["rwa_total_base"].sum()
+    rwa_s    = bridge["rwa_total_stress"].sum()
+    ratio_b  = cet1_b/rwa_b if rwa_b > 0 else 0
+    ratio_s  = cet1_s/rwa_s if rwa_s > 0 else 0
+    delta_pp = (ratio_s - ratio_b) * 100
+
+    cc1, cc2, cc3, cc4 = st.columns(4, gap="small")
+    cc1.metric("CET1 Capital · base → stress",
+               f"€{cet1_b/1e9:.0f} → {cet1_s/1e9:.0f} bn",
+               f"{(cet1_s-cet1_b)/1e9:+.1f} bn")
+    cc2.metric("Total RWA · base → stress",
+               f"€{rwa_b/1e9:.0f} → {rwa_s/1e9:.0f} bn",
+               f"{(rwa_s-rwa_b)/1e9:+.0f} bn")
+    cc3.metric("CET1-Quote vorher", f"{ratio_b*100:.2f}%",
+               delta_color="off")
+    cc4.metric("CET1-Quote nachher", f"{ratio_s*100:.2f}%",
+               f"{delta_pp:+.2f} pp")
+
+    insight(
+        f"<strong>Aggregate CET1-Wirkungskette:</strong> "
+        f"M = {m_used:+.2f} → ΔCET1 {(cet1_s-cet1_b)/1e9:+.1f} bn · "
+        f"ΔRWA {(rwa_s-rwa_b)/1e9:+.0f} bn · CET1-Quote "
+        f"{ratio_b*100:.2f}% → {ratio_s*100:.2f}% "
+        f"({delta_pp:+.2f} pp). Volle Channel-Decomposition: "
+        f"<em>Capital-Adequacy</em>-Page."
+    )
+else:
+    st.info("Apply a macro shock in the sidebar for live CET1-Impact.")
 
 footer(
     f"Source: {universe.source} · Anchor: {anchor.label} "

@@ -37,6 +37,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 # Project root (directory above `backend/`)
@@ -144,7 +145,22 @@ MATURITY_BY_VASICEK_CLASS: dict[str, float] = {
 # Items from SDD.xlsx, Template = "Sovereign"
 ITEM_SOV_GROSS_ON_BS    = 2520810   # Gross carrying amount, on-balance
 ITEM_SOV_NET_ON_BS      = 2520811   # Net carrying amount, on-balance
+ITEM_SOV_HFT            = 2520812   # of which: Held for Trading (P&L)
+ITEM_SOV_FVTPL          = 2520813   # of which: Designated FVTPL (P&L)
+ITEM_SOV_FVOCI          = 2520814   # of which: FVOCI / AfS (OCI)
+ITEM_SOV_AC             = 2520815   # of which: Amortised Cost (no MtM)
 ITEM_SOV_RWA            = 2520822   # RWA on sovereign exposures
+
+# Sovereign accounting-item to CET1-transmission channel.
+#   "P&L"  → ΔFV durchläuft P&L → CET1 retained earnings
+#   "OCI"  → ΔFV via Other Comprehensive Income → CET1 (FVOCI/AfS)
+#   "none" → bei Buchwert (HtM/AC), kein direkter CET1-Effekt unter Stress
+SOV_ACCOUNTING_ITEMS = {
+    ITEM_SOV_HFT:   {"label": "HfT",   "channel": "P&L"},
+    ITEM_SOV_FVTPL: {"label": "FVTPL", "channel": "P&L"},
+    ITEM_SOV_FVOCI: {"label": "FVOCI", "channel": "OCI"},
+    ITEM_SOV_AC:    {"label": "AC",    "channel": "none"},
+}
 
 # Maturity dimension (TR_Metadata sheet "Maturity")
 MATURITY_BUCKETS: dict[int, str] = {
@@ -540,6 +556,97 @@ def aggregate_to_vasicek_segments(
                 "value_adj_eur", "implied_pd"]]
 
 
+# ============================================================================
+# 4b. Banking-Book Bond-Class Breakdown (for the Bonds page)
+# ============================================================================
+# Map an EBA Exposure-Code to a "Bond category" suitable for the Bonds tab.
+# These categories overlap with the Vasicek classes but slice differently —
+# they keep Covered Bonds (603) separate from regular Banks (203/204), and
+# they group Corporate codes that are otherwise split into "corporate" and
+# "sme_corporate" in the Vasicek mapping.
+EXPOSURE_TO_BOND_CATEGORY: dict[int, str] = {
+    # Financials = banks + institutions (excludes covered bonds)
+    202: "Financials", 203: "Financials", 204: "Financials",
+    # Corporates (incl. SME, Specialised Lending, etc.)
+    301: "Corporates", 302: "Corporates", 303: "Corporates", 304: "Corporates",
+    305: "Corporates", 306: "Corporates", 307: "Corporates", 311: "Corporates",
+    312: "Corporates", 308: "Corporates",
+    # Covered Bonds (kept separate)
+    603: "Covered Bonds",
+}
+
+
+def loan_book_class_breakdown(
+    cre_df: pd.DataFrame, *, period: int,
+) -> pd.DataFrame:
+    """Banking-Book Exposures aufgeschlüsselt nach Bond-Kategorie pro Bank.
+
+    Aggregiert Item 2520522 (Exposure Value, post-CCF) aus Items des Loan-
+    Book-IRB pro (Bank × Bond-Category × {Financials, Corporates, Covered}).
+    Das ist die Datenbasis für den "Banking Book Bonds"-Sub-Tab.
+
+    Wichtig: Die EBA-Disclosure unterscheidet **nicht** zwischen Bonds und
+    Loans innerhalb einer Exposure-Class. Das Aggregat enthält beides.
+    Disclaimer im Frontend.
+
+    Filter:
+      - Item = 2520522 (Exposure Value)
+      - Portfolio = 2 (IRB)
+      - Country = 0 (Aggregat)
+      - Status = 0, Perf_Status = 0
+      - Period = period
+      - Exposure-Code in EXPOSURE_TO_BOND_CATEGORY
+
+    Returns
+    -------
+    DataFrame [LEI_Code, bond_category, ead_eur, rwa_eur, defaulted_eur,
+               implied_pd]
+    """
+    df = cre_df[
+        (cre_df["Period"] == period)
+        & cre_df["Exposure"].isin(EXPOSURE_TO_BOND_CATEGORY.keys())
+    ].copy()
+    if df.empty:
+        return pd.DataFrame()
+    df["bond_category"] = df["Exposure"].map(EXPOSURE_TO_BOND_CATEGORY)
+
+    # EAD (Item 2520522, Status=0)
+    ead = (df[(df["Item"] == ITEM_EXPOSURE_VALUE) & (df["Status"] == 0)]
+           .groupby(["LEI_Code", "bond_category"], as_index=False)
+           ["Amount"].sum().rename(columns={"Amount": "ead_m_eur"}))
+    # Original Exposure (for default ratio denominator)
+    oe = (df[(df["Item"] == ITEM_ORIGINAL_EXPOSURE) & (df["Status"] == 0)]
+          .groupby(["LEI_Code", "bond_category"], as_index=False)
+          ["Amount"].sum().rename(columns={"Amount": "oe_m_eur"}))
+    # Defaulted (Status=2)
+    deflt = (df[(df["Item"] == ITEM_DEFAULTED_EXPOSURE) & (df["Status"] == 2)]
+             .groupby(["LEI_Code", "bond_category"], as_index=False)
+             ["Amount"].sum().rename(columns={"Amount": "defaulted_m_eur"}))
+    # RWA (Item 2520532, Status=0)
+    rwa = (df[(df["Item"] == ITEM_RWA) & (df["Status"] == 0)]
+           .groupby(["LEI_Code", "bond_category"], as_index=False)
+           ["Amount"].sum().rename(columns={"Amount": "rwa_m_eur"}))
+
+    out = ead.merge(oe, on=["LEI_Code", "bond_category"], how="outer")
+    out = out.merge(deflt, on=["LEI_Code", "bond_category"], how="outer")
+    out = out.merge(rwa, on=["LEI_Code", "bond_category"], how="outer")
+    out = out.fillna(0.0)
+
+    # Implied PD = defaulted / original_exposure (gleiche Konvention wie
+    # aggregate_to_vasicek_segments). Floor 3 bp, Cap 50%.
+    safe_oe = out["oe_m_eur"].where(out["oe_m_eur"] > 0, np.nan)
+    raw_pd = out["defaulted_m_eur"] / safe_oe
+    out["implied_pd"] = raw_pd.fillna(0.0).clip(lower=3e-4, upper=0.50)
+
+    # Convert to EUR
+    for c in ("ead_m_eur", "oe_m_eur", "defaulted_m_eur", "rwa_m_eur"):
+        out[c.replace("_m_eur", "_eur")] = out[c] * 1e6
+
+    return out[["LEI_Code", "bond_category",
+                "ead_eur", "oe_eur", "defaulted_eur", "rwa_eur",
+                "implied_pd"]]
+
+
 def build_bank_portfolios(
     seg_df: pd.DataFrame, bank_dir: pd.DataFrame,
 ) -> dict[str, BankPortfolio]:
@@ -652,7 +759,10 @@ def parse_sovereign_csv(
       2520810 — On-balance gross carrying amount (primary exposure measure)
       2520822 — RWA on sovereign exposures
     """
-    keep_items = {ITEM_SOV_GROSS_ON_BS, ITEM_SOV_RWA}
+    keep_items = {
+        ITEM_SOV_GROSS_ON_BS, ITEM_SOV_RWA,
+        ITEM_SOV_HFT, ITEM_SOV_FVTPL, ITEM_SOV_FVOCI, ITEM_SOV_AC,
+    }
     chunks = []
     for chunk in pd.read_csv(csv_path, chunksize=chunksize):
         sub = chunk[chunk["Item"].isin(keep_items)]
@@ -725,6 +835,96 @@ def sovereign_maturity_ladder(
     out["label"] = out["Maturity"].map(MATURITY_BUCKETS)
     return out[["LEI_Code", "Maturity", "label", "exposure_eur",
                 "duration_years"]]
+
+
+# ============================================================================
+# 5b1. Sovereign Accounting-Portfolio Split (Items 2520812-2520815)
+# ============================================================================
+def sovereign_by_accounting_class(
+    sov_df: pd.DataFrame, period: int,
+) -> pd.DataFrame:
+    """Sovereign-Bestände pro Bank × Accounting-Class × Maturity-Bucket.
+
+    Unterscheidet die vier IFRS-9-Accounting-Categorien (HfT, FVTPL, FVOCI,
+    AC) — entscheidend für die CET1-Wirkungskette:
+      - HfT/FVTPL : ΔFV durchläuft P&L → CET1 (durchschlagend)
+      - FVOCI     : ΔFV via OCI → CET1 (durchschlagend)
+      - AC        : zu Buchwert, kein P&L-Effekt unter Rate-Stress
+
+    Filter:
+      - Item ∈ {2520812, 2520813, 2520814, 2520815}
+      - Country > 0 (specific countries — Country=0 nicht reportiert)
+      - Maturity ∈ [1, 7] (specific buckets, nicht Total=8)
+      - Accounting_portfolio = 0 (Items kodieren bereits die Accounting-Class)
+
+    Returns
+    -------
+    DataFrame mit Spalten [LEI_Code, accounting_class, channel, Maturity,
+    label, exposure_eur, duration_years]. exposure_eur ist die Summe
+    über alle Counterparty-Countries innerhalb der gegebenen
+    Bank/Class/Maturity-Kombination.
+    """
+    df = sov_df[
+        sov_df["Item"].isin(SOV_ACCOUNTING_ITEMS.keys())
+        & (sov_df["Period"] == period)
+        & (sov_df["Country"] > 0)
+        & (sov_df["Accounting_portfolio"] == 0)
+        & (sov_df["Maturity"].between(1, 7))
+    ].copy()
+
+    if df.empty:
+        return pd.DataFrame()
+
+    # Sum across counterparty-countries
+    out = (df.groupby(["LEI_Code", "Item", "Maturity"], as_index=False)
+             ["Amount"].sum()
+             .rename(columns={"Amount": "exposure_m_eur"}))
+    out["exposure_eur"]   = out["exposure_m_eur"] * 1e6
+    out["duration_years"] = out["Maturity"].map(DURATION_BY_BUCKET)
+    out["label"]          = out["Maturity"].map(MATURITY_BUCKETS)
+    out["accounting_class"] = out["Item"].map(
+        lambda x: SOV_ACCOUNTING_ITEMS[x]["label"]
+    )
+    out["channel"] = out["Item"].map(
+        lambda x: SOV_ACCOUNTING_ITEMS[x]["channel"]
+    )
+    return out[["LEI_Code", "accounting_class", "channel", "Maturity",
+                "label", "exposure_eur", "duration_years"]]
+
+
+def sovereign_cet1_impact(
+    sov_acct_df: pd.DataFrame, delta_r_pp: float,
+) -> pd.DataFrame:
+    """Pro Bank: CET1-Impact aus Sovereign-Bonds unter Δr-Shock, gespalten
+    nach Accounting-Class.
+
+    Formel:  ΔFV_bucket = -D_bucket * (Δr_pp/100) * exposure_eur
+    CET1-Wirkung: nur HfT/FVTPL/FVOCI durchschlagend; AC bleibt konstant.
+
+    Returns
+    -------
+    DataFrame [LEI_Code, accounting_class, channel, fair_value_eur,
+               delta_fv_eur, cet1_impact_eur]
+    """
+    if sov_acct_df.empty:
+        return pd.DataFrame(columns=["LEI_Code", "accounting_class", "channel",
+                                     "fair_value_eur", "delta_fv_eur",
+                                     "cet1_impact_eur"])
+    delta_y = delta_r_pp / 100.0
+    df = sov_acct_df.copy()
+    df["delta_fv_eur"] = -df["duration_years"] * delta_y * df["exposure_eur"]
+
+    # Aggregate per bank × accounting_class
+    agg = (df.groupby(["LEI_Code", "accounting_class", "channel"],
+                      as_index=False)
+             .agg(fair_value_eur=("exposure_eur", "sum"),
+                  delta_fv_eur=("delta_fv_eur", "sum")))
+    # CET1 impact: P&L and OCI channels durchschlagend; AC nicht
+    agg["cet1_impact_eur"] = agg.apply(
+        lambda r: r["delta_fv_eur"] if r["channel"] in ("P&L", "OCI") else 0.0,
+        axis=1,
+    )
+    return agg
 
 
 def sovereign_kpis_per_bank(
@@ -866,6 +1066,7 @@ def rate_shock_pnl_per_bucket(
 ITEM_CET1_CAPITAL    = 2520102   # Common Equity Tier 1 Capital
 ITEM_OCI             = 2520105   # Accumulated Other Comprehensive Income
 ITEM_CR_RWA          = 2520201   # Credit Risk RWA (excl. CCR & Securitisations)
+ITEM_SECURITISATION_RWA = 2520209  # Securitisation exposures RWA (banking book)
 ITEM_MR_RWA          = 2520210   # Market Risk RWA (Position, FX, Commodities)
 ITEM_OP_RWA          = 2520215   # Operational Risk RWA
 ITEM_TOTAL_RWA       = 2520220   # Total Risk Exposure Amount
@@ -887,8 +1088,8 @@ def parse_capital_overview(
     Werte in EUR (Input ist m EUR → ×1e6).
     """
     keep_items = {
-        ITEM_CET1_CAPITAL, ITEM_OCI, ITEM_CR_RWA, ITEM_MR_RWA,
-        ITEM_OP_RWA, ITEM_TOTAL_RWA, ITEM_TB_PNL,
+        ITEM_CET1_CAPITAL, ITEM_OCI, ITEM_CR_RWA, ITEM_SECURITISATION_RWA,
+        ITEM_MR_RWA, ITEM_OP_RWA, ITEM_TOTAL_RWA, ITEM_TB_PNL,
     }
     chunks = []
     for chunk in pd.read_csv(csv_path, chunksize=chunksize, low_memory=False):
@@ -910,13 +1111,14 @@ def parse_capital_overview(
 
     # Map item codes to readable column names
     rename_map = {
-        ITEM_CET1_CAPITAL:  "cet1_m_eur",
-        ITEM_OCI:           "oci_m_eur",
-        ITEM_CR_RWA:        "rwa_credit_m_eur",
-        ITEM_MR_RWA:        "rwa_market_m_eur",
-        ITEM_OP_RWA:        "rwa_operational_m_eur",
-        ITEM_TOTAL_RWA:     "rwa_total_m_eur",
-        ITEM_TB_PNL:        "tb_pnl_m_eur",
+        ITEM_CET1_CAPITAL:        "cet1_m_eur",
+        ITEM_OCI:                 "oci_m_eur",
+        ITEM_CR_RWA:              "rwa_credit_m_eur",
+        ITEM_SECURITISATION_RWA:  "rwa_securitisation_m_eur",
+        ITEM_MR_RWA:              "rwa_market_m_eur",
+        ITEM_OP_RWA:              "rwa_operational_m_eur",
+        ITEM_TOTAL_RWA:           "rwa_total_m_eur",
+        ITEM_TB_PNL:              "tb_pnl_m_eur",
     }
     pivot = pivot.rename(columns=rename_map).reset_index()
 

@@ -190,12 +190,12 @@ st.markdown(
 )
 nav1 = st.columns(3, gap="small")
 with nav1[0]:
-    st.page_link("pages/1_Bank_Portfolio.py", label="Bank Portfolio",
-                 help="EBA Top-N banks · IRB capital under macro stress",
+    st.page_link("pages/1_Credit_Risk.py", label="Credit Risk · Loan Book",
+                 help="EBA Top-N banks · IRB Vasicek · NPL · CET1-Impact",
                  use_container_width=True)
 with nav1[1]:
-    st.page_link("pages/2_Sovereign_Risk.py", label="Sovereign Risk",
-                 help="Doom-loop concentration · duration-shock P&L",
+    st.page_link("pages/2_Bonds.py", label="Bonds",
+                 help="Sovereigns · Banking-Book · Trading-Book + ABS",
                  use_container_width=True)
 with nav1[2]:
     st.page_link("pages/3_Capital_Adequacy.py", label="Capital Adequacy",
