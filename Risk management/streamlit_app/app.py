@@ -206,23 +206,37 @@ with nav1[2]:
 st.markdown(
     "<div style='font-family: var(--mc-sans); font-size: 0.85rem; "
     "color: var(--mc-stone); margin: 1.4rem 0 1rem 0; "
-    "letter-spacing: 0.04em; text-transform: uppercase;'>Engine &amp; reference"
+    "letter-spacing: 0.04em; text-transform: uppercase;'>Engine &amp; validation"
     "</div>",
     unsafe_allow_html=True,
 )
-nav2 = st.columns(3, gap="small")
+nav2 = st.columns(2, gap="small")
 with nav2[0]:
     st.page_link("pages/4_Yield_Curve.py", label="Yield Curve",
                  help="Bundesbank Svensson · multi-maturity shifts · "
                       "factor history",
                  use_container_width=True)
 with nav2[1]:
-    st.page_link("pages/5_Annahmen.py", label="Annahmen & Datenbasis",
+    st.page_link("pages/5_Backtesting.py", label="Backtesting",
+                 help="Outcomes analysis SR 11-7 · forecast vs realized · "
+                      "RWA decomposition · 6 EBA vintages",
+                 use_container_width=True)
+
+st.markdown(
+    "<div style='font-family: var(--mc-sans); font-size: 0.85rem; "
+    "color: var(--mc-stone); margin: 1.4rem 0 1rem 0; "
+    "letter-spacing: 0.04em; text-transform: uppercase;'>Reference"
+    "</div>",
+    unsafe_allow_html=True,
+)
+nav3 = st.columns(2, gap="small")
+with nav3[0]:
+    st.page_link("pages/6_Annahmen.py", label="Annahmen & Datenbasis",
                  help="Three-tier governance disclosure · "
                       "Executive · Validator · Quant",
                  use_container_width=True)
-with nav2[2]:
-    st.page_link("pages/6_Methodology.py", label="Methodology",
+with nav3[1]:
+    st.page_link("pages/7_Methodology.py", label="Methodology",
                  help="Full assumptions document · all formulas + sources",
                  use_container_width=True)
 

@@ -989,6 +989,182 @@ def trading_book_stress(
 # ============================================================================
 # 5e. CET1-Ratio Bridge (3-channel decomposition)
 # ============================================================================
+# ============================================================================
+# 5f. Vintage-aware loader (for backtesting · Phase 5)
+# ============================================================================
+def get_sdd_translation_table(metadata_dir: Path) -> pd.DataFrame:
+    """Lädt die SDD-Item-Translation-Tabelle (TR_2020 ... TR_2025).
+
+    Returns
+    -------
+    DataFrame mit Spalten ['Item', 'Item_TR_2024', 'Item_TR_2023',
+    'Item_TR_2022', 'Item_TR_2021', 'Item_TR_2020A', 'Label', 'CSV',
+    'Template'].
+    """
+    sdd_path = Path(metadata_dir) / "SDD.xlsx"
+    if not sdd_path.exists():
+        raise FileNotFoundError(f"SDD.xlsx not found in {metadata_dir}")
+    return pd.read_excel(sdd_path, sheet_name="SDD", header=1)
+
+
+def resolve_item_for_vintage(
+    item_2025: int, vintage: str, sdd: pd.DataFrame,
+) -> int | None:
+    """Mappt einen 2025-Item-Code auf den entsprechenden vintage-spezifischen Code.
+
+    EBA Items shiften pro Jahr (2x20yyy mit x = vintage decade digit):
+        2020102 (TR_2020) → 2120102 (TR_2021) → ... → 2520102 (TR_2025)
+    """
+    col_map = {
+        "2020": "Item_TR_2020A",   # Spring 2020 vintage
+        "2020S": "Item_TR_2020S",
+        "2021": "Item_TR_2021",
+        "2022": "Item_TR_2022",
+        "2023": "Item_TR_2023",
+        "2024": "Item_TR_2024",
+        "2025": "Item",            # Item column itself = TR_2025
+    }
+    col = col_map.get(vintage)
+    if col is None or col not in sdd.columns:
+        return None
+    rows = sdd[sdd["Item"] == item_2025]
+    if len(rows) == 0:
+        return None
+    val = rows[col].iloc[0]
+    if pd.isna(val):
+        return None
+    try:
+        return int(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def _read_csv_resilient(path: Path, **kwargs) -> pd.DataFrame:
+    """Read CSV with utf-8 → latin-1 fallback (older EBA vintages need latin-1)."""
+    try:
+        return pd.read_csv(path, **kwargs)
+    except UnicodeDecodeError:
+        return pd.read_csv(path, encoding="latin-1", **kwargs)
+
+
+def parse_capital_overview_vintage(
+    eba_dir: Path | str,
+    *,
+    vintage: str,
+    items_2025: tuple[int, ...] = (
+        ITEM_CET1_CAPITAL, ITEM_OCI, ITEM_CR_RWA, ITEM_MR_RWA,
+        ITEM_OP_RWA, ITEM_TOTAL_RWA, ITEM_TB_PNL,
+    ),
+    chunksize: int = 500_000,
+) -> pd.DataFrame:
+    """Lädt Capital + RWA aus einem historischen Vintage.
+
+    Erkennt Pfade automatisch:
+      - vintage = "2025" → eba_dir / "tr_oth.csv"  (current snapshot)
+      - vintage = "2024" → eba_dir / "transparency_2024" / "tr_oth.csv"
+      - usw.
+
+    Mappt 2025-Item-Codes auf vintage-spezifische Codes via SDD-Translation.
+
+    Returns long-format DataFrame [LEI_Code, Period, item_label, Amount_eur].
+    """
+    eba_dir = Path(eba_dir)
+    if vintage == "2025":
+        oth_path = eba_dir / "tr_oth.csv"
+        sdd_dir = eba_dir
+    else:
+        oth_path = eba_dir / f"transparency_{vintage}" / "tr_oth.csv"
+        sdd_dir = eba_dir / f"transparency_{vintage}"
+    if not oth_path.exists():
+        raise FileNotFoundError(f"tr_oth.csv not found at {oth_path}")
+
+    # Load SDD for this vintage (or fall back to 2025 SDD which has all
+    # historical mappings).
+    sdd = get_sdd_translation_table(eba_dir)
+
+    # Resolve items for this vintage
+    item_resolution = {}
+    for item_2025 in items_2025:
+        resolved = resolve_item_for_vintage(item_2025, vintage, sdd)
+        if resolved is not None:
+            item_resolution[resolved] = item_2025
+
+    if not item_resolution:
+        return pd.DataFrame()
+
+    # Stream and filter
+    chunks = []
+    for chunk in _read_csv_resilient(oth_path, chunksize=chunksize, low_memory=False):
+        sub = chunk[chunk["Item"].isin(item_resolution.keys())]
+        if len(sub):
+            chunks.append(sub[["LEI_Code", "Period", "Item", "Amount"]])
+    if not chunks:
+        return pd.DataFrame()
+
+    raw = pd.concat(chunks, ignore_index=True)
+    # Translate vintage-Item back to canonical 2025-label
+    raw["item_2025"] = raw["Item"].map(item_resolution)
+    raw["item_label"] = raw["item_2025"].map({
+        ITEM_CET1_CAPITAL:   "cet1",
+        ITEM_OCI:            "oci",
+        ITEM_CR_RWA:         "rwa_credit",
+        ITEM_MR_RWA:         "rwa_market",
+        ITEM_OP_RWA:         "rwa_operational",
+        ITEM_TOTAL_RWA:      "rwa_total",
+        ITEM_TB_PNL:         "tb_pnl",
+    })
+    raw["Amount_eur"] = raw["Amount"] * 1e6
+    raw["vintage"] = vintage
+    return raw[["LEI_Code", "Period", "item_label", "Amount_eur", "vintage"]]
+
+
+def load_historical_capital_panel(
+    eba_dir: Path | str,
+    vintages: tuple[str, ...] = ("2020", "2021", "2022", "2023", "2024", "2025"),
+) -> pd.DataFrame:
+    """Konkateniert Capital-Panels über alle Vintages zu einer langen Zeitreihe.
+
+    Output schema:
+      LEI_Code (str) · Period (int YYYYMM) · item_label (str) · Amount_eur (float) · vintage (str)
+
+    Bei überlappenden Periods (z.B. Q3 2020 in 2021-Vintage UND 2020-Autumn-Vintage)
+    wird die *neuere* Vintage bevorzugt — die EBA korrigiert in späteren
+    Releases gelegentlich publizierte Daten der Vorperiode.
+    """
+    panels = []
+    for v in vintages:
+        try:
+            p = parse_capital_overview_vintage(eba_dir, vintage=v)
+            if not p.empty:
+                panels.append(p)
+        except FileNotFoundError:
+            continue
+    if not panels:
+        return pd.DataFrame()
+
+    full = pd.concat(panels, ignore_index=True)
+    # When same (LEI, Period, label) appears in multiple vintages, keep the latest vintage
+    full = (full.sort_values(["LEI_Code", "Period", "item_label", "vintage"])
+                .drop_duplicates(subset=["LEI_Code", "Period", "item_label"],
+                                 keep="last"))
+    return full
+
+
+def panel_to_wide(panel: pd.DataFrame) -> pd.DataFrame:
+    """Pivots the long panel to wide: rows = (LEI, Period), columns = item_label."""
+    if panel.empty:
+        return pd.DataFrame()
+    wide = (panel.pivot_table(
+                index=["LEI_Code", "Period"],
+                columns="item_label", values="Amount_eur",
+                aggfunc="first",
+            ).reset_index())
+    if "rwa_total" in wide.columns and "cet1" in wide.columns:
+        # Compute CET1 ratio inline
+        wide["cet1_ratio"] = wide["cet1"] / wide["rwa_total"].replace(0, pd.NA)
+    return wide
+
+
 def cet1_ratio_bridge(
     capital_df: pd.DataFrame,
     loan_book_bridge_per_bank: dict[str, dict],
