@@ -1,47 +1,54 @@
 # EU Banking Credit Stress Cockpit
 
-Regulatory credit-risk view of the European banking system, built on the EBA EU-wide Transparency Exercise 2025 and a Vasicek/ASRF — Basel-III IRB engine. Live macroeconomic stress in two channels:
+Regulatorische Credit-Risk-Sicht auf das europäische Bankensystem, gebaut auf der EBA EU-wide Transparency Exercise 2025 + Vasicek/ASRF (Basel-III IRB). Drei Stress-Channels, einheitliche CET1-Wirkungskette:
 
-1. **Loan-book channel** — bank-portfolio expected loss, RWA and capital under macro shocks via Vasicek/ASRF.
-2. **Sovereign-book channel** — modified-duration mark-to-market on the sovereign portfolio, driven by the same Δr_10y.
+1. **Loan-Book-Channel** — Vasicek-conditional-PD + Downturn-LGD → Δ-EL / Δ-RWA
+2. **Sovereign-/Bonds-Channel** — IFRS-9-Accounting-Class-Split (HfT/FVTPL/FVOCI/AC), Modified-Duration-MtM → ΔFV → CET1
+3. **Trading-Book-Channel** — FRTB-style Market-RWA-Multiplier + TB-P&L-Haircut
 
-The Bundesbank Svensson zero-curve drives both the rate shock vector and the discounting framework.
+Bundesbank-Svensson-Zero-Curve treibt den Δr-Schock; ICE Brent treibt den Energy-Faktor.
 
-## Repository layout
+## Repository-Struktur
 
 ```
 Risk management/
-│
-├── config.py                              ← paths + Vasicek/EBA config
-├── 03_fetch_brent_crude.py                ← Brent crude (yfinance)
-├── 04_fetch_bundesbank_svensson.py        ← Svensson params (Bundesbank CSV)
+├── config.py                    ← Pfade + Vasicek/EBA-Konfig
+├── 03_fetch_brent_crude.py      ← Brent (yfinance)
+├── 04_fetch_bundesbank_svensson.py  ← Svensson-Params (Bundesbank)
 │
 ├── backend/
-│   ├── svensson.py                        ← Svensson zero-curve engine
-│   ├── vasicek.py                         ← Vasicek/ASRF + Basel-III IRB
-│   ├── eba_loader.py                      ← EBA Transparency CSV parsing + sovereign
-│   └── macro_factor.py                    ← (Brent, Δr_10y) → Vasicek M
+│   ├── svensson.py              ← Zero-Curve-Engine
+│   ├── vasicek.py               ← Vasicek/ASRF + Basel-III IRB
+│   ├── eba_loader.py            ← EBA-CSV-Parsing + Sovereign + Capital
+│   ├── macro_factor.py          ← (Brent, Δr) → Vasicek-M
+│   └── backtesting.py           ← historisches Panel + Forecast vs Realized
 │
 ├── streamlit_app/
-│   ├── app.py                             ← landing page
-│   ├── components/                        ← theme, sidebar, data loader
+│   ├── app.py                   ← Landing-Page
+│   ├── components/              ← theme · sidebar · methodology · data_loader
 │   └── pages/
-│       ├── 1_Bank_Portfolio.py            ← Vasicek IRB capital under stress
-│       ├── 2_Sovereign_Risk.py            ← doom-loop heatmap + duration P&L
-│       ├── 3_Yield_Curve.py               ← Bundesbank Svensson + factor history
-│       └── 4_Methodology.py               ← rendered MODEL_ASSUMPTIONS.md
+│       ├── 1_Credit_Risk.py     ← Vasicek IRB + NPL + CET1-Strip
+│       ├── 2_Bonds.py           ← 3 Sub-Tabs: Sovereigns · Banking-Book · TB+ABS
+│       ├── 3_Capital_Adequacy.py ← 3-Channel CET1-Ratio
+│       ├── 4_Yield_Curve.py     ← Bundesbank-Svensson + β-Shifts
+│       ├── 5_Backtesting.py     ← 22 Quartals-Stichtage 2019-2025
+│       ├── 6_Annahmen.py        ← Governance-Doku (3 Layer)
+│       └── 7_Methodology.py     ← Vollständige MODEL_ASSUMPTIONS.md
 │
 ├── data/
-│   ├── bundesbank_svensson.csv            ← Bundesbank download (manual)
+│   ├── bundesbank_svensson.csv  ← Bundesbank-Download (manuell)
 │   ├── tr_cre.csv  (~123 MB, EBA, gitignored)
 │   ├── tr_sov.csv  (~91 MB, EBA, gitignored)
-│   ├── TR_Metadata.xlsx, SDD.xlsx         ← EBA dictionaries
-│   └── cache/
-│       ├── brent_crude.parquet
-│       └── svensson_params.parquet
+│   ├── tr_oth.csv  (~14 MB, EBA, gitignored)
+│   ├── tr_mrk.csv  (~3.6 MB, EBA, gitignored)
+│   ├── TR_Metadata.xlsx, SDD.xlsx  ← EBA-Dictionaries
+│   ├── cache/
+│   │   ├── brent_crude.parquet
+│   │   └── svensson_params.parquet
+│   └── transparency_2020/ … 2024/  ← historische Vintages für Backtesting
 │
-├── MODEL_ASSUMPTIONS.md                   ← single source of truth for assumptions
-└── README.md
+├── MODEL_ASSUMPTIONS.md         ← Single Source of Truth
+└── README.md                    ← (dieses File)
 ```
 
 ## Setup
@@ -50,48 +57,77 @@ Risk management/
 pip install streamlit pandas pyarrow numpy scipy openpyxl yfinance plotly
 ```
 
-## Bringing in Bundesbank Svensson parameters
+## Daten beschaffen
 
-Download once from the Bundesbank time-series database (Svensson method, daily values for listed federal securities):
-- https://www.bundesbank.de/dynamic/action/de/statistiken/zeitreihen-datenbanken/zeitreihen-datenbank/759778/759778
-- Export as CSV, save to `data/bundesbank_svensson.csv`
-- Run `python 04_fetch_bundesbank_svensson.py` to build the parquet cache
+### Bundesbank Svensson (einmalig)
 
-## Bringing in EBA Transparency 2025 data
+```text
+URL:  https://www.bundesbank.de/dynamic/action/de/statistiken/zeitreihen-datenbanken/zeitreihen-datenbank/759778/759778
+```
 
-Download the public EBA EU-wide Transparency Exercise 2025 release (~210 MB total):
-- https://www.eba.europa.eu/risk-and-data-analysis/eu-wide-transparency-exercise
-- Save the four CSVs (`tr_cre.csv`, `tr_sov.csv`, `tr_oth.csv`, `tr_mrk.csv`) and the two Excel dictionaries (`TR_Metadata.xlsx`, `SDD.xlsx`) into `data/`.
+Als CSV exportieren → `data/bundesbank_svensson.csv` → `python 04_fetch_bundesbank_svensson.py`
 
-The cockpit's loader (`backend/eba_loader.py`) auto-discovers them via `config.EBA_RAW_DIR`.
+### EBA Transparency 2025
 
-## Running
+Download von [eba.europa.eu/risk-and-data-analysis/eu-wide-transparency-exercise](https://www.eba.europa.eu/risk-and-data-analysis/eu-wide-transparency-exercise):
+- `tr_cre.csv`, `tr_sov.csv`, `tr_oth.csv`, `tr_mrk.csv`
+- `TR_Metadata.xlsx`, `SDD.xlsx`
+
+Nach `data/`. Der Loader (`backend/eba_loader.py`) findet sie automatisch via `config.EBA_RAW_DIR`.
+
+### Historische Vintages (für Backtesting-Page)
+
+Optional. Die Vintages 2020–2024 nach `data/transparency_2020/` … `data/transparency_2024/` ablegen — gleicher 6-File-Satz. URLs in der Backtesting-Page-Doku.
+
+## Cockpit starten
 
 ```bash
 cd "Risk management"
 streamlit run streamlit_app/app.py
 ```
 
-Sidebar drives the live macro stress (ΔBrent, Svensson β-shifts → Δr_10y). All charts on every page recompute on change.
+→ Browser öffnet `http://localhost:8501`. Linke Sidebar: Live-Macro-Slider (ΔBrent + Svensson-β → Δr_10y). Alle Pages reagieren in Echtzeit.
 
-## Backend self-tests
+### Falls Pages nicht öffnen oder fehlerhaft sind
 
-Each backend module has a `__main__` validation block:
+99% der Fälle: **stale `__pycache__/`-Files** aus einer früheren Version (insb. nach Page-Renamings). Einmalig aufräumen:
 
 ```bash
-python backend/svensson.py        # Svensson Excel cross-check + 6 tests
-python backend/vasicek.py         # 6 ASRF / IRB tests (incl BCBS reference)
-python backend/eba_loader.py      # synthetic + real-loader smoke tests
-python backend/macro_factor.py    # 6 anchor + data-route tests
+# vom Risk-management-Ordner aus
+find . -type d -name "__pycache__" -exec rm -rf {} +
+```
+
+Dann `streamlit run streamlit_app/app.py` neu starten. Python regeneriert die Caches korrekt für die aktuellen Pages.
+
+Alternativ einmal `python run_clean.py` (bei Fix beigelegt — ruft den obigen Befehl + Streamlit-Start zusammen auf).
+
+## Backend Self-Tests
+
+```bash
+python backend/svensson.py        # Svensson Excel-Cross-Check + 6 Tests
+python backend/vasicek.py         # 9 ASRF/IRB Tests (BCBS-Referenz, Bridge, Downturn-LGD)
+python backend/eba_loader.py      # Synthetic + Real-Loader-Smoke-Tests
+python backend/macro_factor.py    # 6 Anchor + Data-Route Tests
+python backend/backtesting.py     # 3 Forecast-vs-Realized Tests
 ```
 
 Expected output: `[PASS] All tests passed.`
 
-## Known limitations
+## Bekannte Limitationen
 
-See `MODEL_ASSUMPTIONS.md` §8 for the full list. Highlights:
+Vollständige Liste in `MODEL_ASSUMPTIONS.md`. Highlights:
 
-- **Implied PD** is the observed default ratio (backward-looking) — stress sensitivity is correct, absolute level conservative.
-- **F-IRB LGD assumptions** stand in for unpublished A-IRB internal models.
-- **Sovereign book**: parallel-shift only, no credit-spread or hedging adjustments.
-- **EBA stress-test 2025 file**: password-protected — anchor values hardcoded from the published Methodology Note.
+- **Implied PD** = beobachteter Default-Ratio (backward-looking) — Stress-Sensitivität korrekt, absolutes Niveau konservativ.
+- **F-IRB-LGD** statt A-IRB-Modell (CRR Art. 181, EBA Stress Test 2023).
+- **Sovereign-Book**: Parallel-Shift only, kein Credit-Spread, kein Hedging.
+- **Banking-Book Bonds (Financials/Corporates/Covered)**: in EBA-Disclosure mit Loans aggregiert — keine isolierte Bond-Position rekonstruierbar.
+- **Trading-Book**: nur Market-RWA-Aggregat, keine Issuer-Granularität.
+- **EBA Stress Test 2025 File**: passwortgeschützt — Adverse-Anker hardcoded aus Methodology Note.
+
+## Wichtige Quellen
+
+- Vasicek, O. (2002). *Loan Portfolio Value*. Risk Magazine.
+- BCBS (2017). *Basel III: Finalising post-crisis reforms*.
+- EBA (2025). *EU-wide Transparency Exercise 2025 — Public Disclosure*.
+- EBA GL 14 (ICAAP / Stress-Testing).
+- SR 11-7 (Federal Reserve / OCC Supervisory Guidance on Model Risk Management).
