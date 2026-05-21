@@ -190,54 +190,42 @@ st.markdown(
 )
 nav1 = st.columns(3, gap="small")
 with nav1[0]:
-    st.page_link("pages/1_Credit_Risk.py", label="Credit Risk · Loan Book",
-                 help="EBA Top-N banks · IRB Vasicek · NPL · CET1-Impact",
+    st.page_link("pages/1_Wirkungskette.py",
+                 label="1 · Wirkungskette",
+                 help="Home · End-to-end-Pipeline · Process-Map · M-Slider",
                  use_container_width=True)
 with nav1[1]:
-    st.page_link("pages/2_Bonds.py", label="Bonds",
-                 help="Sovereigns · Banking-Book · Trading-Book + ABS",
+    st.page_link("pages/2_Kreditbuch.py",
+                 label="2 · Kreditbuch",
+                 help="Loan-Book-Channel · Vasicek/ASRF IRB · Capital-Bridge "
+                      "· EL-Decomposition pro Bank",
                  use_container_width=True)
 with nav1[2]:
-    st.page_link("pages/3_Capital_Adequacy.py", label="Capital Adequacy",
-                 help="Three-channel CET1 ratio · Loan + Sovereign + "
-                      "Trading Book",
+    st.page_link("pages/3_Marktbuch.py",
+                 label="3 · Marktbuch",
+                 help="Bonds-Channel · 4 Sub-Tabs: Yield-Curve · Sovereigns "
+                      "· Banking-Book Bonds · Trading-Book + ABS",
                  use_container_width=True)
 
 st.markdown(
     "<div style='font-family: var(--mc-sans); font-size: 0.85rem; "
     "color: var(--mc-stone); margin: 1.4rem 0 1rem 0; "
-    "letter-spacing: 0.04em; text-transform: uppercase;'>Engine &amp; validation"
-    "</div>",
+    "letter-spacing: 0.04em; text-transform: uppercase;'>"
+    "Eigenkapital &amp; Validierung</div>",
     unsafe_allow_html=True,
 )
 nav2 = st.columns(2, gap="small")
 with nav2[0]:
-    st.page_link("pages/4_Yield_Curve.py", label="Yield Curve",
-                 help="Bundesbank Svensson · multi-maturity shifts · "
-                      "factor history",
+    st.page_link("pages/4_Eigenkapital.py",
+                 label="4 · Eigenkapital-Wirkung",
+                 help="3-Channel CET1-Quote · Threshold-Analyse "
+                      "(4.5% / 7% / 8%) · M-Sensitivity-Curve",
                  use_container_width=True)
 with nav2[1]:
-    st.page_link("pages/5_Backtesting.py", label="Backtesting",
-                 help="Outcomes analysis SR 11-7 · forecast vs realized · "
-                      "RWA decomposition · 6 EBA vintages",
-                 use_container_width=True)
-
-st.markdown(
-    "<div style='font-family: var(--mc-sans); font-size: 0.85rem; "
-    "color: var(--mc-stone); margin: 1.4rem 0 1rem 0; "
-    "letter-spacing: 0.04em; text-transform: uppercase;'>Reference"
-    "</div>",
-    unsafe_allow_html=True,
-)
-nav3 = st.columns(2, gap="small")
-with nav3[0]:
-    st.page_link("pages/6_Annahmen.py", label="Annahmen & Datenbasis",
-                 help="Three-tier governance disclosure · "
-                      "Executive · Validator · Quant",
-                 use_container_width=True)
-with nav3[1]:
-    st.page_link("pages/7_Methodology.py", label="Methodology",
-                 help="Full assumptions document · all formulas + sources",
+    st.page_link("pages/5_Validierung.py",
+                 label="5 · Validierung & Methodologie",
+                 help="Backtesting (22 EBA-Vintages) · Annahmen-Disclosure "
+                      "· MODEL_ASSUMPTIONS.md",
                  use_container_width=True)
 
 footer(

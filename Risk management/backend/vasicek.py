@@ -221,33 +221,61 @@ def downturn_lgd(
     lgd_base: float | np.ndarray,
     m_factor: float,
     kappa: float = 0.3,
+    *,
+    exponent: float = 1.0,
+    cap_mode: str = "hard",
 ) -> float | np.ndarray:
-    """Stress-elastische LGD nach EBA-Stresstest-Konvention.
+    """Stress-elastische LGD mit V2-Erweiterungen (Non-Linearität + Logit-Cap).
 
-    Konzept (EBA 2023 Methodology, BCBS 2017): unter adversem Stress
-    steigt LGD über die Baseline-Annahme hinaus, weil Sicherheiten-Werte
-    (Immobilien, Aktien) korreliert mit dem Default-Ereignis fallen
-    (Wrong-Way-Risk, downturn-LGD-Floor in CRR Art. 181).
+    Funktionale Form V1 (linear, hard-cap):
+        LGD_stress = min(LGD_base · (1 + κ · |M|), 1.0),  M < 0
 
-    Funktionale Form: linear in |M| sofern M < 0:
-        LGD_stress = LGD_base · (1 + κ · max(-M, 0))
+    Funktionale Form V2 (Non-Linearität via exponent ≠ 1, Logit-Cap optional):
+        stress_signal = κ · |M|^exponent
+        cap_mode = "hard"  : LGD = min(LGD_base · (1 + stress_signal), 1.0)
+        cap_mode = "logit" : LGD = σ(logit(LGD_base) + stress_signal),
+                              asymptotisch gegen 1.0 ohne mathematische
+                              Varianz-Abschnürung an der 100%-Grenze.
 
-    Konsequenz:
-        M = 0    → LGD_stress = LGD_base       (no stress)
-        M = -1   → LGD_stress = LGD_base · 1.30
-        M = -2.5 → LGD_stress = LGD_base · 1.75 (EBA 2025 adverse anchor)
-        M > 0    → LGD_stress = LGD_base       (benign — keine LGD-Reduktion
-                                                 in der Konvention)
+    Adressiert vier methodische Kritikpunkte:
 
-    Cap bei 100% (LGD ≤ 1.0).
+      1. Lineare Skalierung vs. Realität (Tail-Risk) — `exponent > 1`
+         erlaubt überproportionalen LGD-Anstieg bei extremem M.
+         Beispiel exponent = 1.5: bei |M| = 2.5 wird der Multiplikator
+         κ·2.5^1.5 = 0.30·3.95 = 1.19 statt 0.75 (lineare V1).
 
-    κ = 0.3 ist EBA-2023-Stresstest-konsistent für Corporate-Klassen;
-    für Mortgage tendenziell niedriger (~0.15-0.2), für Retail höher
-    (~0.3-0.4). V1 nutzt κ uniform; sektor-spezifisches κ ist V2.
+      2. Hard-Cap bei 100% — bei QRRE (Baseline 65%) sättigt die V1 schon
+         bei |M| ≈ 1.79 (= (1/0.65 - 1) / 0.30). `cap_mode = "logit"`
+         entfernt diese Diskontinuität: die Sigmoid-Transformation nähert
+         sich 100% asymptotisch ohne Informationsverlust im Extrembereich.
+
+      3. Sektor-Granularität (κ pro Class) — wird durch die Aufrufer
+         (BankPortfolio.*) erreicht; downturn_lgd selbst bleibt skalar-κ.
+
+      4. F-IRB vs. A-IRB Kalibrierung — wird im `lgd_calibration`-Parameter
+         der Aufrufer (siehe irb_capital_requirement) abgebildet, NICHT
+         hier. Eingang `lgd_base` ist bereits kalibriert.
+
+    Konsequenz für V1-Default (exponent=1.0, cap_mode="hard"): identische
+    Werte wie zuvor — keine Verhaltensänderung ohne explizite V2-Aktivierung.
     """
     if m_factor >= 0:
         return lgd_base
-    multiplier = 1.0 + kappa * abs(m_factor)
+
+    stress_signal = float(kappa) * (abs(float(m_factor)) ** float(exponent))
+
+    if cap_mode == "logit":
+        eps = 1e-9
+        if isinstance(lgd_base, np.ndarray):
+            x = np.clip(lgd_base, eps, 1.0 - eps)
+            logit_base = np.log(x / (1.0 - x))
+            return 1.0 / (1.0 + np.exp(-(logit_base + stress_signal)))
+        x = float(np.clip(lgd_base, eps, 1.0 - eps))
+        logit_base = float(np.log(x / (1.0 - x)))
+        return float(1.0 / (1.0 + np.exp(-(logit_base + stress_signal))))
+
+    # Default: hard cap at 100%
+    multiplier = 1.0 + stress_signal
     if isinstance(lgd_base, np.ndarray):
         return np.minimum(lgd_base * multiplier, 1.0)
     return min(float(lgd_base) * multiplier, 1.0)
@@ -261,13 +289,23 @@ def irb_capital_requirement(
     maturity_years: float = 2.5,
     sales_m_eur: float | None = None,
     confidence: float = 0.999,
+    rho_multiplier: float = 1.0,
+    lgd_calibration: float = 1.0,
 ) -> dict:
     """Vollständige IRB-Capital-Berechnung pro Exposure.
+
+    Parameters
+    ----------
+    rho_multiplier : float, default 1.0
+        Modell-Risiko-Override auf die Basel-formelmäßige Asset-Korrelation
+        ρ. Default 1.0 = Basel-Standard. Werte > 1 simulieren höhere
+        Korrelation (Crisis-Stress), < 1 niedrigere. Wirkt sowohl im
+        ASRF-Loss-Quantil als auch in der maturity-adjustment-Anwendung.
 
     Returns
     -------
     dict mit Keys:
-        rho   : Asset-Korrelation
+        rho   : Asset-Korrelation (nach Multiplikator)
         K     : Kapital-Anforderung pro EAD-Einheit (Anteil)
         UL    : Unexpected-Loss-Rate = K (synonym)
         EL    : Expected-Loss-Rate = PD · LGD
@@ -275,9 +313,15 @@ def irb_capital_requirement(
         rwa_density : K · 12.5 (RWA pro EAD-Einheit)
         ma    : Maturity-Adjustment (1 für Retail/Mortgage)
     """
-    rho = asset_correlation(pd_value, exposure_class, sales_m_eur)
-    L_a = asrf_loss_quantile(pd_value, lgd, rho, confidence=confidence)
-    el = np.asarray(pd_value) * np.asarray(lgd)
+    rho_base = asset_correlation(pd_value, exposure_class, sales_m_eur)
+    rho = np.clip(rho_base * float(rho_multiplier), 1e-4, 0.999)
+    # F-IRB → A-IRB-Proxy: lgd_calibration < 1 simuliert empirisch
+    # niedrigere realized LGDs (Sicherheiten, Collateral) wie sie A-IRB-
+    # Banken intern schätzen. lgd_calibration > 1 wäre Stress-Up auf
+    # die regulatorischen Defaults.
+    lgd_eff = np.clip(np.asarray(lgd) * float(lgd_calibration), 1e-4, 1.0)
+    L_a = asrf_loss_quantile(pd_value, lgd_eff, rho, confidence=confidence)
+    el = np.asarray(pd_value) * lgd_eff
 
     if exposure_class in ("corporate", "sme_corporate", "bank", "sovereign"):
         ma = maturity_adjustment(pd_value, maturity_years)
@@ -314,13 +358,17 @@ class PortfolioSegment:
     maturity_years: float = 2.5
     sales_m_eur: float | None = None    # nur bei sme_corporate genutzt
 
-    def basel_metrics(self, confidence: float = 0.999) -> dict:
+    def basel_metrics(self, confidence: float = 0.999,
+                      *, rho_multiplier: float = 1.0,
+                      lgd_calibration: float = 1.0) -> dict:
         """IRB-Metriken für das Segment."""
         m = irb_capital_requirement(
             self.pd, self.lgd, self.exposure_class,
             maturity_years=self.maturity_years,
             sales_m_eur=self.sales_m_eur,
             confidence=confidence,
+            rho_multiplier=rho_multiplier,
+            lgd_calibration=lgd_calibration,
         )
         return {
             "name":         self.name,
@@ -354,15 +402,24 @@ class BankPortfolio:
     def total_ead(self) -> float:
         return float(sum(s.ead for s in self.segments))
 
-    def baseline_metrics(self, confidence: float = 0.999) -> pd.DataFrame:
-        rows = [s.basel_metrics(confidence) for s in self.segments]
+    def baseline_metrics(self, confidence: float = 0.999,
+                         *, rho_multiplier: float = 1.0,
+                         lgd_calibration: float = 1.0) -> pd.DataFrame:
+        rows = [s.basel_metrics(confidence,
+                                 rho_multiplier=rho_multiplier,
+                                 lgd_calibration=lgd_calibration)
+                for s in self.segments]
         df = pd.DataFrame(rows)
         if not df.empty:
             df["ead_share"] = df["ead"] / df["ead"].sum()
         return df
 
-    def portfolio_kpis(self, confidence: float = 0.999) -> dict:
-        df = self.baseline_metrics(confidence)
+    def portfolio_kpis(self, confidence: float = 0.999,
+                       *, rho_multiplier: float = 1.0,
+                       lgd_calibration: float = 1.0) -> dict:
+        df = self.baseline_metrics(confidence,
+                                     rho_multiplier=rho_multiplier,
+                                     lgd_calibration=lgd_calibration)
         if df.empty:
             return {}
         return {
@@ -384,6 +441,10 @@ class BankPortfolio:
         *,
         confidence: float = 0.999,
         kappa_lgd: float = 0.3,
+        rho_multiplier: float = 1.0,
+        lgd_calibration: float = 1.0,
+        stress_exponent: float = 1.0,
+        cap_mode: str = "hard",
     ) -> pd.DataFrame:
         """Portfolio-Metriken unter Systemfaktor-Schock M = z_factor.
 
@@ -392,21 +453,33 @@ class BankPortfolio:
           - LGD via downturn-LGD-Funktion (siehe §11.x):
               LGD_stress = LGD_base · (1 + κ · max(-M, 0))
 
-        Damit ist die volle Wirkungskette Macro → (PD, LGD) → IRB-K
-        konsistent abgebildet (regulatorische Wirkungskette nach
-        BCBS 2017 / EBA GL 14).
+        ``rho_multiplier`` skaliert die Basel-ρ konsistent in Conditional-
+        PD und Capital-Charge (Modell-Risiko-Override).
         """
         rows = []
+        rmult = float(rho_multiplier)
+        lgd_cal = float(lgd_calibration)
         for s in self.segments:
-            rho = asset_correlation(s.pd, s.exposure_class, s.sales_m_eur)
+            rho_basel = asset_correlation(s.pd, s.exposure_class, s.sales_m_eur)
+            rho = float(np.clip(rho_basel * rmult, 1e-4, 0.999))
+            # Apply lgd_calibration BEFORE downturn-LGD (A-IRB-Proxy first,
+            # then stress on top) — methodisch konsistent mit "echtem"
+            # bank-internen LGD-Niveau.
+            lgd_calibrated = float(np.clip(s.lgd * lgd_cal, 1e-4, 1.0))
             stressed_pd = float(conditional_pd(s.pd, rho, z_factor))
-            stressed_lgd = float(downturn_lgd(s.lgd, z_factor, kappa=kappa_lgd))
+            stressed_lgd = float(downturn_lgd(
+                lgd_calibrated, z_factor, kappa=kappa_lgd,
+                exponent=stress_exponent, cap_mode=cap_mode,
+            ))
             stressed_seg = PortfolioSegment(
                 name=s.name, exposure_class=s.exposure_class,
                 ead=s.ead, pd=stressed_pd, lgd=stressed_lgd,
                 maturity_years=s.maturity_years, sales_m_eur=s.sales_m_eur,
             )
-            row = stressed_seg.basel_metrics(confidence)
+            # NB: pass lgd_calibration=1.0 hier — die Kalibrierung wurde
+            # bereits oben in s.lgd → lgd_calibrated angewendet.
+            row = stressed_seg.basel_metrics(confidence, rho_multiplier=rmult,
+                                              lgd_calibration=1.0)
             row["pd_baseline"]  = s.pd
             row["pd_stressed"]  = stressed_pd
             row["delta_pd"]     = stressed_pd - s.pd
@@ -424,13 +497,23 @@ class BankPortfolio:
         *,
         confidence: float = 0.999,
         kappa_lgd: float = 0.3,
+        rho_multiplier: float = 1.0,
+        lgd_calibration: float = 1.0,
+        stress_exponent: float = 1.0,
+        cap_mode: str = "hard",
     ) -> dict:
         df = self.stressed_metrics(
             z_factor, confidence=confidence, kappa_lgd=kappa_lgd,
+            rho_multiplier=rho_multiplier,
+            lgd_calibration=lgd_calibration,
+            stress_exponent=stress_exponent, cap_mode=cap_mode,
         )
         if df.empty:
             return {}
-        baseline_kpis = self.portfolio_kpis(confidence)
+        baseline_kpis = self.portfolio_kpis(
+            confidence, rho_multiplier=rho_multiplier,
+            lgd_calibration=lgd_calibration,
+        )
         return {
             "name":          self.name,
             "z_factor":      z_factor,
@@ -454,6 +537,10 @@ class BankPortfolio:
         *,
         confidence: float = 0.999,
         kappa_lgd: float = 0.3,
+        rho_multiplier: float = 1.0,
+        lgd_calibration: float = 1.0,
+        stress_exponent: float = 1.0,
+        cap_mode: str = "hard",
     ) -> dict:
         """Sequentielle Aktivierung der zwei Stress-Channels.
 
@@ -479,26 +566,45 @@ class BankPortfolio:
           per_segment: DataFrame mit Stage-by-Stage Werten pro Segment
         """
         rows = []
+        rmult   = float(rho_multiplier)
+        lgd_cal = float(lgd_calibration)
+        expn    = float(stress_exponent)
+        cmode   = str(cap_mode)
         for s in self.segments:
-            rho = asset_correlation(s.pd, s.exposure_class, s.sales_m_eur)
+            rho_basel = asset_correlation(s.pd, s.exposure_class, s.sales_m_eur)
+            rho = float(np.clip(rho_basel * rmult, 1e-4, 0.999))
+            # Apply lgd_calibration (A-IRB proxy) first, then downturn-LGD
+            lgd_calibrated = float(np.clip(s.lgd * lgd_cal, 1e-4, 1.0))
             pd_stress  = float(conditional_pd(s.pd, rho, z_factor))
-            lgd_stress = float(downturn_lgd(s.lgd, z_factor, kappa=kappa_lgd))
+            lgd_stress = float(downturn_lgd(
+                lgd_calibrated, z_factor, kappa=kappa_lgd,
+                exponent=expn, cap_mode=cmode,
+            ))
 
             def _metrics(pd_v: float, lgd_v: float) -> tuple[float, float, float]:
-                """Return (K, RWA, EL) in EUR for this segment."""
+                """Return (K, RWA, EL) in EUR for this segment.
+
+                NB: lgd_calibration ist BEREITS in pd_v/lgd_v eingepreist,
+                deshalb hier lgd_calibration=1.0 weiterreichen.
+                """
                 m = irb_capital_requirement(
                     pd_v, lgd_v, s.exposure_class,
                     maturity_years=s.maturity_years,
                     sales_m_eur=s.sales_m_eur,
                     confidence=confidence,
+                    rho_multiplier=rmult,
+                    lgd_calibration=1.0,
                 )
                 K   = float(m["K"])           * s.ead
                 RWA = float(m["rwa_density"]) * s.ead
                 EL  = float(m["EL"])          * s.ead
                 return K, RWA, EL
 
-            K0, RWA0, EL0 = _metrics(s.pd,        s.lgd)
-            K1, RWA1, EL1 = _metrics(pd_stress,   s.lgd)
+            # Stage 0 uses calibrated LGD as the BASELINE — d.h. wenn der
+            # User lgd_calibration ändert, verschiebt sich die Baseline mit.
+            # Andernfalls würde der LGD-Bridge-Beitrag verzerrt aussehen.
+            K0, RWA0, EL0 = _metrics(s.pd,        lgd_calibrated)
+            K1, RWA1, EL1 = _metrics(pd_stress,   lgd_calibrated)
             K2, RWA2, EL2 = _metrics(pd_stress,   lgd_stress)
 
             rows.append({

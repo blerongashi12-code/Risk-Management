@@ -30,6 +30,7 @@ from components.theme import (apply_theme, hero, eyebrow, insight, footer,
                               COLORS, PALETTE_DISCRETE, SEQ_COOL_TO_WARM)
 from components.sidebar import render_sidebar
 from components.methodology import render_sovereign_methodology
+from components.legacy_views import render_yield_curve_tab
 from components.backend_path import setup
 setup()
 
@@ -47,22 +48,23 @@ from eba_loader import (                                            # type: igno
 )
 
 
-st.set_page_config(page_title="Bonds · Tier 2", layout="wide")
+st.set_page_config(page_title="Marktbuch · Bonds + Yield-Curve", layout="wide")
 apply_theme()
 config = render_sidebar()
 
 hero(
-    "Bonds",
-    eyebrow="Tier 2 · Sovereigns + Banking-Book + Trading-Book",
-    deck="Drei Bond-Channels mit konsistenter CET1-Wirkung: Sovereigns "
-         "granular nach Country × Maturity × IFRS-9-Accounting-Class, "
-         "Banking-Book-Bonds (Financials / Corporates / Covered) aus dem "
-         "EBA-IRB-Aggregat, Trading-Book + ABS/MBS via Market-Risk-RWA. "
-         "Pro Sub-Tab: ΔFair Value oder ΔRWA → CET1-Quote vorher / nachher.",
+    "Marktbuch · Bonds + Yield-Curve Channel",
+    eyebrow="Tab 3 · Sovereigns · Banking-Book Bonds · Trading-Book · Yield-Curve",
+    deck="Vier Sub-Tabs für den Markt-Channel: (1) Yield-Curve als zentraler "
+         "Input (Bundesbank Svensson), (2) Sovereigns granular nach Country × "
+         "Maturity × IFRS-9-Accounting-Class, (3) Banking-Book-Bonds "
+         "(Financials / Corporates / Covered) aus dem EBA-IRB-Aggregat, "
+         "(4) Trading-Book + ABS/MBS via Market-Risk-RWA. Pro Sub-Tab: "
+         "ΔFair Value oder ΔRWA → CET1-Quote vorher / nachher.",
 )
 
 # === Live macro shock from sidebar ===================================
-delta_r_pp = config["d_r_10y_pp"] * 100
+delta_r_pp = config["d_r_10y_pp"]    # already in pp (unit-bug fixed)
 d_brent    = config["d_brent"]
 
 
@@ -88,13 +90,21 @@ lb_class   = loan_book_class_breakdown(cre_raw, period=202506)
 
 
 # =====================================================================
-# Three tabs
+# Four tabs (Yield-Curve als 1. Sub-Tab integriert)
 # =====================================================================
-tab_sov, tab_bb, tab_tb = st.tabs([
-    "Sovereigns",
-    "Banking-Book Bonds (Financials · Corporates · Covered)",
-    "Trading Book + ABS / MBS",
+tab_yc, tab_sov, tab_bb, tab_tb = st.tabs([
+    "1 · Yield-Curve (Input)",
+    "2 · Sovereigns",
+    "3 · Banking-Book Bonds (Financials · Corporates · Covered)",
+    "4 · Trading Book + ABS / MBS",
 ])
+
+
+# =====================================================================
+# SUB-TAB 0 · Yield-Curve (zentraler Input für alle Bond-Channels)
+# =====================================================================
+with tab_yc:
+    render_yield_curve_tab(config)
 
 
 # =====================================================================
@@ -410,6 +420,135 @@ deshalb die **gesamte Banking-Book-IRB-Exposure** dieser Klassen.
 
         st.divider()
 
+        # === NEW: System-wide aggregation analysis ===
+        # Because per-issuer granularity is unavailable in EBA-Public-Disclosure,
+        # we compensate with system-level concentration + dispersion metrics
+        # across banks. These tell the regulator/professor where the systemic
+        # risk concentration sits without requiring issuer detail.
+        eyebrow("Aggregierte Systemanalyse · Konzentration & Verteilung")
+
+        st.caption(
+            "Weil EBA keine Issuer-Granularität für Non-Sovereign-Bonds "
+            "publiziert, ersetzen wir den fehlenden Issuer-Detail durch "
+            "**System-Konzentrations- und Cross-Bank-Verteilungsmetriken**. "
+            "Diese antworten auf 'wo sitzt das Risiko im EU-System' ohne "
+            "Issuer-Listen zu benötigen."
+        )
+
+        agg_rows = []
+        dispersion_rows = []
+        for cat in ["Financials", "Corporates", "Covered Bonds"]:
+            sub_c = lb_class[lb_class["bond_category"] == cat].copy()
+            if sub_c.empty:
+                continue
+            sub_c = sub_c.sort_values("ead_eur", ascending=False)
+            tot_ead   = float(sub_c["ead_eur"].sum())
+            tot_rwa   = float(sub_c["rwa_eur"].sum())
+            n_banks_c = sub_c["LEI_Code"].nunique()
+            # HHI on EAD shares (×10000 by convention)
+            shares = (sub_c["ead_eur"] / tot_ead).to_numpy() if tot_ead > 0 else np.zeros(0)
+            hhi    = float((shares ** 2).sum() * 10000)
+            top3   = float(sub_c["ead_eur"].head(3).sum() / tot_ead * 100) if tot_ead > 0 else 0.0
+            top5   = float(sub_c["ead_eur"].head(5).sum() / tot_ead * 100) if tot_ead > 0 else 0.0
+            agg_rows.append({
+                "Category":         cat,
+                "Σ EAD bn":         round(tot_ead/1e9, 0),
+                "Σ RWA bn":         round(tot_rwa/1e9, 0),
+                "RWA density":      f"{tot_rwa/tot_ead*100:.0f}%" if tot_ead > 0 else "—",
+                "n banks reporting": n_banks_c,
+                "HHI (EAD)":        round(hhi, 0),
+                "Top-3 share":      f"{top3:.0f}%",
+                "Top-5 share":      f"{top5:.0f}%",
+            })
+            # Dispersion of implied PD (NPL ratio) across banks
+            pds = sub_c["implied_pd"].dropna().to_numpy() * 100
+            if len(pds) >= 3:
+                dispersion_rows.append({
+                    "Category":    cat,
+                    "metric":      "Implied PD across banks [%]",
+                    "p10":         float(np.percentile(pds, 10)),
+                    "p50":         float(np.percentile(pds, 50)),
+                    "p90":         float(np.percentile(pds, 90)),
+                    "max":         float(pds.max()),
+                })
+            # Dispersion of RWA-density across banks
+            rwd = (sub_c["rwa_eur"] / sub_c["ead_eur"].replace(0, np.nan)).dropna().to_numpy() * 100
+            if len(rwd) >= 3:
+                dispersion_rows.append({
+                    "Category":    cat,
+                    "metric":      "RWA density across banks [%]",
+                    "p10":         float(np.percentile(rwd, 10)),
+                    "p50":         float(np.percentile(rwd, 50)),
+                    "p90":         float(np.percentile(rwd, 90)),
+                    "max":         float(rwd.max()),
+                })
+
+        agg_l, agg_r = st.columns([1, 1], gap="medium")
+
+        with agg_l:
+            st.markdown("**Konzentration pro Bond-Category**")
+            agg_df = pd.DataFrame(agg_rows)
+            st.dataframe(agg_df, use_container_width=True, hide_index=True,
+                         height=160)
+            st.caption(
+                "HHI < 1500 = niedrig konzentriert, 1500–2500 = moderat, "
+                "> 2500 = hoch (DOJ/FTC Merger-Konventionen)."
+            )
+
+        with agg_r:
+            st.markdown("**Cross-Bank Verteilung (p10 / Median / p90 / max)**")
+            disp_df = pd.DataFrame(dispersion_rows)
+            if not disp_df.empty:
+                disp_df_show = disp_df.copy()
+                for c in ("p10", "p50", "p90", "max"):
+                    disp_df_show[c] = disp_df_show[c].round(2).astype(str) + "%"
+                st.dataframe(disp_df_show, use_container_width=True,
+                             hide_index=True, height=260)
+                st.caption(
+                    "Breite Spannweite (p90 − p10) signalisiert heterogenes "
+                    "Underwriting-Profil über EU-Banken hinweg — ein klassisches "
+                    "Modellrisiko-Frühwarnzeichen."
+                )
+
+        # Top-5 concentration chart per category (horizontal stacked bar share)
+        eyebrow("Top-5 Banken-Konzentration pro Category (EAD-Anteil)")
+        conc_traces = []
+        for cat in ["Financials", "Corporates", "Covered Bonds"]:
+            sub_c = (lb_class[lb_class["bond_category"] == cat]
+                     .merge(bank_dir[["lei", "bank_name"]],
+                            left_on="LEI_Code", right_on="lei")
+                     .sort_values("ead_eur", ascending=False)
+                     .head(5))
+            if sub_c.empty:
+                continue
+            tot = float(lb_class[lb_class["bond_category"] == cat]["ead_eur"].sum())
+            shares = (sub_c["ead_eur"] / tot * 100) if tot > 0 else sub_c["ead_eur"] * 0
+            conc_traces.append((cat, sub_c["bank_name"].tolist(), shares.tolist()))
+
+        if conc_traces:
+            fig_conc = go.Figure()
+            cat_colors = {"Financials":    COLORS["mid_blue"],
+                          "Corporates":    COLORS["crimson"],
+                          "Covered Bonds": COLORS["amber"]}
+            for cat, banks_c, sh in conc_traces:
+                fig_conc.add_trace(go.Bar(
+                    name=cat, y=[cat]*len(banks_c), x=sh,
+                    orientation="h",
+                    marker_color=cat_colors.get(cat, COLORS["stone"]),
+                    text=[f"{b[:18]} {s:.0f}%" for b, s in zip(banks_c, sh)],
+                    textposition="inside",
+                    textfont=dict(size=10, color=COLORS["white"]),
+                    showlegend=False, marker_line_width=0,
+                ))
+            fig_conc.update_layout(
+                title="EU-System: Top-5-Banken-Anteil am Category-EAD [%]",
+                barmode="stack", height=260, bargap=0.25,
+                xaxis=dict(range=[0, 100], title="Σ Top-5 Anteil [%]"),
+            )
+            st.plotly_chart(fig_conc, use_container_width=True)
+
+        st.divider()
+
         # === Per-category exposure breakdown table ===
         eyebrow("Top-15 Banken pro Bond-Category")
 
@@ -521,6 +660,108 @@ Struktur ist nicht publiziert.
     t3.metric("Trading Book P&L (current)",
               f"€{sys_tb_pnl/1e9:+.1f} bn",
               "Item 2520311 · YTD", delta_color="off")
+
+    st.divider()
+
+    # === NEW: Aggregierte Systemanalyse für Trading Book + ABS ===
+    # Same pattern as Banking-Book tab — since no issuer/tranche detail
+    # is published, we provide cross-bank concentration + dispersion.
+    eyebrow("Aggregierte Systemanalyse · Konzentration Market-RWA + Securitisation-RWA")
+
+    st.caption(
+        "Trading-Book und Securitisation-RWA werden nur als Bank-Aggregate "
+        "publiziert (kein Issuer-/Tranche-Detail). Ersatz: Konzentration der "
+        "Risiko-Träger im EU-System."
+    )
+
+    cap_with_name = cap_df.merge(bank_dir[["lei", "bank_name"]],
+                                  left_on="LEI_Code", right_on="lei")
+
+    tb_agg_rows = []
+    tb_dispersion_rows = []
+    for label, col in [
+        ("Market RWA (Trading Book)",       "rwa_market_eur"),
+        ("Securitisation RWA",              "rwa_securitisation_eur"),
+    ]:
+        if col not in cap_with_name.columns:
+            continue
+        s = cap_with_name.sort_values(col, ascending=False)
+        tot = float(s[col].sum())
+        n   = int((s[col] > 0).sum())
+        if tot <= 0 or n == 0:
+            continue
+        shares = (s[col] / tot).to_numpy()
+        hhi    = float((shares ** 2).sum() * 10000)
+        top3   = float(s[col].head(3).sum() / tot * 100)
+        top5   = float(s[col].head(5).sum() / tot * 100)
+        tb_agg_rows.append({
+            "Category":           label,
+            "Σ RWA bn":           round(tot/1e9, 0),
+            "n banks > 0":        n,
+            "HHI (RWA shares)":   round(hhi, 0),
+            "Top-3 share":        f"{top3:.0f}%",
+            "Top-5 share":        f"{top5:.0f}%",
+        })
+        vals = s[col][s[col] > 0].to_numpy() / 1e9
+        if len(vals) >= 3:
+            tb_dispersion_rows.append({
+                "Category":   label,
+                "p10 bn":     round(float(np.percentile(vals, 10)), 2),
+                "p50 bn":     round(float(np.percentile(vals, 50)), 2),
+                "p90 bn":     round(float(np.percentile(vals, 90)), 2),
+                "max bn":     round(float(vals.max()), 2),
+            })
+
+    tb_l, tb_r = st.columns([1, 1], gap="medium")
+    with tb_l:
+        st.markdown("**Konzentration**")
+        if tb_agg_rows:
+            st.dataframe(pd.DataFrame(tb_agg_rows),
+                         use_container_width=True, hide_index=True, height=140)
+            st.caption("HHI > 2500 = stark konzentriert: wenige Banken tragen "
+                       "fast alle Market-/Securitisation-Risiken.")
+    with tb_r:
+        st.markdown("**Cross-Bank Verteilung (bn EUR, nur Banken > 0)**")
+        if tb_dispersion_rows:
+            st.dataframe(pd.DataFrame(tb_dispersion_rows),
+                         use_container_width=True, hide_index=True, height=140)
+
+    # Concentration stacked bar — top 5 banks per category
+    eyebrow("Top-5 Konzentration · Market-RWA + Securitisation-RWA")
+    conc2_traces = []
+    for label, col in [
+        ("Market RWA",       "rwa_market_eur"),
+        ("Securitisation RWA", "rwa_securitisation_eur"),
+    ]:
+        if col not in cap_with_name.columns:
+            continue
+        s = cap_with_name.sort_values(col, ascending=False).head(5)
+        tot = float(cap_with_name[col].sum())
+        if tot <= 0:
+            continue
+        sh = (s[col] / tot * 100).tolist()
+        conc2_traces.append((label, s["bank_name"].tolist(), sh))
+
+    if conc2_traces:
+        fig_conc2 = go.Figure()
+        tb_colors = {"Market RWA":          COLORS["bright_blue"],
+                     "Securitisation RWA":  COLORS["crimson"]}
+        for label, banks_c, sh in conc2_traces:
+            fig_conc2.add_trace(go.Bar(
+                name=label, y=[label]*len(banks_c), x=sh,
+                orientation="h",
+                marker_color=tb_colors.get(label, COLORS["stone"]),
+                text=[f"{b[:18]} {s:.0f}%" for b, s in zip(banks_c, sh)],
+                textposition="inside",
+                textfont=dict(size=10, color=COLORS["white"]),
+                showlegend=False, marker_line_width=0,
+            ))
+        fig_conc2.update_layout(
+            title="EU-System: Top-5-Banken-Anteil am Category-RWA [%]",
+            barmode="stack", height=240, bargap=0.25,
+            xaxis=dict(range=[0, 100], title="Σ Top-5 Anteil [%]"),
+        )
+        st.plotly_chart(fig_conc2, use_container_width=True)
 
     st.divider()
 

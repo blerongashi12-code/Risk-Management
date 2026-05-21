@@ -397,3 +397,178 @@ header             { visibility: hidden; }
 .js-plotly-plot .plotly .hoverlayer .hovertext {
   font-family: var(--mc-sans) !important;
 }
+
+/* =====================================================================
+ * DASHBOARD POLISH · v2 · professional feel + accents
+ * --------------------------------------------------------------------
+ * Subtle elevation, refined accents, smoother transitions.
+ * Maintains the McKinsey look but adds dashboard depth.
+ * ===================================================================== */
+
+/* KPI tiles · subtle depth + smoother hover */
+[data-testid="stMetric"] {
+  border-radius: 4px !important;
+  box-shadow: 0 1px 2px rgba(5, 28, 44, 0.04),
+              0 0 0 1px rgba(5, 28, 44, 0.02);
+  transition: box-shadow 0.18s ease, border-left-color 0.18s ease,
+              transform 0.18s ease;
+}
+[data-testid="stMetric"]:hover {
+  box-shadow: 0 4px 10px rgba(5, 28, 44, 0.06),
+              0 0 0 1px rgba(34, 81, 255, 0.10);
+  transform: translateY(-1px);
+}
+
+/* Tabs · clearer active state with light blue background */
+.stTabs [data-baseweb="tab-list"] {
+  background: var(--mc-canvas);
+  padding: 0.25rem 0.4rem 0 0.4rem;
+  border-bottom: 2px solid var(--mc-hairline) !important;
+  border-radius: 4px 4px 0 0;
+}
+.stTabs [data-baseweb="tab"] {
+  font-size: 0.90rem !important;
+  padding: 0.7rem 1.4rem !important;
+  transition: all 0.18s ease;
+  border-radius: 4px 4px 0 0 !important;
+}
+.stTabs [data-baseweb="tab"]:hover {
+  background: var(--mc-white) !important;
+  color: var(--mc-navy) !important;
+}
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+  background: var(--mc-white) !important;
+  border-bottom: 3px solid var(--mc-bright-blue) !important;
+  font-weight: 600 !important;
+}
+
+/* Data-frames · slight elevation + first-column emphasis */
+[data-testid="stDataFrame"] {
+  border-radius: 4px !important;
+  box-shadow: 0 1px 2px rgba(5, 28, 44, 0.04);
+  overflow: hidden;
+}
+[data-testid="stDataFrame"] tbody tr:hover td {
+  background: rgba(34, 81, 255, 0.04) !important;
+}
+
+/* Expanders · refined card-look with hover */
+[data-testid="stExpander"] {
+  border-radius: 4px !important;
+  box-shadow: 0 1px 2px rgba(5, 28, 44, 0.03);
+  margin-bottom: 0.5rem;
+  transition: box-shadow 0.18s ease;
+}
+[data-testid="stExpander"]:hover {
+  box-shadow: 0 2px 6px rgba(5, 28, 44, 0.06);
+}
+.streamlit-expanderHeader {
+  border-radius: 4px 4px 0 0 !important;
+  padding: 0.65rem 0.85rem !important;
+  border: none !important;
+  border-bottom: 1px solid var(--mc-hairline) !important;
+}
+.streamlit-expanderHeader:hover {
+  background: var(--mc-canvas) !important;
+}
+
+/* Alert boxes · cleaner, with subtle shadow */
+[data-testid="stAlert"] {
+  border-radius: 4px !important;
+  box-shadow: 0 1px 2px rgba(5, 28, 44, 0.03);
+  padding: 0.85rem 1.1rem !important;
+}
+
+/* Hero · slightly more presence */
+.mc-hero {
+  background: linear-gradient(to bottom, var(--mc-canvas) 0%, var(--mc-white) 100%);
+  border-top: 4px solid var(--mc-bright-blue);
+  border-bottom: 1px solid var(--mc-hairline);
+  padding: 1.8rem 1.5rem 1.4rem 1.5rem;
+  margin: -1.0rem -1.0rem 1.6rem -1.0rem;
+  border-radius: 4px;
+}
+
+/* Insight cards · richer accent */
+.mc-insight {
+  background: var(--mc-white);
+  border: 1px solid var(--mc-hairline);
+  border-left: 4px solid var(--mc-navy);
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(5, 28, 44, 0.04);
+  padding: 1.0rem 1.2rem;
+}
+
+/* Buttons · slightly softer */
+.stButton > button {
+  border-radius: 3px !important;
+  letter-spacing: 0.06em !important;
+  transition: all 0.18s ease;
+  box-shadow: 0 1px 2px rgba(5, 28, 44, 0.10);
+}
+.stButton > button:hover {
+  box-shadow: 0 3px 8px rgba(5, 28, 44, 0.14);
+  transform: translateY(-1px);
+}
+
+/* Sliders · richer track */
+.stSlider [data-baseweb="slider"] [role="slider"] {
+  box-shadow: 0 0 0 1px var(--mc-bright-blue),
+              0 2px 4px rgba(34, 81, 255, 0.25) !important;
+  transition: all 0.18s ease;
+}
+.stSlider [data-baseweb="slider"] [role="slider"]:hover {
+  box-shadow: 0 0 0 2px var(--mc-bright-blue),
+              0 3px 8px rgba(34, 81, 255, 0.35) !important;
+}
+
+/* Sidebar nav · refined active marker */
+[data-testid="stSidebarNav"] li a {
+  margin: 0 0.25rem;
+  border-radius: 3px;
+  transition: all 0.18s ease;
+}
+[data-testid="stSidebarNav"] li a[aria-current="page"] {
+  border-left-width: 3px;
+  box-shadow: 0 1px 2px rgba(5, 28, 44, 0.05);
+}
+
+/* Sidebar expanders · less heavy */
+[data-testid="stSidebar"] [data-testid="stExpander"] {
+  background: var(--mc-white) !important;
+  border-radius: 3px !important;
+  box-shadow: none !important;
+  border: 1px solid var(--mc-hairline) !important;
+}
+
+/* Plotly charts · subtle frame */
+.js-plotly-plot {
+  background: var(--mc-white);
+  border-radius: 4px;
+  box-shadow: 0 1px 2px rgba(5, 28, 44, 0.04);
+  padding: 0.4rem;
+  margin: 0.3rem 0;
+}
+
+/* Captions · slightly more presence */
+[data-testid="stCaptionContainer"] {
+  line-height: 1.5;
+}
+
+/* Spacing rhythm */
+.stMarkdown { margin-bottom: 0.4rem; }
+
+/* Selectbox · cleaner */
+.stSelectbox > div > div {
+  border-radius: 3px !important;
+  transition: border-color 0.18s ease;
+}
+.stRadio > div { gap: 0.5rem; }
+.stRadio label {
+  border-radius: 3px;
+  padding: 0.3rem 0.6rem;
+  transition: background 0.18s ease;
+}
+.stRadio label:hover {
+  background: var(--mc-canvas);
+}

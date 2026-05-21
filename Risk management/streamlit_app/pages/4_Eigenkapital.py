@@ -54,18 +54,20 @@ TARGET_CET1_RATIO  = PILLAR1_MIN_CET1 + CCB_BUFFER  # 7.0% basic guidance
 SREP_TARGET        = TARGET_CET1_RATIO + SII_BUFFER  # 8.0% typical SREP target
 
 
-st.set_page_config(page_title="Capital Adequacy · CET1", layout="wide")
+st.set_page_config(page_title="Eigenkapital · CET1-Wirkung", layout="wide")
 apply_theme()
 config = render_sidebar()
 
 hero(
-    "Capital Adequacy · CET1 Ratio",
-    eyebrow="Tier 2 · Three-channel CET1 stress",
-    deck="The same Macro shock drives three risk channels simultaneously: "
-         "Loan-Book Provisions (PD + LGD via Vasicek), Sovereign Mark-to-"
-         "Market (Duration), and Trading Book (Market-RWA + P&L). All three "
-         "feed the CET1-Ratio numerator and denominator — the regulatory "
-         "headline of capital adequacy.",
+    "Eigenkapital-Wirkung · CET1-Quote",
+    eyebrow="Tab 4 · 3-Channel CET1 stress · regulatorische Headline",
+    deck="Derselbe Macro-Schock treibt drei Risiko-Channels simultan: "
+         "Loan-Book Provisions (PD + LGD via Vasicek), Sovereign "
+         "Mark-to-Market (Duration), und Trading-Book (Market-RWA + P&L). "
+         "Alle drei wirken auf den Zähler und Nenner der CET1-Quote — "
+         "der regulatorischen Headline für Kapitaladäquanz. Inklusive "
+         "Threshold-Analyse (welche Banken fallen unter 4.5% / 7% / 8%) "
+         "und CET1-Sensitivity-Curve über M-Scan.",
 )
 
 # === Load data + macro shock =========================================
@@ -110,13 +112,18 @@ cov_factors = fac_stats["sigma"] if fac_stats else np.array([[4e-4, 2e-5], [2e-5
 anchor = anchor_from_eba("2025")
 mapping = hybrid_mapping(
     delta_brent_log=config["d_brent"],
-    delta_rate_10y_pp=config["d_r_10y_pp"] * 100,
+    delta_rate_10y_pp=config["d_r_10y_pp"],   # already in pp
     anchor=anchor,
     cov_factors=cov_factors,
     horizon_days=252,
 )
-m_used = mapping["m_hybrid"]
-delta_r_pp = config["d_r_10y_pp"] * 100
+# Honour Single-Factor mode (user drives M directly)
+if config.get("m_direct") is not None:
+    m_used = float(config["m_direct"])
+    mapping["m_hybrid"] = m_used
+else:
+    m_used = mapping["m_hybrid"]
+delta_r_pp = config["d_r_10y_pp"]   # already in pp
 
 # Compute the three channels per bank in the universe -----------------
 # Channel 1 — loan book bridge (from the universe BankPortfolio objects)
@@ -131,6 +138,10 @@ for bank_name, portfolio in universe.banks.items():
     if abs(m_used) > 1e-9:
         loan_bridges[lei] = portfolio.capital_bridge(
             z_factor=m_used, kappa_lgd=KAPPA_DOWNTURN_LGD, confidence=0.999,
+            rho_multiplier=float(config.get("rho_mult", 1.0)),
+            lgd_calibration=float(config.get("lgd_calibration", 1.0)),
+            stress_exponent=float(config.get("stress_exponent", 1.0)),
+            cap_mode=str(config.get("cap_mode", "hard")),
         )
 
 # Channel 2 — sovereign rate-shock P&L per bank
@@ -421,6 +432,256 @@ if abs(m_used) > 1e-9:
 else:
     st.info("Apply a macro shock in the sidebar to view the CET1 "
             "ratio waterfall.")
+
+st.divider()
+
+# =====================================================================
+# NEW · Threshold-Analyse (welche Banken fallen unter Regulatorik?)
+# =====================================================================
+eyebrow("Threshold-Analyse · regulatorische CET1-Mindestquoten")
+
+st.caption(
+    "Alle Banken im Aggregat, sortiert nach **Post-Stress-CET1-Quote**. "
+    "Farb-Code zeigt Threshold-Breaches: "
+    "<span style='color:#A52F4D;font-weight:600;'>● rot = unter 4.5% (Pillar-1-Minimum)</span> · "
+    "<span style='color:#C9A227;font-weight:600;'>● gelb = unter 7.0% (inkl. CCB)</span> · "
+    "<span style='color:#034B6F;font-weight:600;'>● blau = unter 8.0% (typischer SREP)</span> · "
+    "<span style='color:#00A9A5;font-weight:600;'>● grün = über 8.0% (komfortabel)</span>",
+    unsafe_allow_html=True,
+)
+
+
+def _classify_threshold(ratio: float) -> tuple[str, str]:
+    """Return (label, hex-color) based on CET1 ratio post-stress."""
+    if ratio < PILLAR1_MIN_CET1:
+        return "Pillar-1 Breach (< 4.5%)", "#A52F4D"
+    elif ratio < TARGET_CET1_RATIO:
+        return "CCB Breach (< 7.0%)", "#C9A227"
+    elif ratio < SREP_TARGET:
+        return "SREP Breach (< 8.0%)", "#034B6F"
+    else:
+        return "Komfortabel (> 8.0%)", "#00A9A5"
+
+
+# Build threshold table
+thr_rows = []
+for _, row in bridge_df.iterrows():
+    label, color = _classify_threshold(row["cet1_ratio_stress"])
+    thr_rows.append({
+        "Bank":            row["bank_name"],
+        "CET1 vorher":     f"{row['cet1_ratio_base']*100:.2f}%",
+        "CET1 nachher":    f"{row['cet1_ratio_stress']*100:.2f}%",
+        "Δ pp":            f"{row['delta_cet1_ratio_pp']:+.2f}",
+        "CET1 Capital bn": round(row["cet1_base"]/1e9, 1),
+        "RWA bn":          round(row["rwa_total_base"]/1e9, 1),
+        "Status":          label,
+        "_color":          color,
+    })
+thr_df = pd.DataFrame(thr_rows).sort_values(
+    "CET1 nachher",
+    key=lambda s: s.str.rstrip("%").astype(float),
+)
+
+# Threshold summary KPIs (count per category)
+status_counts = thr_df["Status"].value_counts()
+ts1, ts2, ts3, ts4 = st.columns(4, gap="small")
+ts1.metric("Pillar-1 Breach (< 4.5%)",
+           int(status_counts.get("Pillar-1 Breach (< 4.5%)", 0)),
+           "Banken unter regulatorischem Minimum",
+           delta_color="off")
+ts2.metric("CCB Breach (< 7.0%)",
+           int(status_counts.get("CCB Breach (< 7.0%)", 0)),
+           "Capital-Conservation-Buffer verletzt",
+           delta_color="off")
+ts3.metric("SREP Breach (< 8.0%)",
+           int(status_counts.get("SREP Breach (< 8.0%)", 0)),
+           "typischer Supervisor-Target verletzt",
+           delta_color="off")
+ts4.metric("Komfortabel (> 8.0%)",
+           int(status_counts.get("Komfortabel (> 8.0%)", 0)),
+           "über SREP-Target", delta_color="off")
+
+# Display the threshold table (drop helper color column)
+disp_thr = thr_df.drop(columns="_color")
+st.dataframe(disp_thr, use_container_width=True, hide_index=True,
+             height=420)
+
+st.divider()
+
+# =====================================================================
+# NEW · CET1-Sensitivity-Curve · scan M und plotte ΔCET1-Quote
+# =====================================================================
+eyebrow("CET1-Sensitivity-Curve · Systemfaktor-Scan M ∈ [−3, +3]")
+
+st.caption(
+    "Stress-Pfad: bei welchem M würde der Aggregat unter 4.5% / 7% / 8% "
+    "fallen? Aggregat = aktuelle Bank-Auswahl. Berechnung pro M-Punkt "
+    "via Vasicek-Capital-Bridge (Loan-Channel) + EBA-Anker-Kopplung "
+    "(Sovereign-MtM + Trading-Book)."
+)
+
+
+@st.cache_data(ttl=24*3600, show_spinner="Computing CET1 sensitivity curve …")
+def _sensitivity_curve(
+    selected_bank_names: tuple, kappa_lgd: float, rho_mult: float,
+    cet1_base_total: float, rwa_base_total: float,
+    sov_pnl_per_pp: float, tb_pnl_per_m: float, tb_rwa_per_m: float,
+    lgd_cal: float = 1.0, stress_exp: float = 1.0, cap_mode: str = "hard",
+):
+    """Scan M and compute aggregate CET1 ratio at each grid point."""
+    # Aggregate portfolio (subset of universe)
+    sub_portfolio = sum(
+        (universe.banks[n].segments for n in selected_bank_names),
+        [],
+    )
+    from vasicek import BankPortfolio                                  # type: ignore
+    agg = BankPortfolio("scan")
+    agg.segments = sub_portfolio
+
+    m_grid = np.linspace(-3.0, 3.0, 31)
+    ratios = []
+    for m in m_grid:
+        if abs(m) < 1e-6:
+            ratios.append(cet1_base_total / rwa_base_total)
+            continue
+        br = agg.capital_bridge(z_factor=float(m), kappa_lgd=kappa_lgd,
+                                confidence=0.999, rho_multiplier=rho_mult,
+                                lgd_calibration=lgd_cal,
+                                stress_exponent=stress_exp,
+                                cap_mode=cap_mode)
+        # Coupled (Brent, Δr) from EBA anchor
+        anchor_z = anchor.z_factor
+        if abs(anchor_z) > 1e-9:
+            scale = -m / abs(anchor_z) * np.sign(-anchor_z)
+            d_r_m  = anchor.rate_10y_pp * scale   # pp
+        else:
+            d_r_m = 0.0
+        # CET1 numerator: subtract loan ΔEL + add sov MtM + add TB P&L
+        sov_dp  = sov_pnl_per_pp * d_r_m
+        tb_pnl  = tb_pnl_per_m * (-m if m < 0 else 0.0)  # only adverse hits
+        cet1_m  = cet1_base_total - br["delta_el"] + sov_dp + tb_pnl
+        # RWA denominator: add loan ΔRWA + TB-RWA-uplift
+        tb_drwa = tb_rwa_per_m * (-m if m < 0 else 0.0)
+        rwa_m   = rwa_base_total + br["delta_rwa"] + tb_drwa
+        ratios.append(cet1_m / rwa_m if rwa_m > 0 else 0.0)
+    return m_grid, np.array(ratios)
+
+
+# Pre-compute static coupling coefficients for fast scan
+_anchor_r_pp = anchor.rate_10y_pp
+_sov_pnl_per_pp = float(sov_pnl_df["delta_pnl_eur"].sum()) / max(delta_r_pp, 1e-9) \
+                    if abs(delta_r_pp) > 1e-9 else 0.0
+# If user has zero current shock, fall back to direct computation
+if abs(_sov_pnl_per_pp) < 1.0:
+    # Compute sov P&L per pp directly via a unit shock
+    _unit_sov = rate_shock_pnl(
+        sovereign_maturity_ladder(parse_sovereign_csv(EBA_RAW_DIR / "tr_sov.csv",
+                                                       period=202506), period=202506),
+        delta_r_pp=1.0)
+    _unit_sov = _unit_sov[_unit_sov["LEI_Code"].isin(universe_leis)]
+    _sov_pnl_per_pp = float(_unit_sov["delta_pnl_eur"].sum())
+
+# TB sensitivities: from existing trading_book_stress at current M, normalised
+if abs(m_used) > 1e-9:
+    _tb_pnl_per_m = float(tb_stress_universe["delta_tb_pnl_eur"].sum()) / abs(m_used) \
+                      if m_used < 0 else 0.0
+    _tb_rwa_per_m = float(tb_stress_universe["delta_rwa_market_eur"].sum()) / abs(m_used) \
+                      if m_used < 0 else 0.0
+else:
+    # Compute unit-shock TB stress
+    _unit_tb = trading_book_stress(cap_universe, m_factor=-1.0)
+    _tb_pnl_per_m = float(_unit_tb["delta_tb_pnl_eur"].sum())
+    _tb_rwa_per_m = float(_unit_tb["delta_rwa_market_eur"].sum())
+
+_cet1_base_total = float(bridge_df["cet1_base"].sum())
+_rwa_base_total  = float(bridge_df["rwa_total_base"].sum())
+
+m_grid_sens, ratio_sens = _sensitivity_curve(
+    tuple(selected_banks) if "selected_banks" in dir() else tuple(universe.banks.keys()),
+    KAPPA_DOWNTURN_LGD, float(config.get("rho_mult", 1.0)),
+    _cet1_base_total, _rwa_base_total,
+    _sov_pnl_per_pp, _tb_pnl_per_m, _tb_rwa_per_m,
+    lgd_cal=float(config.get("lgd_calibration", 1.0)),
+    stress_exp=float(config.get("stress_exponent", 1.0)),
+    cap_mode=str(config.get("cap_mode", "hard")),
+)
+
+# Plot
+fig_sens = go.Figure()
+fig_sens.add_trace(go.Scatter(
+    x=m_grid_sens, y=ratio_sens * 100,
+    mode="lines+markers",
+    line=dict(color=COLORS["navy"], width=2.8),
+    marker=dict(size=6, color=COLORS["navy"]),
+    name="CET1 ratio (Aggregat)",
+))
+# Threshold lines
+fig_sens.add_hline(y=4.5, line_dash="dot", line_color="#A52F4D",
+                   annotation_text="4.5% · Pillar 1", annotation_position="right",
+                   annotation_font=dict(size=10, color="#A52F4D"))
+fig_sens.add_hline(y=7.0, line_dash="dot", line_color="#C9A227",
+                   annotation_text="7.0% · inkl. CCB", annotation_position="right",
+                   annotation_font=dict(size=10, color="#C9A227"))
+fig_sens.add_hline(y=8.0, line_dash="dot", line_color="#034B6F",
+                   annotation_text="8.0% · SREP", annotation_position="right",
+                   annotation_font=dict(size=10, color="#034B6F"))
+# Vertical line at current M
+fig_sens.add_vline(x=m_used, line_dash="dash", line_color=COLORS["crimson"],
+                   annotation_text=f"aktuell M = {m_used:+.2f}",
+                   annotation_position="top",
+                   annotation_font=dict(size=10, color=COLORS["crimson"]))
+# Baseline marker at M=0
+ratio_at_zero = ratio_sens[np.argmin(np.abs(m_grid_sens))] * 100
+fig_sens.add_annotation(x=0, y=ratio_at_zero,
+                         text=f"Baseline {ratio_at_zero:.2f}%",
+                         xshift=10, yshift=8,
+                         showarrow=False,
+                         font=dict(size=10, color=COLORS["stone"]))
+fig_sens.update_layout(
+    title=f"CET1-Quote in Abhängigkeit von M · Aggregat über "
+          f"{universe.n_banks} Banken",
+    xaxis_title="Systemfaktor M (adverse ⟵ ⟶ benigne)",
+    yaxis_title="CET1-Quote [%]",
+    height=440, showlegend=False,
+)
+st.plotly_chart(fig_sens, use_container_width=True)
+
+# Find breaking points
+def _find_breach(ratio_arr, m_grid_arr, thr_pct):
+    """Find the M-value at which ratio first drops below threshold."""
+    below = ratio_arr * 100 < thr_pct
+    if not below.any():
+        return None
+    # Find first index where below=True moving from M=0 leftward
+    zero_idx = int(np.argmin(np.abs(m_grid_arr)))
+    for i in range(zero_idx, -1, -1):
+        if below[i]:
+            return float(m_grid_arr[i])
+    return None
+
+
+bp_45 = _find_breach(ratio_sens, m_grid_sens, 4.5)
+bp_70 = _find_breach(ratio_sens, m_grid_sens, 7.0)
+bp_80 = _find_breach(ratio_sens, m_grid_sens, 8.0)
+
+bp_l, bp_r = st.columns([1, 1], gap="medium")
+with bp_l:
+    st.markdown("**Breaking-Points** · M-Wert bei dem die Aggregat-CET1-Quote unter die Schwelle fällt:")
+    bp_table = pd.DataFrame([
+        ("4.5% (Pillar-1)", f"M = {bp_45:+.2f}σ" if bp_45 is not None else "nicht erreicht im Scan-Bereich"),
+        ("7.0% (inkl. CCB)", f"M = {bp_70:+.2f}σ" if bp_70 is not None else "nicht erreicht im Scan-Bereich"),
+        ("8.0% (SREP)",      f"M = {bp_80:+.2f}σ" if bp_80 is not None else "nicht erreicht im Scan-Bereich"),
+    ], columns=["Threshold", "Breaking-Point M"])
+    st.dataframe(bp_table, use_container_width=True, hide_index=True, height=140)
+
+with bp_r:
+    insight(
+        f"<strong>Lesart.</strong> Bei M = −2.5 entspricht ungefähr der "
+        f"EBA-2025-Adverse-Härte. Falls die Sensitivity-Kurve dort bereits unter "
+        f"7% liegt, würde die Aggregat-Bank den Capital-Conservation-Buffer "
+        f"unter dem EBA-Stress reißen. Aktuelles Aggregat: "
+        f"<strong>{ratio_at_zero:.2f}% Baseline</strong>."
+    )
 
 st.divider()
 
