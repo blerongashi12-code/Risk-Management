@@ -1,133 +1,806 @@
-# EU Banking Credit Stress Cockpit
+# EU Banking Credit Stress Cockpit · Modell-Dokumentation
 
-Regulatorische Credit-Risk-Sicht auf das europäische Bankensystem, gebaut auf der EBA EU-wide Transparency Exercise 2025 + Vasicek/ASRF (Basel-III IRB). Drei Stress-Channels, einheitliche CET1-Wirkungskette:
+**Version 2.1 (Mai 2026)** · 2-Faktor-Stress-Modell auf regulatorisch publizierten A-IRB-Parametern
+der zehn größten EU-IRB-Banken.
 
-1. **Loan-Book-Channel** — Vasicek-conditional-PD + Downturn-LGD → Δ-EL / Δ-RWA
-2. **Sovereign-/Bonds-Channel** — IFRS-9-Accounting-Class-Split (HfT/FVTPL/FVOCI/AC), Modified-Duration-MtM → ΔFV → CET1
-3. **Trading-Book-Channel** — FRTB-style Market-RWA-Multiplier + TB-P&L-Haircut
+> **Autor.** Bleron Gashi · HS Düsseldorf · `bleron.gashi@study.hs-duesseldorf.de`
+> **Single Source of Truth.** [`MODEL_ASSUMPTIONS.md`](./MODEL_ASSUMPTIONS.md) (Methodik-Detail)
+> · [`BACKTESTING_WALKFORWARD_KONZEPT.docx`](./BACKTESTING_WALKFORWARD_KONZEPT.docx) (Backtest-Konzept)
 
-Bundesbank-Svensson-Zero-Curve treibt den Δr-Schock; ICE Brent treibt den Energy-Faktor.
+Dieses README ist als **Stand-Alone-Dokumentation** geschrieben — alle Formeln, Annahmen,
+Quellen und Parameter sind hier zitiert, sodass ein Kollege jeden einzelnen Bestandteil
+ohne Cockpit-Zugriff verifizieren kann.
 
-## Repository-Struktur
+---
+
+## Inhaltsverzeichnis
+
+1. [Überblick · was das Modell macht](#1-überblick--was-das-modell-macht)
+2. [Ökonomische Motivation](#2-ökonomische-motivation)
+3. [Mathematische Fundierung](#3-mathematische-fundierung)
+4. [Datenbasis · Quellen mit URLs](#4-datenbasis--quellen-mit-urls)
+5. [Banken-Universum · Top-10-Auswahl](#5-banken-universum--top-10-auswahl)
+6. [Sensitivitäts-Kalibrierung · β-/γ-Matrix](#6-sensitivitäts-kalibrierung--β-γ-matrix)
+7. [Annahmen-Katalog · jede Annahme mit Quelle](#7-annahmen-katalog--jede-annahme-mit-quelle)
+8. [Repository-Struktur](#8-repository-struktur)
+9. [Bibliographie · prüfbare Referenzen mit URLs/DOIs](#9-bibliographie--prüfbare-referenzen-mit-urls-und-dois)
+10. [Setup, Start, Tests](#10-setup-start-tests)
+11. [Bekannte Limitationen](#11-bekannte-limitationen)
+
+---
+
+## 1 · Überblick · was das Modell macht
+
+Das Cockpit liefert eine **regulatorische Credit-Risk-Sicht auf das europäische
+Bankensystem**. Zwei voneinander unabhängige Macro-Faktoren werden frei vorgegeben,
+und das Modell rechnet daraus live die Wirkung auf die CET1-Quote der zehn größten
+EU-IRB-Banken aus.
+
+### 1.1 · Zwei Eingangsfaktoren
+
+| Faktor | Einheit | Wertebereich | Notation |
+|---|---|---|---|
+| ΔBrent | logarithmischer Return | −1,0 ≤ Δ ≤ +1,5 | Δlog(Brent) |
+| Δr_10y | Prozentpunkte (pp) | −3,0 ≤ Δ ≤ +5,0 | Δr |
+
+### 1.2 · Drei Stress-Kanäle, ein Ziel
 
 ```
-Risk management/
-├── config.py                    ← Pfade + Vasicek/EBA-Konfig
-├── 03_fetch_brent_crude.py      ← Brent (yfinance)
-├── 04_fetch_bundesbank_svensson.py  ← Svensson-Params (Bundesbank)
-│
-├── backend/
-│   ├── svensson.py              ← Zero-Curve-Engine
-│   ├── vasicek.py               ← Vasicek/ASRF + Basel-III IRB
-│   ├── eba_loader.py            ← EBA-CSV-Parsing + Sovereign + Capital
-│   ├── macro_factor.py          ← (Brent, Δr) → Vasicek-M
-│   └── backtesting.py           ← historisches Panel + Forecast vs Realized
-│
-├── streamlit_app/
-│   ├── app.py                   ← Landing-Page
-│   ├── components/              ← theme · sidebar · methodology · data_loader
-│   └── pages/
-│       ├── 1_Credit_Risk.py     ← Vasicek IRB + NPL + CET1-Strip
-│       ├── 2_Bonds.py           ← 3 Sub-Tabs: Sovereigns · Banking-Book · TB+ABS
-│       ├── 3_Capital_Adequacy.py ← 3-Channel CET1-Ratio
-│       ├── 4_Yield_Curve.py     ← Bundesbank-Svensson + β-Shifts
-│       ├── 5_Backtesting.py     ← 22 Quartals-Stichtage 2019-2025
-│       ├── 6_Annahmen.py        ← Governance-Doku (3 Layer)
-│       └── 7_Methodology.py     ← Vollständige MODEL_ASSUMPTIONS.md
-│
-├── data/
-│   ├── bundesbank_svensson.csv  ← Bundesbank-Download (manuell)
-│   ├── tr_cre.csv  (~123 MB, EBA, gitignored)
-│   ├── tr_sov.csv  (~91 MB, EBA, gitignored)
-│   ├── tr_oth.csv  (~14 MB, EBA, gitignored)
-│   ├── tr_mrk.csv  (~3.6 MB, EBA, gitignored)
-│   ├── TR_Metadata.xlsx, SDD.xlsx  ← EBA-Dictionaries
-│   ├── cache/
-│   │   ├── brent_crude.parquet
-│   │   └── svensson_params.parquet
-│   └── transparency_2020/ … 2024/  ← historische Vintages für Backtesting
-│
-├── MODEL_ASSUMPTIONS.md         ← Single Source of Truth
-└── README.md                    ← (dieses File)
+        ΔBrent     Δr_10y
+           ╲         ╱
+            ╲       ╱
+             ▼     ▼
+   ┌─────────────────────────────────────────┐
+   │  Sektor-Sensitivitäten β_oil + β_rate    │
+   │  pro Exposure-Klasse (Corporate, SME,    │
+   │  Mortgage, QRRE, Other Retail, Bank,     │
+   │  Sovereign)                              │
+   └─────────────────────────────────────────┘
+       │              │              │
+       ▼              ▼              ▼
+  ┌─────────┐    ┌─────────┐    ┌─────────┐
+  │ Kanal 1 │    │ Kanal 2 │    │ Kanal 3 │
+  │ Kredit­ │    │ Sovereign│    │ Trading │
+  │ buch    │    │ Book    │    │ Book    │
+  │         │    │         │    │         │
+  │ ΔPD +   │    │ ΔFV via │    │ FRTB-   │
+  │ ΔLGD →  │    │ Modi-   │    │ Multi-  │
+  │ ΔEL +   │    │ fied    │    │ plier   │
+  │ ΔRWA    │    │ Dura-   │    │ + P&L-  │
+  │ via     │    │ tion ·  │    │ Hair-   │
+  │ Basel-  │    │ IFRS-9- │    │ cut     │
+  │ IRB     │    │ Filter  │    │         │
+  └─────────┘    └─────────┘    └─────────┘
+       │              │              │
+       └──────────────┼──────────────┘
+                      ▼
+            ┌──────────────────┐
+            │   CET1-Quote     │
+            │ (Pillar 1 / CCB  │
+            │  / SREP-Schwellen)│
+            └──────────────────┘
 ```
 
-## Setup
+### 1.3 · 5-Tab-Cockpit (Streamlit-App)
 
-```bash
-pip install streamlit pandas pyarrow numpy scipy openpyxl yfinance plotly
+| Tab | Inhalt |
+|---|---|
+| **0 · Intro (Landing-Page)** | 5-Minuten-Tour, Faktor-Begründung, β-Matrix, Stress-Kanäle mit Mini-Beispielen |
+| **1 · Faktor-Analyse & Transmission** | 5-Jahres-Korrelations-Analyse + 5-stufige Stress-Bridge |
+| **2 · Kreditbuch** | Loan-Book-Kanal: PD/LGD-Matrix pro Bank, Worked Example, Capital-Bridge, Bank-Drilldown |
+| **3 · Marktbuch** | 4 Sub-Tabs: Yield-Curve · Sovereigns (IFRS-9) · Banking-Book-Bonds · Trading-Book |
+| **4 · Eigenkapital** | 3-Kanal-CET1-Waterfall, Pillar-1/CCB/SREP-Threshold-Analyse, Bank-Drilldown |
+| **5 · Validierung** | Walk-Forward-Backtest + Annahmen + Methodologie-Disclosure |
+
+---
+
+## 2 · Ökonomische Motivation
+
+### 2.1 · Warum gerade Brent-Öl und der 10-Jahres-Zins?
+
+Beide Faktoren wirken auf die Bilanz einer Bank, aber über **grundverschiedene
+Mechanismen**. Sie sind die zwei Macro-Treiber, die in fast allen aufsichtlichen
+Stress-Test-Szenarien explizit erscheinen (vgl. EBA Stress Test 2025 Methodology
+Note, Sec. 3.2 und 3.4).
+
+| Faktor | Primäre Wirkung auf | Zentrale Transmissions-Kanäle |
+|---|---|---|
+| **ΔBrent** | Real-Sektor-Cashflows | Input-Kosten energie­intensiver Industrien · Headline-Inflation → EZB-Reaktion · Konsumenten-Disposable-Income via Heiz-/Kraftstoff-Preise |
+| **Δr_10y** | Diskontierungs- und Refi-Kosten | Hypotheken-Refi (Mortgage-PD) · Sovereign-Bond-Mark-to-Market via Modified Duration · Bank-Net-Interest-Margin · Corporate-Bond-Spread-Baseline |
+
+**Warum Brent (und nicht WTI)?**
+Brent ist der maßgebliche **europäische** Ölpreis-Referenzpunkt — über zwei Drittel
+des global gehandelten Rohöls wird gegen Brent gepreist (ICE Futures Europe). Für
+eine EU-Banken-Stichprobe ist Brent damit der ökonomisch näherliegende Energie-Schock
+als WTI (US-Crude) oder Dubai (Asien). Auch die EBA-Stress-Test-2025-Methodology-Note
+verwendet Brent (Sec. 3.2.4).
+
+**Warum der 10-Jahres-Zins?**
+Der 10y-Zins ist der zentrale Pricing-Anker für:
+- **Hypotheken** (Fixzins-Refinanzierung, Property-Value-Reaktion)
+- **Unternehmensanleihen** (Corporate-Spread-Baseline)
+- **Staatsanleihen** (Sovereign-Duration)
+
+Kurze Laufzeiten (2y/5y) reagieren primär auf Geldpolitik; sehr lange (30y) sind
+illiquide. 10y trifft die typische Bilanz-Duration europäischer Universalbanken.
+
+### 2.2 · Empirische Unabhängigkeit (über 5 Jahre)
+
+Über 1242 Handelstage (≈ 5 Jahre) gilt:
+
+- **Pearson ρ(ΔBrent, Δr_10y) = +0,07** (95 %-CI [+0,01; +0,12])
+- **OLS R²(Δr ~ ΔBrent) = 0,005** — keine erklärende Varianz
+- **F-Statistik = 6,2** (p ≈ 0,013) — schwach signifikant, aber inhaltlich vernachlässigbar
+
+Konsequenz: **separate Modellierung als zwei unabhängige Risikofaktoren empirisch
+gerechtfertigt**. Die volle Diagnostik (R-Style `lm()`-Output mit Coefficients,
+t-Werten, p-Werten, F-Statistik und Residual-Standardfehler) ist im
+Cockpit-Tab 1 reproduzierbar.
+
+### 2.3 · Warum logarithmische Returns für Brent — und nicht für Zinsen?
+
+| Faktor | Transformation | Begründung |
+|---|---|---|
+| **Brent** | log-Return | additiv über Zeit, symmetrisch (+0,50 und −0,50 sind gleich groß in der Verteilung), annähernd normalverteilt für Ölpreise → robuste Regressions-Inferenz (vgl. Tsay 2010, §1.4) |
+| **Zinsen** | Δ in Prozentpunkten (kein Log) | Zinsänderungen sind bereits linear interpretierbar; Modified-Duration-Bond-Pricing rechnet direkt mit Δy in pp (vgl. Tuckman/Serrat 2012, §4.2) |
+
+---
+
+## 3 · Mathematische Fundierung
+
+### 3.1 · 2-Faktor-Stress-Transmission (pro Exposure-Klasse)
+
+Für jede Exposure-Klasse *c* ∈ {Corporate, SME, Mortgage, QRRE, Other Retail, Bank, Sovereign}:
+
+```
+ΔPD_c (pp)  = β^c_oil  · ΔBrent_log  +  β^c_rate · Δr_10y_pp
+ΔLGD_c (pp) = γ^c_oil  · ΔBrent_log  +  γ^c_rate · Δr_10y_pp
 ```
 
-## Daten beschaffen
+Anschließend mit Floor / Cap geclipt:
 
-### Bundesbank Svensson (einmalig)
+```
+PD_stress  = clip(PD_base  + ΔPD_c / 100,   3 bp, 50 %)
+LGD_stress = clip(LGD_base + ΔLGD_c / 100,  5 %, 100 %)
+```
+
+Der 3-bp-PD-Floor ist der Basel-Sovereign-Floor (BCBS d424, Art. 160 (1)).
+Der 50-%-PD-Cap ist ein numerisches Sanity-Limit.
+
+### 3.2 · Basel-III-IRB-Capital-Formel (für Corporate, Bank, Sovereign)
+
+Aus BCBS d424 (2017), Art. 153 der Regulation (EU) 575/2013 (CRR):
+
+```
+ρ(PD) = 0,12 · (1 − e^(−50·PD)) / (1 − e^(−50))
+      + 0,24 · [1 − (1 − e^(−50·PD)) / (1 − e^(−50))]
+
+b(PD) = (0,11852 − 0,05478 · ln(PD))²
+
+K = [ LGD · N( (N⁻¹(PD) + √ρ · N⁻¹(0,999)) / √(1 − ρ) ) − PD · LGD ]
+    · (1 − 1,5 · b(PD))⁻¹ · (1 + (M − 2,5) · b(PD))
+
+RWA = K · 12,5 · EAD
+```
+
+Wobei:
+- **N(·)** = Standard-Normal-CDF, **N⁻¹(·)** = ihre Inverse
+- **ρ** = Asset-Korrelation, abhängig von PD (Basel-Funktion)
+- **b(PD)** = Maturity-Adjustment-Slope-Faktor
+- **M** = Effective Maturity in Jahren (im Modell auf Klassen-spezifischen Wert gesetzt)
+- **0,999** = aufsichtsrechtliches Konfidenz-Niveau (99,9 %-Verlust-Quantil)
+- **12,5** = 1 / 8 % Mindest-Kapitalquote (Basel-Standardumrechnung)
+
+Für **Mortgage / Retail** entfallen Maturity-Adjustment (M-Term verschwindet),
+und die Asset-Korrelation ist fest:
+- Mortgage: ρ = 0,15
+- QRRE: ρ = 0,04
+- Other Retail: ρ-Funktion klassen-spezifisch (CRR Art. 154 (3))
+
+### 3.3 · Modified-Duration-Approximation (Sovereign-Buch)
+
+Für jeden Laufzeit-Bucket *m* ∈ {<3M, 3M–1J, 1–2J, 2–3J, 3–5J, 5–10J, >10J}:
+
+```
+ΔFV_m ≈ − D_m · Δy · E_{b,m}
+```
+
+mit:
+- **D_m** = Modified Duration des Buckets in Jahren
+  (approximiert als Bucket-Mittelpunkt: 0,1 · 0,6 · 1,5 · 2,5 · 4,0 · 7,5 · 15,0)
+- **Δy** = Zinsänderung in Dezimal (Δr_10y = +2,0 pp = 0,020)
+- **E_{b,m}** = Bond-Bestand der Bank *b* im Bucket *m* in EUR
+
+Aggregat pro Bank:
+```
+ΔFV_bank = Σ_m ΔFV_m
+```
+
+Quelle: Tuckman/Serrat (2012), "Fixed Income Securities", 3rd ed., Wiley, §4.2.
+
+**IFRS-9-Filter:**
+```
+CET1-Effekt = ΔFV · f_IFRS9
+   mit  f_IFRS9 = w_HfT + w_FVTPL + w_FVOCI  (Standardannahme 0,60)
+```
+
+Der Anteil **w_AC** des AC-Buchs (Annahme 0,40) bleibt buchhalterisch unsichtbar,
+ist aber ökonomisch real (latenter Verlust, vgl. SVB-Krise 2023).
+
+### 3.4 · FRTB-Style Market-RWA + Trading-P&L (Trading-Book)
+
+Schock-Magnitude (additive Aggregation der zwei Faktoren):
+```
+|Schock| = |ΔBrent_log| + |Δr_10y_pp|
+```
+
+Markt-RWA unter Stress:
+```
+RWA_market,stress = RWA_market,base · (1 + k · |Schock|)        mit k = 0,15
+```
+
+Trading-P&L-Haircut:
+```
+ΔP&L_trading = − h · |Schock| · P&L_trading,base                mit h = 0,20
+```
+
+Kalibrierung von **k** und **h**: EBA Stress Test 2025 Methodology Note, §3.4
+(Net-Trading-Income-Reduktion 40–60 % im Adverse-Szenario) und §7
+(Markt-RWA-Anstieg 30–40 %). Bei typischem |Schock| ≈ 2 ergibt das k ≈ 0,15 und
+h ≈ 0,20.
+
+### 3.5 · CET1-Quoten-Aggregation
+
+```
+                CET1_base − ΔEL_loan − ΔFV_sovereign − ΔP&L_trading
+CET1_stress = ──────────────────────────────────────────────────────
+                RWA_base + ΔRWA_credit + ΔRWA_market
+```
+
+Vergleich gegen die drei Aufsichts-Schwellen:
+
+| Schwelle | Wert | Aufsichts-Konsequenz |
+|---|---|---|
+| Pillar 1 | 4,5 % | Mindest-Kapitalquote (CRR Art. 92) |
+| Pillar 1 + Capital Conservation Buffer | 7,0 % | Auto-Dividenden-/Bonus-Restriktion bei Unterschreitung |
+| Pillar 1 + CCB + SREP-Add-On | 8,0 % | Aufsichtliche Maßnahmen, Pillar-2-Capital-Guidance |
+
+Rechtsgrundlage: Regulation (EU) 575/2013 (CRR) Art. 92, 128, 129;
+EBA Guidelines on SREP (EBA/GL/2018/03).
+
+---
+
+## 4 · Datenbasis · Quellen mit URLs
+
+### 4.1 · Bank-spezifische PDs aus Pillar-3-Disclosures (primary)
+
+**Inhalt im Modell:** EAD-gewichtete 1-Jahres-PDs und -LGDs **pro einzelner
+Bank × IRB-Exposure-Klasse**, gezogen aus den EU-CR6-Tabellen der jeweiligen
+Pillar-3-Reports (regulatorisch publiziert nach CRR Art. 431–455, EBA ITS
+on Disclosure ITS/2020/04).
+
+### 4.1a · Einheitlicher Stichtag · 31.12.2024
+
+**Methodische Konvention:** **Alle Baseline-PDs sind auf den Stichtag
+31.12.2024 verankert.** Diese Wahl folgt dem EBA-Stress-Test-2025-Standard
+und macht den Forward-Stress methodisch sauber: ein einheitlicher
+„Heute"-Snapshot ist der Ausgangspunkt, von dem aus der Macro-Schock
+(ΔBrent + Δr_10y) in die Zukunft simuliert wird. Vintage-Mix wäre
+methodisch unzulässig — manche Banken hätten dann schon 6+ Monate Macro-
+Evolution absorbiert, andere nicht.
+
+Der Loader (`backend/eba_pd_loader.py`) enthält einen Test
+`_test_vintage_consistency`, der bei jeder Code-Änderung erzwingt, dass
+alle 70 CSV-Zeilen denselben `vintage_date` haben.
+
+**Annahme für den 5-Jahres-Backtest-Horizont (2020–2024).** Für die
+Walk-Forward-Backtest-Periode unterstellen wir, dass die 31.12.2024-PDs
+auch für historische Quartale als Baseline gültig sind. Begründung:
+A-IRB-PDs sind **Through-the-Cycle** (TTC) gemäß CRR Art. 180 Abs. 2 —
+sie werden bewusst über ≥ 5 Jahre historischer Default-Daten geglättet
+und bewegen sich typischerweise nur ±0,1–0,3 pp quartalweise. Die
+echte Macro-Dynamik (Brent, Δr_10y) wird in dem Backtest über die zwei
+Faktoren modelliert, **nicht über die Baseline-PDs**. Ein synthetisches
+historisches PD-Time-Series wäre dieselbe TTC-Glättung wie heute und
+würde nichts hinzufügen — die Information sitzt in den β-Sensitivitäten
+und Macro-Returns, nicht im PD-Level.
+
+Diese Annahme deckt sich mit der Behandlung in EBA-Stress-Test-Backtests,
+die ebenfalls eine fixe Baseline gegen historische Macro-Realisationen
+testen.
+
+**Status (Stand Mai 2026):** **10 von 10 Banken** sind aus dem
+Pillar-3-Report für **31.12.2024** extrahiert und Cell-by-Cell verifiziert
+(`status = "pillar3_verified"`):
+
+| Bank | Quelle | Stichtag | Seiten |
+|---|---|---|---|
+| Deutsche Bank | [Pillar 3 Report Q4 2024](https://investor-relations.db.com/files/documents/regulatory-reporting/Pillar-3-Report-Q4-2024.pdf) | 31.12.2024 | 108–113 (EU CR6 AIRB) |
+| ING Groep | [Additional Pillar III Report 2024](https://ing.com/binaries/content/assets/documents/annual-reports/2024-ing-groep-nv-additional-pillar-iii-report.pdf) | 31.12.2024 | 44–51 (EU CR6 IRB) |
+| Société Générale | [Pillar 3 Report 31.12.2024](https://www.societegenerale.com/sites/default/files/documents/2025-03/pillar-3-31122024.pdf) | 31.12.2024 | 134–137 (Table 58 EU CR6 AIRB) |
+| Coöperatieve Rabobank | [Pillar 3 Report 2024](https://a.storyblok.com/f/329380/x/0bfc34783d/rabobank_pillar_3-_report-2024.pdf) | 31.12.2024 | 75–82 (EU CR6 AIRB) |
+| UniCredit | [Pillar III Disclosure 31.12.2024](https://www.unicreditgroup.eu/content/dam/unicreditgroup-eu/documents/en/investors/third-pillar-basel/2024/UniCredit-Group-Disclosure-Pillar-III-as-at-31-December-2024.pdf) | 31.12.2024 | 36–40 (EU CR6 AIRB) |
+| Crédit Mutuel (5 von 7 Klassen) | [Groupe Crédit Mutuel Pilier 3 Bâle III Exercice 2024](https://www.creditmutuel.com/partage/fr/CNCM/telechargements/presse-et-publications/publications/2025/2024-informations-relatives-au-pilier-3-de-bale-III-exercice-2024.pdf) | 31.12.2024 | 50, 53 (Sous-totaux NI/IRB) |
+| Groupe BPCE (5 von 7 Klassen) | [Pillar III Risk Report 2024](https://www.groupebpce.com/app/uploads/2025/03/bpce-pillar-iii-2024.pdf) | 31.12.2024 | 153–157 (EU CR6 AIRB) |
+| Groupe Crédit Agricole | [Risk Report Pillar 3 H1 2025](https://www.credit-agricole.com/en/pdfPreview/207696) — **31.12.2024-Komparativ-Spalten extrahiert** | 31.12.2024 | 40–42 (EU CR6 AIRB · 31.12.2024 comparative columns) |
+| Banco Santander (6 von 7 Klassen) | [Pillar 3 Disclosures 2025](https://www.santander.com/en/shareholders-and-investors/financial-and-economic-information/pillar-3-disclosures-report) — **31.12.2024-Komparativ-Spalten extrahiert** | 31.12.2024 | 94–100 (Tables 27 + 28 EU CR6 AIRB · 31.12.2024 comparative); Sovereign via Standardised-Approach → F-IRB-Default |
+| **BNP Paribas** | [Universal Registration Document 2024 (Pillar 3 Chapter 5)](https://invest.bnpparibas/en/document/release-of-the-english-version-of-the-universal-registration-document-and-annual-financial-report-2024) | 31.12.2024 | 440 + 442 + 443 + 448 + 450 + 451 (Tables 38, 39, 41, 42 IRBA EU CR6 SUB-TOTAL rows) |
+
+**Lokale Datei:** `data/pillar3_bank_pd_lgd.csv` (70 Zeilen,
+10 Banken × 7 Klassen, mit Audit-Trail pro Cell: `source_url`,
+`source_page`, `source_period`, `status`).
+
+### 4.1b · Verbleibende Country-Proxy-Einträge (5 von 70 Zellen)
+
+Alle 10 Banken sind Pillar-3-verifiziert. **5 von 70 Zellen** verbleiben
+dennoch auf Country-Proxy bzw. F-IRB-Default — nicht weil die Bank fehlt,
+sondern weil die jeweilige Bank für diese Klasse kein dediziertes
+EU-CR6-Sub-Total publiziert:
+
+| Bank | Klasse | Grund |
+|---|---|---|
+| Crédit Mutuel | QRRE | Klassen-Label in CM-Tabelle 35/36 nicht eindeutig isolierbar |
+| Crédit Mutuel | Bank (Institutions) | CM publiziert Institutions nicht separat als IRB-Subtotal |
+| Groupe BPCE | Mortgage | BPCE Retail-Real-Estate-Sub-totals zeigen ungewöhnlich hohe PDs (vermutlich NPE-incl.) — Mapping unklar |
+| Groupe BPCE | QRRE | BPCE Eligible-Revolving-Sub-total nicht eindeutig isolierbar |
+| Banco Santander | Sovereign | Santander reportet Sovereign-Exposures unter Standardised Approach (kein IRB-CR6-Eintrag) → F-IRB-Default |
+
+Diese Einträge nutzen den gleichen Stichtag (31.12.2024) — entweder EBA
+Risk Dashboard Country-Aggregate (Crédit Mutuel QRRE, BPCE Mortgage/QRRE)
+oder Basel-III-F-IRB-Default (CM Bank, Santander Sovereign).
+
+### 4.1c · Methodische Innovation · Komparativ-Spalten-Extraktion
+
+Für **Crédit Agricole** und **Banco Santander** konnten wir die 31.12.2024-
+Werte über die **Komparativ-Spalten** in den neueren Pillar-3-Berichten
+extrahieren:
+
+- **Crédit Agricole**: das H1 2025-Pillar-3 (`pdfPreview/207696`) enthält
+  pro EU-CR6-Tabelle eine separate Spalte mit den 31.12.2024-Komparativen
+  (Pages 40–42 zeigen explizit „CREDIT RISK EXPOSURES BY PORTFOLIO AND
+  PROBABILITY OF DEFAULT (PD) RANGE — ADVANCED INTERNAL RATINGS-BASED
+  APPROACH **AT 31 DECEMBER 2024**").
+- **Banco Santander**: das 2025-Pillar-3 (`irp-2025-irp-2025-en.pdf`,
+  vom User lokal bereitgestellt) hat dieselbe Konvention — pages 94–100
+  haben explizit „CR6 - AIRB approach **(31.12.2024)**" als Header.
+
+Diese Komparativ-Werte sind regulatorisch identisch mit den im
+Original-Jahresbericht publizierten 31.12.2024-Werten — sie werden
+unverändert in den Folgeperioden mitgeführt (EBA-ITS-Disclosure-Pflicht).
+
+**Coverage-Status:** beim Cockpit-Start emittiert der Loader
+(`backend/eba_pd_loader.py`) automatisch eine Konsolen-Meldung
+`PD/LGD-Tabelle geladen · 70 Zeilen (10/10 Banken Pillar-3-verifiziert,
+93 % der Zeilen verified) · verified=65, country_proxy=3,
+basel_default=2` — der Daten-Reifegrad ist also bei jedem Run sichtbar.
+
+### 4.1d · Quelle der Übergangs-Werte für 5 Klassen-Zellen: EBA Risk Dashboard
+
+Für die 5 Zellen (von 70), die auf Country-Proxy bleiben (z. B. Santander
+Sovereign unter Standardised Approach, BPCE Mortgage Mapping unklar),
+nutzen wir die Country-Aggregate aus:
+
+**Quelle:** European Banking Authority, "Risk Dashboard — Credit Risk
+Parameters Annex Q4 2024", veröffentlicht März 2025 (gleicher Stichtag
+31.12.2024 wie die Pillar-3-Disclosures).
+**URL:** https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/risk-dashboard
+**Lokale Datei:** `data/eba_risk_dashboard_pd_lgd.csv` (Legacy-Quelle).
+
+### 4.2 · EBA Transparency Exercise 2025
+
+**Inhalt im Modell:**
+- EAD (Exposure at Default) pro Bank × Klasse (Item 2520522)
+- Sovereign-Bestände pro Bank × Maturity-Bucket (Items 2520810/812/813/814/815)
+- Market-RWA pro Bank (Item 2520210)
+- Trading-Net-Income pro Bank (Item 2520311)
+- Common Equity Tier 1 Capital pro Bank (Item 2520102)
+
+**Quelle:** European Banking Authority, "EU-wide Transparency Exercise 2025",
+Reporting-Stichtag 30. Juni 2025, veröffentlicht Dezember 2025.
+
+**URL:** https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/eu-wide-transparency-exercise
+
+**Lokale Dateien:** `data/tr_cre.csv`, `data/tr_sov.csv`, `data/tr_oth.csv`,
+`data/tr_mrk.csv`, `data/TR_Metadata.xlsx`, `data/SDD.xlsx`.
+
+### 4.3 · Bundesbank Svensson-Parameter (10-Jahres-Zins)
+
+**Inhalt im Modell:** Tagesreihe der vier Svensson-Parameter (β₀, β₁, β₂, β₃) der
+deutschen Zins-Strukturkurve, daraus berechnet der 10-Jahres-Zero-Coupon-Zins.
+
+**Quelle:** Deutsche Bundesbank, Zeitreihen-Datenbank, Reihe BBSSY01.
+
+**URL:** https://www.bundesbank.de/dynamic/action/de/statistiken/zeitreihen-datenbanken/zeitreihen-datenbank/759778/759778
+
+**Methodologie:** Svensson, L. E. O. (1994), "Estimating and Interpreting Forward
+Interest Rates: Sweden 1992-1994", IMF Working Paper 94/114.
+
+**Lokale Datei:** `data/cache/svensson_params.parquet`.
+
+### 4.4 · Brent Crude (ICE Futures Europe)
+
+**Inhalt im Modell:** Tägliche Brent-Schluss-Kurse in USD.
+
+**Quelle:** ICE Futures Europe via yfinance-Ticker `BZ=F`.
+
+**URL:** https://www.theice.com/products/219/Brent-Crude-Futures (Produkt-Spezifikation)
+
+**Lokale Datei:** `data/cache/brent_crude.parquet`. Auto-Update via
+`03_fetch_brent_crude.py`.
+
+---
+
+## 5 · Banken-Universum · Top-10-Auswahl
+
+### 5.1 · Auswahl-Logik
+
+Aus den 120 Banken des EBA-Transparency-Universe werden zunächst die 67 IRB-Banken
+ausgewählt (Filter 1: nur Banken mit Internal-Ratings-Based-Approach liefern PD/LGD,
+Voraussetzung für jede Vasicek-/IRB-basierte Modellierung). Aus diesen werden die
+**zehn größten** nach einem kombinierten Score aus Σ EAD und Klassen-Coverage
+selektiert.
+
+### 5.2 · Die zehn Banken im Cockpit
+
+| # | Bank | Heimat | Σ EAD (€ Mrd.) | EBA-LEI |
+|---|---|---|---:|---|
+| 1 | Crédit Agricole | FR | 1 646 | 969500TJ5KRTCJQWXH05 |
+| 2 | BNP Paribas | FR | 1 302 | R0MUWSFPU8MPRO8K5P83 |
+| 3 | ING Groep | NL | 928 | 549300NYKK9MWM7GGW15 |
+| 4 | Société Générale | FR | 791 | O2RNE8IBXP4R0TD8PU41 |
+| 5 | Groupe BPCE | FR | 777 | 9695005MSX1OYEMGDF46 |
+| 6 | Deutsche Bank | DE | 739 | 7LTWFZYICNSX8D621K86 |
+| 7 | Crédit Mutuel | FR | 627 | 9695000CG7B84NLR5984 |
+| 8 | Banco Santander | ES | 595 | 5493006QMFDDMYWIAM13 |
+| 9 | Coöperatieve Rabobank | NL | 469 | DG3RU1DBUFHT4ZF9WN62 |
+| 10 | UniCredit | IT | 408 | 549300TRUWO2CD2G5692 |
+
+**Σ EAD Top-10 = €8 282 Mrd.** = rund **55 %** der gesamten EU-IRB-EAD,
+ca. **45 %** der gesamten EU-Banken-Bilanzsumme.
+
+### 5.3 · Begründung der Begrenzung auf 10
+
+1. **Datenqualität.** Diese zehn Banken haben vollständige PD/LGD-Disclosure
+   über alle sieben Exposure-Klassen. Bei kleineren IRB-Banken fehlen oft Klassen
+   oder Werte sind aggregiert.
+2. **Coverage.** Die Top-10 repräsentieren bereits einen substantiellen Anteil
+   des EU-IRB-Systems (siehe Σ EAD oben).
+3. **Heimatland-Diversifikation.** Die zehn decken die fünf größten EU-Bankenmärkte
+   ab: Frankreich (5), Deutschland (1), Niederlande (2), Spanien (1), Italien (1).
+4. **Modell-Transparenz.** Pro Bank wird im Cockpit ein Worked Example dargestellt.
+   Mit 67 Banken wäre die didaktische Nachvollziehbarkeit nicht mehr gegeben.
+
+---
+
+## 6 · Sensitivitäts-Kalibrierung · β-/γ-Matrix
+
+### 6.1 · Vollständige Matrix
+
+Pro Exposure-Klasse vier Koeffizienten: β_oil (PD), β_rate (PD), γ_oil (LGD),
+γ_rate (LGD). Alle in Prozentpunkten pro Einheit des Faktors.
+
+| Klasse | β_oil | β_rate | γ_oil | γ_rate | Ökonomische Logik |
+|---|---:|---:|---:|---:|---|
+| Corporate | +0,30 | +0,20 | +0,50 | +1,00 | Energie-Input-Kosten + Bond-Refi-Kosten |
+| SME Corporate | +0,45 | +0,35 | +0,40 | +1,20 | SMEs sensitiver wegen geringerer Diversifikation und kürzerer Refi-Profile |
+| Mortgage | +0,05 | +0,30 | +0,10 | +1,50 | Floating-Rate-Affordability + Property-Value-Haircut bei Δr |
+| QRRE | +0,40 | +0,15 | +0,30 | +0,50 | Konsumenten-Inflation belastet Disposable Income stark |
+| Other Retail | +0,30 | +0,25 | +0,25 | +0,80 | zwischen Mortgage und QRRE |
+| **Bank** | +0,05 | **−0,05** | +0,10 | +0,50 | **NIM-Uplift** bei steigenden Zinsen — adressiert die Kritik, dass „steigende Zinsen pauschal schlecht" ökonomisch unkorrekt ist |
+| Sovereign | 0 | 0 | 0 | 0 | fiskalisch determiniert, nicht macro-getrieben |
+
+### 6.2 · Quellen pro Wert
+
+| Klasse | Quelle für β-Werte |
+|---|---|
+| Corporate | EBA Stress Test 2025 Methodology Note, §3.4 (Corporate-Channel) · Hosszú & Király (2018) MNB-WP 2018/2 für ungarische Corporates |
+| SME Corporate | Castro (2013) Economic Modelling 31 für GIPSI-Länder, höhere Sensitivität bei kleineren Firmen empirisch belegt · EBA ST 2025 §3.4 |
+| Mortgage | Drehmann & Juselius (2014) BIS Working Paper 421 für DSR-Channel · ECB Macroprudential Bulletin Issue 7 (Apr 2019) zu Hypotheken-Affordability |
+| QRRE | Castro (2013) Economic Modelling 31, Konsumenten-DSR via Energie-Inflation |
+| Other Retail | EBA ST 2025 §3.4, interpoliert zwischen Mortgage und QRRE |
+| **Bank** | EBA Stress Test 2025 Methodology Note §3.5 (Net Interest Income) — NIM-Profit-Effekt bei steigenden Zinsen explizit erfasst |
+| Sovereign | konventionell auf 0 gesetzt — Sovereign-Risiko wird im Sovereign-Buch (Modified Duration) modelliert, nicht über PD-Stress |
+
+Die γ-Werte (LGD-Stress) sind analog kalibriert. CRR Art. 181 fordert „Downturn-LGD"
+für IRB-Banken — die γ-Werte bilden den Downturn-Aufschlag faktor-spezifisch ab.
+
+### 6.3 · Override-Möglichkeit für Sensitivitäts-Analysen
+
+Im Cockpit (Tab 0 · Intro · Schritt 3b) können alle β-Werte überschrieben werden.
+Die geänderten Werte wirken sofort und global auf alle Charts.
+
+---
+
+## 7 · Annahmen-Katalog · jede Annahme mit Quelle
+
+| ID | Annahme | Wert | Quelle / Begründung |
+|---|---|---|---|
+| A-01 | PD pro Bank × Klasse | **bank-spezifisch** aus Pillar-3 EU-CR6-Subtotals (**10/10 Banken Pillar-3-verifiziert**, 93 % der 70 Zellen direkt aus Bank-Pillar-3; 5 Zellen mit Country-Aggregate weil Bank diese spezifische Klasse nicht als IRB-Sub-total publiziert) | CRR Art. 180 (A-IRB-Schätzung) + EBA ITS on Disclosure ITS/2020/04 (Pillar-3-Disclosure-Pflicht) |
+| A-01b | **Einheitlicher Stichtag aller PDs/LGDs** | **31.12.2024** für alle 70 CSV-Zeilen (7 Pillar-3 + 3 Country-Proxy) — Loader-Test `_test_vintage_consistency` erzwingt diese Konsistenz | EBA Stress Test 2025 Methodology Note (uniformer Forward-Stress-Startpunkt); BCBS d155 Sound Stress Testing Principles |
+| A-01c | **PD-Baseline für 5-Jahres-Backtest 2020–2024** | 31.12.2024-PDs gelten als Baseline-Proxy für alle historischen Quartale — Macro-Dynamik (Brent, Δr) wird über die zwei Faktoren modelliert, nicht über das PD-Level | CRR Art. 180 Abs. 2 (TTC-Glättung über ≥ 5 Jahre Default-Daten → A-IRB-PDs sind quartalweise quasi-stabil mit ±0,1–0,3 pp Drift); analog zur EBA-Stress-Test-Backtest-Methodik |
+| A-02 | LGD pro Bank × Klasse | analog zu A-01 — bank-spezifisch wo Pillar-3 verfügbar, sonst Country-Aggregate / F-IRB-Default (45 % Senior Unsecured) | CRR Art. 181 (Downturn-LGD-Konvention) + CRR Art. 161 (F-IRB-Fallback) |
+| A-03 | EAD pro Bank × Klasse | EBA Transparency 2025, Item 2520522, post-CCF | EBA Implementing Technical Standards ITS 680/2014 |
+| A-04 | β-/γ-Sensitivitäten | siehe Abschnitt 6 | EBA ST 2025 + akademische Literatur |
+| A-05 | Asset-Korrelation ρ | Basel-Funktion gemäß CRR Art. 153 (Corporate/Bank/Sovereign), feste Werte für Mortgage (0,15) und QRRE (0,04) | BCBS d424, Art. 153–154 |
+| A-06 | Konfidenz-Niveau IRB-Formel | 99,9 % | BCBS d424, Art. 153 (Pillar-1-Standard) |
+| A-07 | Modified Duration Sovereign | gewichteter Bucket-Mittelpunkt: 0,1 / 0,6 / 1,5 / 2,5 / 4,0 / 7,5 / 15,0 Jahre | Tuckman/Serrat (2012) §4.2; EBA-Bucket-Definition Items 2520810ff. |
+| A-08 | IFRS-9-Mix Sovereign | 60 % HfT/FVTPL/FVOCI, 40 % AC | EBA "Implementation of IFRS 9 by EU Banks" Reports (2018, 2021, 2023) + ECB SSM Supervisory Banking Statistics — typischer Mittelwert für große EU-IRB-Banken |
+| A-09 | Trading-Book-RWA-Multiplier k | 0,15 pro Einheit \|Schock\| | EBA Stress Test 2025 Methodology Note §7 — Markt-RWA-Anstieg 30–40 % im Adverse-Szenario bei \|Schock\| ≈ 2 |
+| A-10 | Trading-P&L-Haircut h | 0,20 pro Einheit \|Schock\| (entspricht 50 %-Reduktion bei \|Schock\| = 2,5) | EBA Stress Test 2025 §3.4 und 2023 §3.2 — Net-Trading-Income-Reduktion 40–60 % im Adverse-Szenario |
+| A-11 | Faktor-Unabhängigkeit Brent ⊥ Δr_10y | empirisch ρ = +0,07 über 5 Jahre, R² = 0,005 | eigene Schätzung auf ICE-Brent + Bundesbank-Svensson, im Cockpit Tab 1 reproduzierbar |
+| A-12 | PD-Floor / PD-Cap | 3 bp / 50 % | Basel-Sovereign-Floor (BCBS d424 Art. 160 (1)) bzw. numerisches Sanity-Limit |
+| A-13 | LGD-Floor / LGD-Cap | 5 % / 100 % | Sanity-Konvention + CRR-Definition |
+| A-14 | Stress-Horizont | 1 Jahr | BCBS d424 (IRB-Standardhorizont) |
+| A-15 | Sovereign-Floor RWA | 0 % Risikogewicht für EU-Sovereigns in eigener Währung | CRR Art. 114 (4) (Carve-Out für EU-Sovereigns) |
+
+---
+
+## 8 · Repository-Struktur
 
 ```text
-URL:  https://www.bundesbank.de/dynamic/action/de/statistiken/zeitreihen-datenbanken/zeitreihen-datenbank/759778/759778
+Risk management/
+├── README.md                          ← dieses File
+├── MODEL_ASSUMPTIONS.md               ← detaillierte Methodik-Doku
+├── BACKTESTING_WALKFORWARD_KONZEPT.docx
+├── run_clean.py                       ← Streamlit-Start mit Cache-Cleanup
+├── config.py                          ← Pfade, Konstanten
+│
+├── 03_fetch_brent_crude.py            ← yfinance-Brent-Daten
+├── 04_fetch_bundesbank_svensson.py    ← Svensson-Parameter-Loader
+│
+├── backend/
+│   ├── two_factor_stress.py           ← β-/γ-Matrix + Stress-Anwendung
+│   ├── factor_correlation.py          ← 5-Jahres-Korrelation + R-Style-lm-Output
+│   ├── eba_pd_loader.py               ← EBA-Risk-Dashboard-Loader + Top-10-Filter
+│   ├── eba_loader.py                  ← EBA-Transparency-CSV-Parsing
+│   ├── vasicek.py                     ← IRB-Capital-Formel (Basel-Standard)
+│   ├── svensson.py                    ← Zero-Coupon-Curve-Engine
+│   ├── macro_factor.py                ← (Legacy) Single-Factor-Mapping
+│   ├── backtesting.py                 ← Panel-OLS-Backtest
+│   └── backtesting_walkforward.py     ← Quartals-Walk-Forward-Backtest
+│
+├── streamlit_app/
+│   ├── app.py                         ← Landing-Page mit 5-Min-Tour
+│   ├── static/mckinsey.css            ← Cockpit-Aesthetic
+│   ├── components/
+│   │   ├── theme.py                   ← Plotly-Template + Breadcrumb
+│   │   ├── sidebar.py                 ← 2-Slider-Sidebar
+│   │   ├── data_loader.py
+│   │   ├── methodology.py
+│   │   ├── legacy_views.py
+│   │   └── backend_path.py
+│   └── pages/
+│       ├── 1_Faktor_Analyse.py        ← Korrelations-Analyse + 5-Stufen-Bridge
+│       ├── 2_Kreditbuch.py            ← Loan-Book mit Worked Example
+│       ├── 3_Marktbuch.py             ← 4 Sub-Tabs (Yield · Sov · BB · TB)
+│       ├── 4_Eigenkapital.py          ← 3-Kanal-CET1
+│       └── 5_Validierung.py           ← Walk-Forward-Backtest
+│
+└── data/
+    ├── eba_risk_dashboard_pd_lgd.csv  ← 70 Zeilen, 10 Banken × 7 Klassen
+    ├── top10_irb_banks.csv            ← Top-10-Selektions-Tabelle
+    ├── bundesbank_svensson.csv
+    ├── tr_cre.csv  (~123 MB, gitignored)
+    ├── tr_sov.csv  (~91 MB, gitignored)
+    ├── tr_oth.csv  (~14 MB, gitignored)
+    ├── tr_mrk.csv  (~3.6 MB, gitignored)
+    ├── TR_Metadata.xlsx, SDD.xlsx
+    └── cache/
+        ├── brent_crude.parquet
+        └── svensson_params.parquet
 ```
 
-Als CSV exportieren → `data/bundesbank_svensson.csv` → `python 04_fetch_bundesbank_svensson.py`
+---
 
-### EBA Transparency 2025
+## 9 · Bibliographie · prüfbare Referenzen mit URLs und DOIs
 
-Download von [eba.europa.eu/risk-and-data-analysis/eu-wide-transparency-exercise](https://www.eba.europa.eu/risk-and-data-analysis/eu-wide-transparency-exercise):
-- `tr_cre.csv`, `tr_sov.csv`, `tr_oth.csv`, `tr_mrk.csv`
-- `TR_Metadata.xlsx`, `SDD.xlsx`
+### 9.1 · Regulatorische Standards
 
-Nach `data/`. Der Loader (`backend/eba_loader.py`) findet sie automatisch via `config.EBA_RAW_DIR`.
+- **BCBS d424 (2017).** *Basel III: Finalising post-crisis reforms.* Basel Committee
+  on Banking Supervision, Dezember 2017.
+  https://www.bis.org/bcbs/publ/d424.htm
 
-### Historische Vintages (für Backtesting-Page)
+- **BCBS d457 (2019).** *Minimum capital requirements for market risk* (FRTB).
+  Basel Committee on Banking Supervision, Januar 2019.
+  https://www.bis.org/bcbs/publ/d457.htm
 
-Optional. Die Vintages 2020–2024 nach `data/transparency_2020/` … `data/transparency_2024/` ablegen — gleicher 6-File-Satz. URLs in der Backtesting-Page-Doku.
+- **BCBS d155 (2009).** *Principles for sound stress testing practices and supervision.*
+  Basel Committee on Banking Supervision, Mai 2009.
+  https://www.bis.org/publ/bcbs155.htm
 
-## Cockpit starten
+- **Regulation (EU) 575/2013 (CRR).** *Capital Requirements Regulation*,
+  konsolidierte Fassung.
+  https://eur-lex.europa.eu/eli/reg/2013/575/oj
+
+- **IFRS 9 (IASB 2014).** *Financial Instruments.* International Accounting Standards
+  Board, Juli 2014, EU-pflichtig seit Januar 2018.
+  https://www.ifrs.org/issued-standards/list-of-standards/ifrs-9-financial-instruments/
+
+- **EBA Guidelines on SREP (EBA/GL/2018/03).**
+  https://www.eba.europa.eu/regulation-and-policy/supervisory-review-and-evaluation-srep-and-pillar-2
+
+- **EBA Guidelines on Stress Testing (EBA/GL/2018/04).**
+  https://www.eba.europa.eu/regulation-and-policy/supervisory-review-and-evaluation-srep-and-pillar-2
+
+- **EBA ITS 680/2014.** *Implementing Technical Standards on Supervisory Reporting*
+  (COREP / FINREP).
+  https://www.eba.europa.eu/regulation-and-policy/supervisory-reporting
+
+- **SR 11-7 (Federal Reserve / OCC / FDIC 2011).** *Guidance on Model Risk Management.*
+  https://www.federalreserve.gov/supervisionreg/srletters/sr1107.htm
+
+### 9.2 · EBA-Veröffentlichungen (Datenbasis)
+
+- **EBA Transparency Exercise 2025.** EU-wide Transparency Exercise, Reporting-Stichtag
+  30. Juni 2025, veröffentlicht Dezember 2025.
+  https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/eu-wide-transparency-exercise
+
+- **EBA Risk Dashboard — Credit Risk Parameters Annex Q4 2025.** Veröffentlicht
+  März 2026.
+  https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/risk-dashboard
+
+- **EBA Stress Test 2025 Methodology Note.** Veröffentlicht September 2024.
+  https://www.eba.europa.eu/regulation-and-policy/stress-testing
+
+- **EBA Reports on the Implementation of IFRS 9 by EU Banks.** Jährlich seit 2018.
+  https://www.eba.europa.eu/risk-and-data-analysis/credit-risk/accounting
+
+- **ECB SSM Supervisory Banking Statistics.** Quartalsweise.
+  https://www.bankingsupervision.europa.eu/banking/statistics/html/index.en.html
+
+### 9.3 · Akademische Literatur
+
+- **Castro, V. (2013).** "Macroeconomic determinants of the credit risk in the banking
+  system: The case of the GIPSI." *Economic Modelling* 31, S. 672–683.
+  DOI: 10.1016/j.econmod.2012.11.029
+  https://doi.org/10.1016/j.econmod.2012.11.029
+
+- **Drehmann, M. & Juselius, M. (2014).** "Evaluating early warning indicators of
+  banking crises: Satisfying policy requirements." *International Journal of
+  Forecasting* 30(3), S. 759–780. Vorabversion: BIS Working Paper 421.
+  https://www.bis.org/publ/work421.htm
+
+- **Hamilton, J. D. (1983).** "Oil and the macroeconomy since World War II."
+  *Journal of Political Economy* 91(2), S. 228–248.
+  https://www.jstor.org/stable/1832055
+
+- **Hosszú, Zs. & Király, J. (2018).** "Banking system, real economy, real estate
+  market." Magyar Nemzeti Bank Working Paper 2018/2.
+  https://www.mnb.hu/en/publications/studies-publications-statistics/mnb-working-papers
+
+- **Kilian, L. (2009).** "Not All Oil Price Shocks Are Alike: Disentangling Demand
+  and Supply Shocks in the Crude Oil Market." *American Economic Review* 99(3),
+  S. 1053–1069. DOI: 10.1257/aer.99.3.1053
+  https://doi.org/10.1257/aer.99.3.1053
+
+- **Reinhart, C. M. & Rogoff, K. S. (2009).** *This Time Is Different: Eight Centuries
+  of Financial Folly.* Princeton University Press. ISBN 978-0-691-15264-6.
+
+- **Svensson, L. E. O. (1994).** "Estimating and Interpreting Forward Interest Rates:
+  Sweden 1992–1994." IMF Working Paper 94/114.
+  https://www.imf.org/external/pubs/cat/longres.aspx?sk=1153
+
+- **Tsay, R. S. (2010).** *Analysis of Financial Time Series.* 3rd edition, Wiley.
+  ISBN 978-0-470-41435-4.
+
+- **Tuckman, B. & Serrat, A. (2012).** *Fixed Income Securities: Tools for Today's
+  Markets.* 3rd edition, Wiley. ISBN 978-0-470-89169-8.
+
+- **Vasicek, O. (2002).** "Loan Portfolio Value." *Risk Magazine* 15(12), S. 160–162.
+  Preprint frei verfügbar via Moody's KMV / Internet.
+
+### 9.4 · Daten-Quellen mit Direkt-URLs
+
+- **ICE Brent Crude Futures.** Produktbeschreibung:
+  https://www.theice.com/products/219/Brent-Crude-Futures · Tagesdaten via
+  yfinance-Ticker `BZ=F`.
+
+- **Deutsche Bundesbank · Zeitreihe BBSSY01 (Svensson-Parameter).**
+  https://www.bundesbank.de/dynamic/action/de/statistiken/zeitreihen-datenbanken/zeitreihen-datenbank/759778/759778
+
+---
+
+## 10 · Setup, Start, Tests
+
+### 10.1 · Setup
+
+```bash
+pip install streamlit pandas pyarrow numpy scipy openpyxl yfinance plotly \
+            python-docx pdfplumber
+```
+
+Python ≥ 3.10 empfohlen.
+
+### 10.2 · Daten beschaffen
+
+**Brent Crude (automatisch):**
+```bash
+python 03_fetch_brent_crude.py
+```
+
+**Bundesbank Svensson (einmalig):**
+Datei von der Bundesbank-URL als CSV exportieren → `data/bundesbank_svensson.csv` →
+```bash
+python 04_fetch_bundesbank_svensson.py
+```
+
+**EBA Transparency 2025:** Download der CSV/XLSX-Files von
+[eba.europa.eu/risk-and-data-analysis/risk-analysis/eu-wide-transparency-exercise](https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/eu-wide-transparency-exercise)
+nach `data/`.
+
+**Bank-spezifische Pillar-3 EU-CR6 (Primary Source, 31.12.2024):**
+Bereits enthalten unter `data/pillar3_bank_pd_lgd.csv` (70 Zeilen,
+10 Banken × 7 Klassen, alle mit `vintage_date = 2024-12-31`).
+Pro Zeile ist die Quelle (Bank-Pillar-3-PDF + Seitenzahl + URL)
+dokumentiert. Falls für eine spätere Vintage neu extrahiert wird:
+sämtliche 10 Banken konsistent auf den neuen Stichtag bringen (sonst
+schlägt der Loader-Test `_test_vintage_consistency` fehl).
+
+**EBA Risk Dashboard Q4 2024 (Fallback-Quelle für 5 Klassen-Zellen):**
+Bereits enthalten unter `data/eba_risk_dashboard_pd_lgd.csv`
+(Country-Aggregate, Stichtag 31.12.2024, gleiche Vintage wie die
+Pillar-3-Daten).
+
+### 10.3 · Cockpit starten
 
 ```bash
 cd "Risk management"
-streamlit run streamlit_app/app.py
+python run_clean.py
 ```
 
-→ Browser öffnet `http://localhost:8501`. Linke Sidebar: Live-Macro-Slider (ΔBrent + Svensson-β → Δr_10y). Alle Pages reagieren in Echtzeit.
+`run_clean.py` räumt vor dem Start stale `__pycache__/` auf (häufigste Fehlerquelle
+nach Page-Renames) und startet Streamlit headless auf Port 8501. Browser öffnet
+automatisch `http://localhost:8501`.
 
-### Falls Pages nicht öffnen oder fehlerhaft sind
-
-99% der Fälle: **stale `__pycache__/`-Files** aus einer früheren Version (insb. nach Page-Renamings). Einmalig aufräumen:
+### 10.4 · Backend Self-Tests
 
 ```bash
-# vom Risk-management-Ordner aus
-find . -type d -name "__pycache__" -exec rm -rf {} +
+python backend/two_factor_stress.py        # 5 Tests: Klassen, NIM-Effekt, Stress-Anwendung
+python backend/factor_correlation.py       # Synthetic + Real-Data-Smoke
+python backend/eba_pd_loader.py            # 3 Tests: CSV-Load, Lookup, Segment-Anreicherung
+python backend/svensson.py                 # 6 Tests
+python backend/vasicek.py                  # 9 Tests: BCBS-Referenz-Werte
+python backend/eba_loader.py               # Synthetic + Real-Loader-Smoke
+python backend/backtesting.py              # 3 Tests
+python backend/backtesting_walkforward.py  # 2 Tests
 ```
 
-Dann `streamlit run streamlit_app/app.py` neu starten. Python regeneriert die Caches korrekt für die aktuellen Pages.
+Erwartete Ausgabe pro Modul: `[PASS] All tests passed.`
 
-Alternativ einmal `python run_clean.py` (bei Fix beigelegt — ruft den obigen Befehl + Streamlit-Start zusammen auf).
+---
 
-## Backend Self-Tests
-
-```bash
-python backend/svensson.py        # Svensson Excel-Cross-Check + 6 Tests
-python backend/vasicek.py         # 9 ASRF/IRB Tests (BCBS-Referenz, Bridge, Downturn-LGD)
-python backend/eba_loader.py      # Synthetic + Real-Loader-Smoke-Tests
-python backend/macro_factor.py    # 6 Anchor + Data-Route Tests
-python backend/backtesting.py     # 3 Forecast-vs-Realized Tests
-```
-
-Expected output: `[PASS] All tests passed.`
-
-## Bekannte Limitationen
+## 11 · Bekannte Limitationen
 
 Vollständige Liste in `MODEL_ASSUMPTIONS.md`. Highlights:
 
-- **Implied PD** = beobachteter Default-Ratio (backward-looking) — Stress-Sensitivität korrekt, absolutes Niveau konservativ.
-- **F-IRB-LGD** statt A-IRB-Modell (CRR Art. 181, EBA Stress Test 2023).
-- **Sovereign-Book**: Parallel-Shift only, kein Credit-Spread, kein Hedging.
-- **Banking-Book Bonds (Financials/Corporates/Covered)**: in EBA-Disclosure mit Loans aggregiert — keine isolierte Bond-Position rekonstruierbar.
-- **Trading-Book**: nur Market-RWA-Aggregat, keine Issuer-Granularität.
-- **EBA Stress Test 2025 File**: passwortgeschützt — Adverse-Anker hardcoded aus Methodology Note.
+- **PD/LGD per Heimatland-Aggregat.** Der EBA-Annex aggregiert nach Counterparty-
+  Land. Bank-individuelle Abweichungen (etwa BNP Paribas' US-Geschäft oder
+  Santander's Lateinamerika-Geschäft) sind nicht abgebildet — die Bank wird hier
+  als wäre sie ein reines Heimatland-Portfolio modelliert.
+- **β-Koeffizienten aus Literatur, nicht aus Schätzung.** Eine banken- und
+  periodenspezifische Re-Schätzung wäre methodisch ideal, aber durch Datenverfüg­
+  barkeit eingeschränkt (Pillar-3 ist nur halbjährlich, AnaCredit ist nicht
+  öffentlich zugänglich).
+- **Sovereign-Buch.** Parallel-Shift-Annahme (kein Slope/Curvature-Stress); kein
+  Credit-Spread-Risiko; kein Hedging.
+- **Banking-Book Bonds.** In den EBA-Daten mit Loans aggregiert — keine isolierte
+  Bond-Position rekonstruierbar.
+- **Trading-Book.** Nur Aggregat, keine Issuer-Granularität, keine
+  Asset-Class-Split (Aktien / Bonds / FX / Rohstoffe).
+- **Walk-Forward-Backtest.** Zeigt die Vorgänger-Methodik (Single-Factor-M) als
+  historische Diagnose, nicht das aktive 2-Faktor-Modell — eine Re-Implementierung
+  des Backtests im 2-Faktor-Setup steht noch aus.
+- **Kreuz-Korrelationen.** β- und γ-Werte sind als unabhängige Effekte modelliert;
+  Kreuz-Terme β_oil × γ_rate etc. sind nicht berücksichtigt.
 
-## Wichtige Quellen
+---
 
-- Vasicek, O. (2002). *Loan Portfolio Value*. Risk Magazine.
-- BCBS (2017). *Basel III: Finalising post-crisis reforms*.
-- EBA (2025). *EU-wide Transparency Exercise 2025 — Public Disclosure*.
-- EBA GL 14 (ICAAP / Stress-Testing).
-- SR 11-7 (Federal Reserve / OCC Supervisory Guidance on Model Risk Management).
+## Projektkontext
+
+Studienprojekt **Quantitatives Credit-Risk-Management** · HS Düsseldorf ·
+Sommersemester 2026 · Bleron Gashi · `bleron.gashi@study.hs-duesseldorf.de`.
+
+**Versionierung:**
+- **2.1 (Mai 2026)** · Top-10-Universe-Refinement, vollständige Quellen-Verifizierbarkeit
+- **2.0 (Mai 2026)** · 2-Faktor-Modell nach Professor-Review
+- **1.0 (April 2026)** · Single-Factor-M-Modell (abgelöst)

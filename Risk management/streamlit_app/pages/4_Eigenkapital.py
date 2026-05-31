@@ -28,7 +28,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from components.theme import (apply_theme, hero, eyebrow, insight, footer,
+from components.theme import (tab_breadcrumb, apply_theme, hero, eyebrow, insight, footer,
                               COLORS)
 from components.sidebar import render_sidebar
 from components.data_loader import load_data_layer
@@ -42,7 +42,7 @@ from eba_loader import (                                            # type: igno
     sovereign_maturity_ladder, rate_shock_pnl,
     trading_book_stress, cet1_ratio_bridge,
 )
-from macro_factor import (anchor_from_eba, hybrid_mapping,           # type: ignore
+from macro_factor import (anchor_from_eba,                          # type: ignore
                           factor_stats)
 
 
@@ -60,16 +60,20 @@ config = render_sidebar()
 
 hero(
     "Eigenkapital-Wirkung · CET1-Quote",
-    eyebrow="Tab 4 · 3-Channel CET1 stress · regulatorische Headline",
-    deck="Derselbe Macro-Schock treibt drei Risiko-Channels simultan: "
-         "Loan-Book Provisions (PD + LGD via Vasicek), Sovereign "
-         "Mark-to-Market (Duration), und Trading-Book (Market-RWA + P&L). "
-         "Alle drei wirken auf den Zähler und Nenner der CET1-Quote — "
-         "der regulatorischen Headline für Kapitaladäquanz. Inklusive "
-         "Threshold-Analyse (welche Banken fallen unter 4.5% / 7% / 8%) "
-         "und CET1-Sensitivity-Curve über M-Scan.",
+    eyebrow="Tab 4 · 3-Channel CET1 stress · 2-Faktor-Modell · 10 IRB-Banken",
+    deck="Die zwei Macro-Faktoren (ΔBrent + Δr_10y) treiben drei "
+         "Risiko-Channels simultan: Loan-Book-Provisions (sektor-"
+         "differenzierte ΔPD und ΔLGD pro Exposure-Klasse), Sovereign-"
+         "Mark-to-Market (Modified-Duration · Δr_10y), und Trading-"
+         "Book (Market-RWA + P&L). Alle drei wirken auf Zähler "
+         "(CET1) und Nenner (RWA) der regulatorischen Headline-"
+         "Kennzahl. Daten: bank-spezifische Pillar-3 EU-CR6 (31.12.2024) "
+         "für PDs/LGDs (CRR Art. 180-konform, 10/10 Banken Pillar-3-"
+         "verifiziert). Inklusive Threshold-Analyse "
+         "(Pillar-1 4.5% / CCB 7% / SREP 8%) und Bank-Drilldown.",
 )
 
+tab_breadcrumb(4)
 # === Load data + macro shock =========================================
 @st.cache_data(ttl=24*3600, show_spinner="Loading EBA capital + RWA data …")
 def _load_capital(top_n: int):
@@ -80,7 +84,10 @@ def _load_capital(top_n: int):
 
 @st.cache_data(ttl=24*3600, show_spinner=False)
 def _load_universe(top_n: int):
-    return load_eba_universe(vintage="2025", top_n=top_n, prefer_real=True)
+    # Top-10-Filter via pillar3_bank_pd_lgd.csv (bank-spezifische Pillar-3 31.12.2024)
+    from eba_pd_loader import filter_universe_to_top10                # type: ignore
+    u = load_eba_universe(vintage="2025", top_n=None, prefer_real=True)
+    return filter_universe_to_top10(u)
 
 
 @st.cache_data(ttl=24*3600, show_spinner="Loading sovereign maturity ladder …")
@@ -107,26 +114,36 @@ universe = _load_universe(top_n)
 sov_mat = _load_sov_pnl()
 fac_stats = _load_factor_cov()
 
-# Macro shock → M
+# === 2-Faktor-Stress: Bridge direkt mit dem 2-Faktor-Modell rechnen ====
+# Statt Vasicek-M-Mapping: direkte Anwendung der sektor-differenzierten
+# β-Sensitivitäten aus two_factor_stress (Brent + Δr_10y separat).
+# WICHTIG: Wir nutzen die 2-Faktor-Bridge ``capital_bridge_2factor``, die
+# baseline und stressed PD/LGD direkt aus den β-Sensitivitäten ableitet.
+# Die alte ``capital_bridge(z_factor=0)`` führte über ``conditional_pd(s.pd,
+# rho, 0)`` eine implizite Vasicek-Median-Transformation durch, welche die
+# PD um typisch 30–50 % reduzierte und so EL falsch herabsetzte (siehe
+# Diskussions-Bug 2026-05-29).
+from two_factor_stress import (apply_stress_to_universe,             # type: ignore
+                                reset_universe_to_baseline,
+                                capital_bridge_2factor)
+
+_d_brent      = float(config["d_brent"])
+_d_r_10y_pp   = float(config["d_r_10y_pp"])
+_sens_overrides = config.get("sensitivity_overrides")
+
+# Universe sicher in Baseline-Zustand (für Re-Renders aus Cache)
+reset_universe_to_baseline(universe)
+m_used = 0.0
+_is_stressed = (abs(_d_brent) > 1e-6) or (abs(_d_r_10y_pp) > 1e-6)
+delta_r_pp = _d_r_10y_pp
+
+# Legacy-Werte für nachgelagerte UI-Caches
 cov_factors = fac_stats["sigma"] if fac_stats else np.array([[4e-4, 2e-5], [2e-5, 1e-4]])
 anchor = anchor_from_eba("2025")
-mapping = hybrid_mapping(
-    delta_brent_log=config["d_brent"],
-    delta_rate_10y_pp=config["d_r_10y_pp"],   # already in pp
-    anchor=anchor,
-    cov_factors=cov_factors,
-    horizon_days=252,
-)
-# Honour Single-Factor mode (user drives M directly)
-if config.get("m_direct") is not None:
-    m_used = float(config["m_direct"])
-    mapping["m_hybrid"] = m_used
-else:
-    m_used = mapping["m_hybrid"]
-delta_r_pp = config["d_r_10y_pp"]   # already in pp
+mapping = {"m_hybrid": 0.0, "m_anchor": 0.0, "m_data": 0.0}
 
 # Compute the three channels per bank in the universe -----------------
-# Channel 1 — loan book bridge (from the universe BankPortfolio objects)
+# Channel 1 — loan book bridge via 2-Faktor-Modell (KEIN conditional_pd-Shift)
 loan_bridges: dict[str, dict] = {}
 name_to_lei: dict[str, str] = {}
 for bank_name, portfolio in universe.banks.items():
@@ -135,14 +152,21 @@ for bank_name, portfolio in universe.banks.items():
         continue
     lei = matches["lei"].iloc[0]
     name_to_lei[bank_name] = lei
-    if abs(m_used) > 1e-9:
-        loan_bridges[lei] = portfolio.capital_bridge(
-            z_factor=m_used, kappa_lgd=KAPPA_DOWNTURN_LGD, confidence=0.999,
+    if _is_stressed:
+        loan_bridges[lei] = capital_bridge_2factor(
+            portfolio, _d_brent, _d_r_10y_pp,
+            confidence=0.999,
             rho_multiplier=float(config.get("rho_mult", 1.0)),
             lgd_calibration=float(config.get("lgd_calibration", 1.0)),
-            stress_exponent=float(config.get("stress_exponent", 1.0)),
-            cap_mode=str(config.get("cap_mode", "hard")),
+            override_betas=_sens_overrides,
         )
+
+# Stress jetzt auch in-place auf das Universum applizieren, damit
+# nachgelagerte Funktionen (cet1_ratio_bridge etc.) konsistent mit
+# gestressten Segmenten arbeiten.
+if _is_stressed:
+    apply_stress_to_universe(universe, _d_brent, _d_r_10y_pp,
+                             override_betas=_sens_overrides)
 
 # Channel 2 — sovereign rate-shock P&L per bank
 sov_pnl_df = (rate_shock_pnl(sov_mat, delta_r_pp=delta_r_pp)
@@ -153,7 +177,7 @@ sov_pnl_lookup: dict[str, float] = dict(
 )
 
 # Channel 3 — Trading Book stress
-tb_stress_df = trading_book_stress(cap_df, m_factor=m_used)
+tb_stress_df = trading_book_stress(cap_df, m_factor=0.0)
 
 # Restrict capital_df to universe banks only
 universe_leis = list(name_to_lei.values())
@@ -192,7 +216,7 @@ a3.metric("Aggregate CET1 ratio · base",
           f"{ratio_base*100:.2f}%",
           f"vs SREP target {SREP_TARGET*100:.1f}%",
           delta_color="off")
-if abs(m_used) > 1e-9:
+if _is_stressed:
     a4.metric("Aggregate CET1 ratio · stress",
               f"{ratio_stress*100:.2f}%",
               f"{(ratio_stress-ratio_base)*100:+.2f} pp")
@@ -207,34 +231,37 @@ else:
               "no shock applied", delta_color="off")
 
 # === Insight box =====================================================
-if abs(m_used) < 1e-3:
+if not _is_stressed:
     insight(
-        "<strong>No macro shock applied.</strong> Move the sliders in "
-        "the sidebar to see how the three transmission channels — "
-        "loan-book provisions, sovereign mark-to-market, and trading-"
-        "book P&amp;L + market-RWA — combine into the regulatory "
-        "CET1 Ratio."
+        "<strong>Kein Macro-Schock aktiv.</strong> Bewege die zwei "
+        "Slider in der Sidebar (ΔBrent + Δr_10y), um zu sehen, wie die "
+        "drei Transmissions-Kanäle — Loan-Book-Provisions (sektor-"
+        "differenzierte ΔPD und ΔLGD), Sovereign-Mark-to-Market "
+        "(Duration · Δr), Trading-Book-P&amp;L + Market-RWA — zur "
+        "regulatorischen CET1-Quote zusammenwirken."
     )
 else:
-    direction = "adverse" if m_used < 0 else "benign"
     insight(
-        f"At <strong>M = {m_used:+.2f}</strong> ({direction}), the "
-        f"aggregate CET1 ratio moves from <strong>{ratio_base*100:.2f}%</strong> "
-        f"to <strong>{ratio_stress*100:.2f}%</strong> "
+        f"Unter dem 2-Faktor-Schock ΔBrent = <strong>"
+        f"{_d_brent:+.2f}</strong> und Δr_10y = <strong>"
+        f"{_d_r_10y_pp:+.2f} pp</strong> bewegt sich die aggregierte "
+        f"CET1-Quote von <strong>{ratio_base*100:.2f}%</strong> "
+        f"auf <strong>{ratio_stress*100:.2f}%</strong> "
         f"(<strong>{(ratio_stress-ratio_base)*100:+.2f} pp</strong>). "
-        f"The headline number masks bank-specific divergence — see "
-        f"the league table and per-bank waterfall below."
+        f"Die System-Headline verbirgt bank-spezifische "
+        f"Differenzierung — siehe Liga-Tabelle und Waterfall unten."
     )
 
 # Methodology disclaimer
 st.caption(
-    "**Methodik-Hinweis.** Loan-Book ΔRWA wird via Vasicek-IRB-99.9%-"
-    "Quantile auf den bedingten PD/LGD berechnet — entspricht regulatorischer "
-    "Pillar-1-Capital-under-Stress (Basel III), **nicht** EBA-Stress-Test-"
-    "realisierten P&L-Pfaden über 3 Jahre. Erwartung: ΔRatio in dieser "
-    "Sicht ist *konservativer* (höher) als in EBA-Methodology, weil Tail-"
-    "Quantile auf bereits gestresste Parameter angewandt werden. Siehe "
-    "Annahmen-Page Approximation A-06."
+    "**Methodik-Hinweis.** Loan-Book ΔRWA wird über die Basel-III-"
+    "IRB-Capital-Formel auf das 99.9%-Quantil berechnet — mit den "
+    "**bereits 2-Faktor-gestressten PD/LGD-Werten** als Inputs. Das "
+    "entspricht regulatorischer Pillar-1-Capital-under-Stress (BCBS "
+    "2017), nicht EBA-Stress-Test-realisierten P&L-Pfaden über 3 Jahre. "
+    "Erwartung: ΔRatio in dieser Sicht ist konservativer (höher) als in "
+    "EBA-Methodology, weil Tail-Quantile auf bereits gestresste "
+    "Parameter angewandt werden. Siehe MODEL_ASSUMPTIONS.md, A-04/A-05."
 )
 
 st.divider()
@@ -242,7 +269,7 @@ st.divider()
 # === League table ====================================================
 eyebrow(f"League table · CET1 ratio movement (top-{n_banks} EU banks)")
 
-if abs(m_used) > 1e-9:
+if _is_stressed:
     league = bridge_df.sort_values("cet1_ratio_stress").copy()
 
     def _flag(row):
@@ -313,7 +340,7 @@ sel_bank_name = st.selectbox(
 )
 sel_row = bridge_df[bridge_df["bank_name"] == sel_bank_name].iloc[0]
 
-if abs(m_used) > 1e-9:
+if _is_stressed:
     # Build a compact waterfall: Base ratio -> Numerator effects -> Denominator effect -> Stress ratio
     base_ratio = sel_row["cet1_ratio_base"]
     rwa_b = sel_row["rwa_total_base"]
@@ -509,178 +536,214 @@ st.dataframe(disp_thr, use_container_width=True, hide_index=True,
 st.divider()
 
 # =====================================================================
-# NEW · CET1-Sensitivity-Curve · scan M und plotte ΔCET1-Quote
+# CET1-Sensitivity-Curve · 2-Faktor-Scan über Δr_10y
 # =====================================================================
-eyebrow("CET1-Sensitivity-Curve · Systemfaktor-Scan M ∈ [−3, +3]")
+eyebrow("Sensitivitäts-Analyse · wie reagiert die CET1-Quote auf "
+        "den Zinsschock?")
 
-st.caption(
-    "Stress-Pfad: bei welchem M würde der Aggregat unter 4.5% / 7% / 8% "
-    "fallen? Aggregat = aktuelle Bank-Auswahl. Berechnung pro M-Punkt "
-    "via Vasicek-Capital-Bridge (Loan-Channel) + EBA-Anker-Kopplung "
-    "(Sovereign-MtM + Trading-Book)."
+st.markdown(
+    '<div style="background:#FAFAFA;border:1px solid #E6E6E6;'
+    'border-left:2px solid #051C2C;padding:0.95rem 1.2rem;'
+    'border-radius:4px;margin:0.4rem 0 1.0rem 0;color:#051C2C;'
+    'font-size:0.88rem;line-height:1.65;">'
+    '<strong>Was diese Kurve zeigt:</strong> Wir scannen den 10y-Zins-Schock '
+    'von −1 bis +5 Prozentpunkten und rechnen für jeden Punkt das volle '
+    '2-Faktor-Modell durch (alle drei Stress-Kanäle, alle 10 Banken '
+    'aggregiert). Der Brent-Schock bleibt auf dem aktuellen Sidebar-Wert. '
+    '<br><br>'
+    '<strong>Wozu?</strong> Du siehst auf einen Blick: ab welchem '
+    'Δr-Schock fällt die CET1-Quote unter die regulatorischen Schwellen '
+    '4.5 % (Pillar 1), 7.0 % (inkl. Kapitalerhaltungs-Puffer CCB) und '
+    '8.0 % (typische SREP-Zielmarke)? Das sind die sogenannten '
+    '<em>Breaking Points</em> — bei welchem Stress-Niveau die Bank '
+    'erstmals in Aufsichts-Reichweite kommt.'
+    '</div>',
+    unsafe_allow_html=True,
 )
 
 
-@st.cache_data(ttl=24*3600, show_spinner="Computing CET1 sensitivity curve …")
-def _sensitivity_curve(
-    selected_bank_names: tuple, kappa_lgd: float, rho_mult: float,
-    cet1_base_total: float, rwa_base_total: float,
-    sov_pnl_per_pp: float, tb_pnl_per_m: float, tb_rwa_per_m: float,
-    lgd_cal: float = 1.0, stress_exp: float = 1.0, cap_mode: str = "hard",
+# --- 2-Faktor-Sensitivity-Scan: vary Δr, hold ΔBrent fixed ---------
+@st.cache_data(ttl=24*3600, show_spinner="Berechne 2-Faktor-Sensitivity-Curve …")
+def _two_factor_sensitivity(
+    selected_bank_names: tuple,
+    d_brent_fixed: float,
+    cet1_base_total: float,
+    rwa_base_total: float,
+    sov_pnl_per_pp: float,
 ):
-    """Scan M and compute aggregate CET1 ratio at each grid point."""
-    # Aggregate portfolio (subset of universe)
-    sub_portfolio = sum(
-        (universe.banks[n].segments for n in selected_bank_names),
-        [],
-    )
-    from vasicek import BankPortfolio                                  # type: ignore
-    agg = BankPortfolio("scan")
-    agg.segments = sub_portfolio
+    """Scan Δr_10y while applying 2-factor stress with fixed ΔBrent.
 
-    m_grid = np.linspace(-3.0, 3.0, 31)
+    Returns dr_grid, cet1_ratios (in decimals).
+    """
+    from two_factor_stress import (apply_stress_to_universe,           # type: ignore
+                                    reset_universe_to_baseline)
+    from vasicek import BankPortfolio                                   # type: ignore
+
+    dr_grid = np.linspace(-1.0, 5.0, 25)  # −100bp bis +500bp
     ratios = []
-    for m in m_grid:
-        if abs(m) < 1e-6:
-            ratios.append(cet1_base_total / rwa_base_total)
-            continue
-        br = agg.capital_bridge(z_factor=float(m), kappa_lgd=kappa_lgd,
-                                confidence=0.999, rho_multiplier=rho_mult,
-                                lgd_calibration=lgd_cal,
-                                stress_exponent=stress_exp,
-                                cap_mode=cap_mode)
-        # Coupled (Brent, Δr) from EBA anchor
-        anchor_z = anchor.z_factor
-        if abs(anchor_z) > 1e-9:
-            scale = -m / abs(anchor_z) * np.sign(-anchor_z)
-            d_r_m  = anchor.rate_10y_pp * scale   # pp
+
+    # 1) Baseline-KPIs auf ungestresstem Universum (einmalig)
+    reset_universe_to_baseline(universe)
+    if selected_bank_names:
+        try:
+            agg_base = BankPortfolio("scan_base")
+            for n in selected_bank_names:
+                if n in universe.banks:
+                    agg_base.segments.extend(universe.banks[n].segments)
+        except Exception:
+            agg_base = universe.aggregated_portfolio("scan_base")
+    else:
+        agg_base = universe.aggregated_portfolio("scan_base")
+    kpi_base = agg_base.portfolio_kpis(confidence=0.999)
+    el_base_total  = float(kpi_base["el_eur"])
+    rwa_base_loan  = float(kpi_base["rwa"])
+
+    # 2) Pro Scan-Punkt: Stress applizieren, KPIs frisch erfassen,
+    #    danach wieder reset_universe_to_baseline.
+    for d_r in dr_grid:
+        apply_stress_to_universe(universe, d_brent_fixed, float(d_r))
+
+        if selected_bank_names:
+            try:
+                agg = BankPortfolio("scan")
+                for n in selected_bank_names:
+                    if n in universe.banks:
+                        agg.segments.extend(universe.banks[n].segments)
+            except Exception:
+                agg = universe.aggregated_portfolio("scan")
         else:
-            d_r_m = 0.0
-        # CET1 numerator: subtract loan ΔEL + add sov MtM + add TB P&L
-        sov_dp  = sov_pnl_per_pp * d_r_m
-        tb_pnl  = tb_pnl_per_m * (-m if m < 0 else 0.0)  # only adverse hits
-        cet1_m  = cet1_base_total - br["delta_el"] + sov_dp + tb_pnl
-        # RWA denominator: add loan ΔRWA + TB-RWA-uplift
-        tb_drwa = tb_rwa_per_m * (-m if m < 0 else 0.0)
-        rwa_m   = rwa_base_total + br["delta_rwa"] + tb_drwa
-        ratios.append(cet1_m / rwa_m if rwa_m > 0 else 0.0)
-    return m_grid, np.array(ratios)
+            agg = universe.aggregated_portfolio("scan")
+
+        kpi_stress = agg.portfolio_kpis(confidence=0.999)
+        delta_el  = float(kpi_stress["el_eur"]) - el_base_total
+        delta_rwa = float(kpi_stress["rwa"])    - rwa_base_loan
+
+        # Sovereign-MtM and Trading-Book scaling (linear approx.)
+        sov_dp = sov_pnl_per_pp * float(d_r)
+
+        # Reset für nächste Iteration
+        reset_universe_to_baseline(universe)
+
+        cet1_scan = cet1_base_total - delta_el + sov_dp
+        rwa_scan  = rwa_base_total  + delta_rwa
+        ratios.append(cet1_scan / rwa_scan if rwa_scan > 0 else 0.0)
+
+    return dr_grid, np.array(ratios)
 
 
-# Pre-compute static coupling coefficients for fast scan
-_anchor_r_pp = anchor.rate_10y_pp
-_sov_pnl_per_pp = float(sov_pnl_df["delta_pnl_eur"].sum()) / max(delta_r_pp, 1e-9) \
-                    if abs(delta_r_pp) > 1e-9 else 0.0
-# If user has zero current shock, fall back to direct computation
-if abs(_sov_pnl_per_pp) < 1.0:
-    # Compute sov P&L per pp directly via a unit shock
-    _unit_sov = rate_shock_pnl(
-        sovereign_maturity_ladder(parse_sovereign_csv(EBA_RAW_DIR / "tr_sov.csv",
-                                                       period=202506), period=202506),
-        delta_r_pp=1.0)
+# Sovereign sensitivity per pp (recomputed at unit shock)
+_sov_pnl_per_pp = 0.0
+try:
+    _unit_sov = rate_shock_pnl(sov_mat, delta_r_pp=1.0)
     _unit_sov = _unit_sov[_unit_sov["LEI_Code"].isin(universe_leis)]
     _sov_pnl_per_pp = float(_unit_sov["delta_pnl_eur"].sum())
-
-# TB sensitivities: from existing trading_book_stress at current M, normalised
-if abs(m_used) > 1e-9:
-    _tb_pnl_per_m = float(tb_stress_universe["delta_tb_pnl_eur"].sum()) / abs(m_used) \
-                      if m_used < 0 else 0.0
-    _tb_rwa_per_m = float(tb_stress_universe["delta_rwa_market_eur"].sum()) / abs(m_used) \
-                      if m_used < 0 else 0.0
-else:
-    # Compute unit-shock TB stress
-    _unit_tb = trading_book_stress(cap_universe, m_factor=-1.0)
-    _tb_pnl_per_m = float(_unit_tb["delta_tb_pnl_eur"].sum())
-    _tb_rwa_per_m = float(_unit_tb["delta_rwa_market_eur"].sum())
+except Exception:
+    pass
 
 _cet1_base_total = float(bridge_df["cet1_base"].sum())
 _rwa_base_total  = float(bridge_df["rwa_total_base"].sum())
+_selected_names = (tuple(selected_banks)
+                   if "selected_banks" in dir()
+                   else tuple(universe.banks.keys()))
 
-m_grid_sens, ratio_sens = _sensitivity_curve(
-    tuple(selected_banks) if "selected_banks" in dir() else tuple(universe.banks.keys()),
-    KAPPA_DOWNTURN_LGD, float(config.get("rho_mult", 1.0)),
+dr_grid_sens, ratio_sens = _two_factor_sensitivity(
+    _selected_names,
+    _d_brent,
     _cet1_base_total, _rwa_base_total,
-    _sov_pnl_per_pp, _tb_pnl_per_m, _tb_rwa_per_m,
-    lgd_cal=float(config.get("lgd_calibration", 1.0)),
-    stress_exp=float(config.get("stress_exponent", 1.0)),
-    cap_mode=str(config.get("cap_mode", "hard")),
+    _sov_pnl_per_pp,
 )
 
 # Plot
 fig_sens = go.Figure()
 fig_sens.add_trace(go.Scatter(
-    x=m_grid_sens, y=ratio_sens * 100,
+    x=dr_grid_sens, y=ratio_sens * 100,
     mode="lines+markers",
     line=dict(color=COLORS["navy"], width=2.8),
     marker=dict(size=6, color=COLORS["navy"]),
-    name="CET1 ratio (Aggregat)",
+    name="CET1-Quote (Aggregat)",
+    hovertemplate="Δr_10y = %{x:+.2f} pp<br>CET1 = %{y:.2f} %<extra></extra>",
 ))
-# Threshold lines
+# Schwellen-Linien
 fig_sens.add_hline(y=4.5, line_dash="dot", line_color="#A52F4D",
-                   annotation_text="4.5% · Pillar 1", annotation_position="right",
+                   annotation_text="4.5 % · Pillar 1", annotation_position="right",
                    annotation_font=dict(size=10, color="#A52F4D"))
 fig_sens.add_hline(y=7.0, line_dash="dot", line_color="#C9A227",
-                   annotation_text="7.0% · inkl. CCB", annotation_position="right",
+                   annotation_text="7.0 % · inkl. CCB", annotation_position="right",
                    annotation_font=dict(size=10, color="#C9A227"))
 fig_sens.add_hline(y=8.0, line_dash="dot", line_color="#034B6F",
-                   annotation_text="8.0% · SREP", annotation_position="right",
+                   annotation_text="8.0 % · SREP", annotation_position="right",
                    annotation_font=dict(size=10, color="#034B6F"))
-# Vertical line at current M
-fig_sens.add_vline(x=m_used, line_dash="dash", line_color=COLORS["crimson"],
-                   annotation_text=f"aktuell M = {m_used:+.2f}",
-                   annotation_position="top",
-                   annotation_font=dict(size=10, color=COLORS["crimson"]))
-# Baseline marker at M=0
-ratio_at_zero = ratio_sens[np.argmin(np.abs(m_grid_sens))] * 100
+# Aktueller Δr-Slider-Wert markieren
+fig_sens.add_vline(x=_d_r_10y_pp, line_dash="dash",
+                    line_color=COLORS["crimson"], line_width=1.5,
+                    annotation_text=f"Aktueller Δr = {_d_r_10y_pp:+.2f} pp",
+                    annotation_position="top",
+                    annotation_font=dict(size=10, color=COLORS["crimson"]))
+# Baseline-Marker bei Δr = 0
+zero_idx = int(np.argmin(np.abs(dr_grid_sens)))
+ratio_at_zero = ratio_sens[zero_idx] * 100
 fig_sens.add_annotation(x=0, y=ratio_at_zero,
-                         text=f"Baseline {ratio_at_zero:.2f}%",
-                         xshift=10, yshift=8,
+                         text=f"Baseline {ratio_at_zero:.2f} %",
+                         xshift=10, yshift=10,
                          showarrow=False,
                          font=dict(size=10, color=COLORS["stone"]))
 fig_sens.update_layout(
-    title=f"CET1-Quote in Abhängigkeit von M · Aggregat über "
-          f"{universe.n_banks} Banken",
-    xaxis_title="Systemfaktor M (adverse ⟵ ⟶ benigne)",
+    title=(f"CET1-Quote als Funktion von Δr_10y · Aggregat über "
+           f"{universe.n_banks} Banken · ΔBrent fix bei {_d_brent:+.2f}"),
+    xaxis_title="Δr_10y · 10-Jahres-Zinsverschiebung (Prozentpunkte)",
     yaxis_title="CET1-Quote [%]",
     height=440, showlegend=False,
 )
 st.plotly_chart(fig_sens, use_container_width=True)
 
-# Find breaking points
-def _find_breach(ratio_arr, m_grid_arr, thr_pct):
-    """Find the M-value at which ratio first drops below threshold."""
+# Breaking-Points pro Schwelle
+def _find_breach_dr(ratio_arr, dr_grid_arr, thr_pct):
+    """Finde Δr-Wert, bei dem CET1 erstmals unter Threshold fällt
+    (suchend vom Baseline Δr=0 nach oben)."""
     below = ratio_arr * 100 < thr_pct
     if not below.any():
         return None
-    # Find first index where below=True moving from M=0 leftward
-    zero_idx = int(np.argmin(np.abs(m_grid_arr)))
-    for i in range(zero_idx, -1, -1):
+    zero_idx = int(np.argmin(np.abs(dr_grid_arr)))
+    for i in range(zero_idx, len(dr_grid_arr)):
         if below[i]:
-            return float(m_grid_arr[i])
+            return float(dr_grid_arr[i])
     return None
 
 
-bp_45 = _find_breach(ratio_sens, m_grid_sens, 4.5)
-bp_70 = _find_breach(ratio_sens, m_grid_sens, 7.0)
-bp_80 = _find_breach(ratio_sens, m_grid_sens, 8.0)
+bp_45 = _find_breach_dr(ratio_sens, dr_grid_sens, 4.5)
+bp_70 = _find_breach_dr(ratio_sens, dr_grid_sens, 7.0)
+bp_80 = _find_breach_dr(ratio_sens, dr_grid_sens, 8.0)
 
 bp_l, bp_r = st.columns([1, 1], gap="medium")
 with bp_l:
-    st.markdown("**Breaking-Points** · M-Wert bei dem die Aggregat-CET1-Quote unter die Schwelle fällt:")
+    st.markdown(
+        "**Breaking Points** — bei welchem Δr_10y-Schock die CET1-Quote "
+        "erstmals unter die jeweilige Aufsichtsschwelle fällt:"
+    )
+    def _fmt_bp(x):
+        if x is None:
+            return "nicht erreicht im Scan-Bereich (−1 bis +5 pp)"
+        return f"Δr = {x:+.2f} pp  ({x*100:+.0f} bp)"
     bp_table = pd.DataFrame([
-        ("4.5% (Pillar-1)", f"M = {bp_45:+.2f}σ" if bp_45 is not None else "nicht erreicht im Scan-Bereich"),
-        ("7.0% (inkl. CCB)", f"M = {bp_70:+.2f}σ" if bp_70 is not None else "nicht erreicht im Scan-Bereich"),
-        ("8.0% (SREP)",      f"M = {bp_80:+.2f}σ" if bp_80 is not None else "nicht erreicht im Scan-Bereich"),
-    ], columns=["Threshold", "Breaking-Point M"])
-    st.dataframe(bp_table, use_container_width=True, hide_index=True, height=140)
+        ("4.5 % · Pillar 1",    _fmt_bp(bp_45)),
+        ("7.0 % · inkl. CCB",   _fmt_bp(bp_70)),
+        ("8.0 % · SREP-Ziel",   _fmt_bp(bp_80)),
+    ], columns=["Aufsichtsschwelle", "Breaking Point Δr_10y"])
+    st.dataframe(bp_table, use_container_width=True, hide_index=True,
+                 height=140)
 
 with bp_r:
     insight(
-        f"<strong>Lesart.</strong> Bei M = −2.5 entspricht ungefähr der "
-        f"EBA-2025-Adverse-Härte. Falls die Sensitivity-Kurve dort bereits unter "
-        f"7% liegt, würde die Aggregat-Bank den Capital-Conservation-Buffer "
-        f"unter dem EBA-Stress reißen. Aktuelles Aggregat: "
-        f"<strong>{ratio_at_zero:.2f}% Baseline</strong>."
+        f"<strong>Wie ist die Kurve zu lesen?</strong> Bei Δr = 0 "
+        f"(keine Zinsschock-Komponente, Baseline) liegt die Aggregat-"
+        f"CET1-Quote bei <strong>{ratio_at_zero:.2f} %</strong>. "
+        f"Steigt Δr, fällt die Quote — drei Effekte überlagern sich: "
+        f"(1) höhere Loan-PDs/LGDs erhöhen ΔRWA und ΔEL, "
+        f"(2) Sovereign-Bonds verlieren MtM-Wert, "
+        f"(3) Trading-Book wird über FRTB-Multiplier belastet. Der "
+        f"EBA-Adverse-Stress-Test 2025 unterstellt typisch +200 bp — "
+        f"bei diesem Δr siehst du am Kurvenverlauf, wie nah die "
+        f"Aggregat-Bank an den Schwellen liegt."
     )
 
 st.divider()
@@ -735,7 +798,7 @@ $$\text{RWA}^{\text{stress}} = \text{RWA}_{\text{cr}}^{\text{base}} + \Delta\tex
 
 footer(
     f"Three-channel CET1 architecture · Vasicek IRB + Sovereign Duration "
-    f"+ Trading Book FRTB-style · M = {m_used:+.2f} · "
+    f"+ Trading Book FRTB-style · ΔBrent = {_d_brent:+.2f}, Δr = {_d_r_10y_pp:+.2f} pp · "
     f"κ_LGD = {KAPPA_DOWNTURN_LGD:.2f} · See Annahmen page for full "
     f"approximations inventory."
 )

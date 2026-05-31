@@ -572,3 +572,254 @@ header             { visibility: hidden; }
 .stRadio label:hover {
   background: var(--mc-canvas);
 }
+
+/* =====================================================================
+ * PROFESSIONAL REFINEMENT v3 — Whitepaper-Look statt Marketing-Stil
+ * ---------------------------------------------------------------------
+ * Ziel: weniger bunte Akzente, mehr Whitespace, monochromer, akademischer.
+ * Wird am Ende der Stylesheet appliziert → überschreibt frühere Akzente.
+ * ===================================================================== */
+
+/* Hero verkleinern und entdramatisieren */
+.stApp h1:first-of-type,
+.mc-hero h1 {
+  font-size: 1.9rem !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.015em !important;
+  margin-bottom: 0.35rem !important;
+}
+.mc-hero {
+  border-bottom: 1px solid var(--mc-hairline);
+  padding-bottom: 0.9rem;
+  margin-bottom: 1.4rem;
+}
+.mc-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em !important;
+  font-size: 0.70rem !important;
+  font-weight: 500;
+  color: var(--mc-stone) !important;
+  margin-bottom: 0.3rem;
+}
+.mc-deck {
+  font-size: 0.95rem !important;
+  line-height: 1.65 !important;
+  color: #333 !important;
+  max-width: 80ch;
+}
+
+/* Inline-Eyebrows (Section-Headers) dezenter */
+.mc-eyebrow-inline {
+  font-family: var(--mc-sans);
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--mc-navy);
+  border-bottom: 1px solid var(--mc-hairline);
+  padding-bottom: 0.3rem;
+  display: block;
+  margin: 1.6rem 0 0.7rem 0;
+}
+
+/* Info-Boxen: dünnere Border, neutralere Hintergründe */
+div[style*="border-left:4px solid"],
+div[style*="border-left: 4px solid"] {
+  border-left-width: 2px !important;
+  border-radius: 4px !important;
+  padding: 0.85rem 1.1rem !important;
+  background: #FAFAFA !important;
+  font-size: 0.88rem !important;
+  line-height: 1.65 !important;
+}
+
+/* Mc-Insight-Box (über components/theme.py) dezenter */
+.mc-insight {
+  background: #FAFAFA !important;
+  border-left: 2px solid var(--mc-mid-blue) !important;
+  padding: 0.85rem 1.1rem !important;
+  border-radius: 4px !important;
+  font-size: 0.88rem !important;
+  line-height: 1.65 !important;
+  color: var(--mc-navy) !important;
+  margin: 0.6rem 0 1.0rem 0 !important;
+  box-shadow: none !important;
+}
+
+/* KPI-Metric-Tiles entdramatisieren */
+[data-testid="stMetric"] {
+  background: var(--mc-white) !important;
+  border: 1px solid var(--mc-hairline) !important;
+  border-radius: 4px !important;
+  padding: 0.65rem 0.85rem !important;
+  box-shadow: none !important;
+}
+[data-testid="stMetricLabel"] {
+  font-size: 0.72rem !important;
+  font-weight: 500 !important;
+  color: var(--mc-stone) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+[data-testid="stMetricValue"] {
+  font-family: var(--mc-serif) !important;
+  font-weight: 600 !important;
+  font-size: 1.55rem !important;
+  color: var(--mc-navy) !important;
+  line-height: 1.15 !important;
+}
+[data-testid="stMetricDelta"] {
+  font-size: 0.78rem !important;
+  font-weight: 500 !important;
+}
+
+/* Buttons reduzierter */
+.stButton button, .stDownloadButton button {
+  border-radius: 3px !important;
+  border: 1px solid var(--mc-navy) !important;
+  background: var(--mc-white) !important;
+  color: var(--mc-navy) !important;
+  box-shadow: none !important;
+  font-weight: 500 !important;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.stButton button:hover, .stDownloadButton button:hover {
+  background: var(--mc-navy) !important;
+  color: var(--mc-white) !important;
+}
+
+/* Page-Links als sachliche Karten */
+[data-testid="stPageLink"] a {
+  background: var(--mc-white) !important;
+  border: 1px solid var(--mc-hairline) !important;
+  border-radius: 4px !important;
+  padding: 0.9rem 1.1rem !important;
+  color: var(--mc-navy) !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+  transition: border-color 0.15s ease;
+}
+[data-testid="stPageLink"] a:hover {
+  border-color: var(--mc-navy) !important;
+  background: #FAFAFA !important;
+}
+
+/* Tabs visueller dezenter (weniger bunt) */
+.stTabs [data-baseweb="tab"] {
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--mc-stone) !important;
+  border-bottom: 2px solid transparent !important;
+  padding: 0.6rem 1.1rem !important;
+}
+.stTabs [data-baseweb="tab"][aria-selected="true"] {
+  color: var(--mc-navy) !important;
+  border-bottom-color: var(--mc-navy) !important;
+  font-weight: 600 !important;
+  background: transparent !important;
+}
+
+/* Dataframes klar lesbar, weniger spielzeughaft */
+[data-testid="stDataFrame"] {
+  border: 1px solid var(--mc-hairline) !important;
+  border-radius: 3px !important;
+}
+[data-testid="stDataFrame"] thead th {
+  background: #FAFAFA !important;
+  border-bottom: 1px solid var(--mc-hairline) !important;
+  color: var(--mc-navy) !important;
+  font-weight: 600 !important;
+  font-size: 0.78rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Code-Blocks (für R-style Output) sauber monochrom */
+.stCode > pre, [data-testid="stCodeBlock"] pre {
+  background: #F7F7F4 !important;
+  border: 1px solid var(--mc-hairline) !important;
+  border-radius: 3px !important;
+  color: #1A1A1A !important;
+  font-family: var(--mc-mono) !important;
+  font-size: 0.84rem !important;
+  line-height: 1.5 !important;
+}
+
+/* Dividers dünner */
+hr {
+  border-top: 1px solid var(--mc-hairline) !important;
+  margin: 1.6rem 0 !important;
+}
+
+/* Sidebar reduzierter */
+[data-testid="stSidebar"] {
+  background: #FAFAFA !important;
+  border-right: 1px solid var(--mc-hairline);
+}
+[data-testid="stSidebar"] h1 {
+  font-size: 1.0rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase;
+  color: var(--mc-navy) !important;
+  margin-bottom: 0.5rem !important;
+}
+
+/* Expander-Header subtiler */
+[data-testid="stExpander"] summary {
+  font-weight: 500 !important;
+  color: var(--mc-navy) !important;
+  font-size: 0.92rem !important;
+  padding: 0.5rem 0.7rem !important;
+}
+[data-testid="stExpander"] {
+  border: 1px solid var(--mc-hairline) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  background: var(--mc-white) !important;
+}
+
+/* Footer dezenter */
+.mc-footer {
+  font-size: 0.78rem;
+  color: var(--mc-stone);
+  border-top: 1px solid var(--mc-hairline);
+  padding-top: 0.8rem;
+  margin-top: 2.4rem;
+}
+
+/* Block-container etwas weiter, mehr Whitespace */
+.block-container {
+  padding-top: 2.0rem !important;
+  padding-bottom: 3rem !important;
+  max-width: 1280px;
+}
+
+/* ---------- Sidebar fix angeheftet (nicht einklappbar) ------------- */
+/* Sidebar immer sichtbar + feste Breite, egal welcher Collapse-State */
+[data-testid="stSidebar"] {
+  min-width: 21rem !important;
+  max-width: 21rem !important;
+  width: 21rem !important;
+  transform: none !important;
+  visibility: visible !important;
+  margin-left: 0 !important;
+  left: 0 !important;
+}
+[data-testid="stSidebar"][aria-expanded="false"] {
+  min-width: 21rem !important;
+  max-width: 21rem !important;
+  width: 21rem !important;
+  transform: none !important;
+  visibility: visible !important;
+}
+/* Einklapp-/Aufklapp-Buttons ausblenden — Sidebar bleibt fixiert */
+[data-testid="stSidebarCollapseButton"],
+[data-testid="collapsedControl"],
+[data-testid="stSidebarCollapsedControl"],
+button[kind="headerNoPadding"][aria-label*="sidebar"],
+button[aria-label="Close sidebar"],
+button[aria-label="Open sidebar"] {
+  display: none !important;
+}
+

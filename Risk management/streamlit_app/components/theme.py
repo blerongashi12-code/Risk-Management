@@ -184,6 +184,62 @@ def footer(text: str) -> None:
     st.markdown(f'<div class="mc-footer">{text}</div>', unsafe_allow_html=True)
 
 
+def tab_breadcrumb(current: int) -> None:
+    """Roter-Faden-Indikator · zeigt Position in der 5-Tab-Pipeline.
+
+    Pro Tab ein Breadcrumb-Streifen mit allen 5 Stationen — die aktuelle
+    Position ist hervorgehoben, die anderen dezenter. Direkt unter dem
+    Hero einsetzen.
+
+    Parameters
+    ----------
+    current : int
+        Tab-Nummer (1-5).
+    """
+    tabs = [
+        ("1", "Faktor-Analyse & Transmission",
+         "Korrelations-Analyse + sequentielle Bridge"),
+        ("2", "Kreditbuch",
+         "Loan-Book · ΔPD/ΔLGD · Capital-Bridge"),
+        ("3", "Marktbuch",
+         "Yield-Curve · Sovereigns · Trading-Book"),
+        ("4", "Eigenkapital",
+         "3-Channel · CET1-Quote · Schwellen"),
+        ("5", "Validierung",
+         "Walk-Forward-Backtest · Annahmen"),
+    ]
+    items = []
+    for idx, (num, name, sub) in enumerate(tabs, start=1):
+        is_active = (idx == current)
+        bg = "#051C2C" if is_active else "#FFFFFF"
+        fg = "#FFFFFF" if is_active else "#051C2C"
+        border = "#051C2C" if is_active else "#E6E6E6"
+        sub_color = "#C9C9C9" if is_active else "#6E6E6E"
+        item = (
+            f'<div style="flex:1;min-width:130px;background:{bg};'
+            f'border:1px solid {border};border-radius:4px;'
+            f'padding:0.55rem 0.7rem;color:{fg};font-size:0.78rem;'
+            f'line-height:1.35;">'
+            f'<div style="font-size:0.66rem;letter-spacing:0.10em;'
+            f'text-transform:uppercase;opacity:0.85;">Tab {num}</div>'
+            f'<div style="font-weight:600;font-size:0.86rem;'
+            f'margin:0.1rem 0;">{name}</div>'
+            f'<div style="color:{sub_color};font-size:0.72rem;'
+            f'line-height:1.35;">{sub}</div>'
+            f'</div>'
+        )
+        items.append(item)
+    arrow = ('<div style="display:flex;align-items:center;color:#9B9B9B;'
+             'font-size:0.95rem;padding:0 4px;">→</div>')
+    html = (
+        '<div style="display:flex;gap:6px;flex-wrap:nowrap;overflow-x:auto;'
+        'margin:0.4rem 0 1.0rem 0;">'
+        + arrow.join(items)
+        + '</div>'
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+
 def kpi_columns(n: int):
     """Wrapper um st.columns mit konsistenten Gaps für KPI-Strips."""
     return st.columns(n, gap="small")

@@ -149,72 +149,129 @@ Capital-Bridge nebeneinander gezeigt.
 # Sovereign-Book methodology · for the Sovereign Risk page
 # =====================================================================
 def render_sovereign_methodology() -> None:
-    """Three collapsible boxes: Exposure measurement, Duration, P&L."""
+    """Drei kollabierbare Erklär-Boxen: Exposure, Duration, Mark-to-Market.
+
+    Bewusst einfach gehalten — Zielgruppe: Leser ohne Quant-Vorwissen.
+    Jede Box folgt dem Muster: Was ist das? → Wie messen wir es? →
+    Warum ist es für unser Stress-Modell wichtig?
+    """
     st.markdown(
         '<span class="mc-eyebrow-inline">'
-        'Methodik · Sovereign Exposure · Duration · MtM-P&L'
+        'Methodik · Was sind Sovereign Exposures · Duration · Mark-to-Market'
         '</span>',
         unsafe_allow_html=True,
     )
-    with st.expander(_box_open("Sovereign Exposure", "published"),
+
+    # ----------------------------------------------------------------
+    with st.expander("Was sind Sovereign Exposures · und woher kommen sie?",
                      expanded=False):
-        st.markdown(r"""
-**Berechnung:** Aggregation aus **EBA Item 2520810** (On-balance Gross
-Carrying Amount der nicht-derivativen Finanzaktiva), pro Bank ×
-Counterparty-Country × Maturity-Bucket × Accounting-Portfolio.
+        st.markdown("""
+**Was ist das?**
+Sovereign Exposures sind alle Bestände einer Bank an Staatsanleihen
+(oder Forderungen gegen Staaten). Beispiel: Wenn die Deutsche Bank
+italienische Staatsanleihen für 30 Mrd. € hält, sind das 30 Mrd. €
+Sovereign Exposure gegenüber Italien.
 
-**Datengrundlage:** EBA-Transparency-2025, Stichtag Juni 2025, Total
-über alle Maturity-Buckets (für Konzentration) und alle Country-Codes
-(für Maturity-Ladder).
+**Woher haben wir die Zahlen?**
+Direkt aus dem EBA-Transparency-2025-Datensatz (`tr_sov.csv`,
+Stichtag Juni 2025). Jede Bank meldet pro Land und Restlaufzeit, wie
+viel sie an Staatspapieren hält. Wir aggregieren auf Bank × Land ×
+Maturity-Bucket.
 
-**Approximations-Charakter:**
-- Off-Balance-Derivative-Engagements (Items 2520816–2520819) sind in V1
-  *nicht* eingerechnet — würden die Doom-Loop-Story nicht qualitativ
-  ändern, kosten aber Komplexität.
-- Off-Balance-Nominal-Commitments (Item 2520820) ebenfalls ausgeschlossen.
+**Warum ist das für unser Modell wichtig?**
+Ein steigender 10y-Zins lässt den Marktwert der Anleihen sinken
+(klassischer Bond-MtM-Verlust). Je mehr eine Bank hält und je länger
+die Restlaufzeit, desto stärker schlägt das auf die CET1-Quote durch
+— das ist der **zweite** der drei Stress-Kanäle unseres Modells
+(Kreditbuch · Marktbuch · Trading-Book).
+
+**Was lassen wir bewusst weg?**
+- Derivative-Engagements auf Staatsanleihen (z.B. Sovereign-CDS)
+- Off-Balance-Sheet-Commitments
+- Hedges via Swaps/Futures — sind im öffentlichen EBA-Datensatz
+  nicht rekonstruierbar
 """)
 
-    with st.expander(_box_open("Modified-Duration-Approximation", "approximation"),
+    # ----------------------------------------------------------------
+    with st.expander("Was ist Modified Duration · und warum brauchen wir sie?",
                      expanded=False):
-        st.markdown(r"""
-**Methodik:** Bucket-Midpoint-Approximation der Macaulay-Duration
-(angenommen ≈ Modified Duration für Sovereign-Bonds nahe par):
+        st.markdown("""
+**Was ist das?**
+Die **Modified Duration** ist eine Zahl (in Jahren), die misst, **wie
+stark der Marktwert eines Bonds fällt, wenn der Zins um 1 Prozentpunkt
+steigt**.
 
-| Maturity-Bucket | Approx. D (Jahre) |
-|---|---|
-| < 3M | 0.125 |
-| 3M – 1Y | 0.625 |
-| 1 – 2Y | 1.5 |
-| 2 – 3Y | 2.5 |
-| 3 – 5Y | 4.0 |
-| 5 – 10Y | 7.5 |
-| > 10Y | 15.0 |
+> Faustformel: Δ Marktwert ≈ −Duration × Δ Zins × Exposure
 
-**Approximations-Charakter:** Annahmen "Bullet-Bond at par",
-Coupon-Effekte und Konvexität ignoriert. Im Mittel ±10–15% Abweichung
-zur tatsächlichen Cashflow-basierten Duration. Konfigurierbar in
-`eba_loader.DURATION_BY_BUCKET`.
+Eine Bundesanleihe mit 10 Jahren Restlaufzeit hat z.B. eine Duration
+von ca. 7.5 Jahren. Steigt der 10y-Zins um 1pp, fällt der Marktwert
+um ca. 7.5%.
+
+**Wie schätzen wir sie?**
+Die EBA gibt für jede Position nur den **Laufzeit-Bucket** an
+(z.B. "5-10 Jahre"), nicht das exakte Restalter. Wir nehmen den
+Mittelpunkt jedes Buckets als Approximation:
+""")
+        st.dataframe(
+            {
+                "Laufzeit-Bucket": ["< 3 Monate", "3 Monate – 1 Jahr",
+                                    "1 – 2 Jahre", "2 – 3 Jahre",
+                                    "3 – 5 Jahre", "5 – 10 Jahre",
+                                    "> 10 Jahre"],
+                "Angenommene Duration": ["0.125 Jahre", "0.625 Jahre",
+                                          "1.5 Jahre", "2.5 Jahre",
+                                          "4.0 Jahre", "7.5 Jahre",
+                                          "15.0 Jahre"],
+            },
+            hide_index=True, use_container_width=True,
+        )
+        st.markdown("""
+**Warum ist das für unser Modell wichtig?**
+Ohne Duration könnten wir den Zinsschock nicht in einen
+EUR-Verlust übersetzen. Genau hier verbindet das Modell den
+Makro-Schock (Δr_10y aus der Sidebar) mit einer konkreten
+Bilanzwirkung pro Bank.
+
+**Vereinfachung, die wir eingehen:**
+- "Bullet-Bond at par" — Coupon-Effekte und Konvexität (= die
+  zweite Ableitung) werden ignoriert. Im Mittel führt das zu
+  ±10-15% Abweichung gegenüber einer exakten Cashflow-Rechnung —
+  vertretbar für ein Stress-Frame.
 """)
 
-    with st.expander(_box_open("Mark-to-Market P&L unter Rate-Shock", "approximation"),
+    # ----------------------------------------------------------------
+    with st.expander("Wie berechnen wir den Mark-to-Market-Verlust unter Zinsschock?",
                      expanded=False):
-        st.markdown(r"""
-**Funktionale Form:**
+        st.markdown("""
+**Was ist das?**
+Ein "Mark-to-Market-Verlust" ist der Wertverlust, der entsteht, wenn
+sich der Marktzins ändert und die Bank ihre Bonds zum neuen
+(niedrigeren) Marktpreis bilanziert. Es ist ein **rein rechnerischer
+Verlust** — die Bank verliert nichts, wenn sie den Bond bis zur
+Endfälligkeit hält. Aber unter IFRS-9 muss sie ihn (je nach
+Klassifizierung) sofort buchen.
 
-$$\Delta P_b = -\sum_{m \in \text{buckets}} D_m \cdot \Delta y \cdot E_{b,m}, \qquad \Delta y = \frac{\Delta r_{10y\,\text{pp}}}{100}$$
+**Die Formel.** Pro Bank summieren wir über alle Laufzeit-Buckets:
+""")
+        st.latex(r"""
+\Delta P_b = -\sum_{m \in \text{buckets}}
+              D_m \cdot \Delta y \cdot E_{b,m}
+""")
+        st.markdown("""
+mit:
+- D_m = Duration des Buckets (Tabelle oben)
+- Δy = Zinsänderung in Dezimal (z.B. +1pp → Δy = 0.01)
+- E_{b,m} = Sovereign-Exposure von Bank b im Bucket m
 
-**Pro Bank:** Σ über alle Maturity-Buckets ergibt den Mark-to-Market-
-Verlust unter parallelem Yield-Shift, in EUR.
+**Warum ist das für unser Modell wichtig?**
+Dies ist der konkrete EUR-Verlust, der direkt auf die CET1-Quote
+durchschlägt — aber **nicht für alle Bonds gleich** (siehe IFRS-9-
+Klassen-Erklärung weiter unten in diesem Sub-Tab).
 
-**Limitationen:**
-- **Nur Parallel-Shift** angenommen — Slope/Curvature-Stress (Δβ₁/β₂/β₃ aus
-  Svensson) wirkt aktuell nicht direkt auf das Sovereign-P&L (würde
-  Bucket-spezifische Yields erfordern).
-- **Kein Credit-Spread-Risiko** — Italian-vs-Bund-Spread-Stress fehlt.
-- **Kein Hedging** — Swaps/Futures-Hedges aus EBA-Public-Disclosure
-  nicht rekonstruierbar.
-- **Buchwert vs. Fair Value:** HtM-Bestände nehmen MtM-Verluste **nicht**
-  durchs P&L auf; das Modell aggregiert über alle Accounting-Portfolios
-  (HfT/FVTPL/FVOCI/AC/HtM) und überschätzt damit die P&L-Wirkung
-  konservativ.
+**Was wir bewusst nicht abbilden:**
+- **Slope-/Curvature-Schocks** (kurze vs. lange Zinsen unterschiedlich)
+  — wir nehmen einen **Parallel-Shift** an
+- **Credit-Spread-Risiko** (Italien-Bund-Spread) — out of scope
+- **Hedging** — Swap-/Future-Positionen sind nicht öffentlich
+  ausgewiesen
 """)
