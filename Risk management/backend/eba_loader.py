@@ -49,6 +49,22 @@ from vasicek import BankPortfolio, PortfolioSegment   # noqa: E402
 
 
 # ============================================================================
+# 0a. Derived-cache fallback
+# ============================================================================
+# Die EBA-Rohdateien (tr_cre.csv, tr_sov.csv, tr_oth.csv, TR_Metadata.xlsx)
+# sind zu groß für Git und fehlen daher in der Cloud-Deployment-Umgebung.
+# `backend/precompute_eba_cache.py` schreibt einmalig die gefilterten/
+# geparsten Ergebnisse als kleine Parquet-Dateien nach `data/derived/`.
+# Fehlt eine Rohdatei, greifen die Loader transparent auf diese committeten
+# Parquets zurück — die öffentliche API bleibt identisch.
+_DERIVED_DIR = _ROOT / "data" / "derived"
+
+
+def _derived(name: str) -> Path:
+    return _DERIVED_DIR / name
+
+
+# ============================================================================
 # 0. EBA Schema Constants
 # ============================================================================
 
@@ -422,6 +438,16 @@ def from_synthetic(vintage: str = "2025") -> EbaUniverse:
 
 def load_bank_directory(metadata_path: Path) -> pd.DataFrame:
     """Lädt die EBA Bank-Liste (LEI -> Name + Country) aus TR_Metadata.xlsx."""
+    metadata_path = Path(metadata_path)
+    if not metadata_path.exists():
+        fb = _derived("bank_dir.parquet")
+        if fb.exists():
+            return pd.read_parquet(fb)
+        raise FileNotFoundError(
+            f"TR_Metadata.xlsx nicht gefunden ({metadata_path}) und kein "
+            f"Derived-Fallback unter {fb}. `python backend/"
+            f"precompute_eba_cache.py` ausführen."
+        )
     df = pd.read_excel(metadata_path, sheet_name="List of Institutions",
                        header=1)
     df = df.rename(columns={
@@ -460,6 +486,19 @@ def parse_credit_risk_csv(
     -------
     DataFrame: lei × period × item × exposure × status → amount
     """
+    csv_path = Path(csv_path)
+    if not csv_path.exists():
+        fb = _derived("cre_raw.parquet")
+        if fb.exists():
+            df = pd.read_parquet(fb)
+            if period is not None:
+                df = df[df["Period"] == period]
+            return df.reset_index(drop=True)
+        raise FileNotFoundError(
+            f"tr_cre.csv nicht gefunden ({csv_path}) und kein Derived-"
+            f"Fallback unter {fb}. `python backend/precompute_eba_cache.py` "
+            f"ausführen."
+        )
     keep_items = set(items)
     chunks = []
     for chunk in pd.read_csv(csv_path, chunksize=chunksize):
@@ -698,14 +737,17 @@ def from_real_files(
 
     cre_path = eba_dir / "tr_cre.csv"
     meta_path = eba_dir / "TR_Metadata.xlsx"
-    if not cre_path.exists():
+    # Akzeptiere entweder die Rohdateien ODER den committeten Derived-Cache
+    # (Cloud-Deployment ohne die großen Rohdaten). load_bank_directory /
+    # parse_credit_risk_csv fallen intern auf data/derived/ zurück.
+    have_raw = cre_path.exists() and meta_path.exists()
+    have_derived = (_derived("cre_raw.parquet").exists()
+                    and _derived("bank_dir.parquet").exists())
+    if not have_raw and not have_derived:
         raise FileNotFoundError(
-            f"tr_cre.csv not found in {eba_dir}. "
-            f"Place EBA Transparency files there or pass an explicit path."
-        )
-    if not meta_path.exists():
-        raise FileNotFoundError(
-            f"TR_Metadata.xlsx not found in {eba_dir}."
+            f"Weder EBA-Rohdateien in {eba_dir} noch Derived-Cache in "
+            f"{_DERIVED_DIR}. `python backend/precompute_eba_cache.py` "
+            f"ausführen oder Rohdaten bereitstellen."
         )
 
     bank_dir = load_bank_directory(meta_path)
@@ -740,6 +782,15 @@ def from_real_files(
 # ============================================================================
 def load_country_dim(metadata_path: Path) -> pd.DataFrame:
     """Lädt Country-Dim mit Code, Name, ISO-Code."""
+    metadata_path = Path(metadata_path)
+    if not metadata_path.exists():
+        fb = _derived("country_dim.parquet")
+        if fb.exists():
+            return pd.read_parquet(fb)
+        raise FileNotFoundError(
+            f"TR_Metadata.xlsx nicht gefunden ({metadata_path}) und kein "
+            f"Derived-Fallback unter {fb}."
+        )
     df = pd.read_excel(metadata_path, sheet_name="Country", header=1)
     df.columns = ["code", "country_name", "iso"]
     df = df.dropna(subset=["code"])
@@ -759,6 +810,19 @@ def parse_sovereign_csv(
       2520810 — On-balance gross carrying amount (primary exposure measure)
       2520822 — RWA on sovereign exposures
     """
+    csv_path = Path(csv_path)
+    if not csv_path.exists():
+        fb = _derived("sov_raw.parquet")
+        if fb.exists():
+            df = pd.read_parquet(fb)
+            if period is not None:
+                df = df[df["Period"] == period]
+            return df.reset_index(drop=True)
+        raise FileNotFoundError(
+            f"tr_sov.csv nicht gefunden ({csv_path}) und kein Derived-"
+            f"Fallback unter {fb}. `python backend/precompute_eba_cache.py` "
+            f"ausführen."
+        )
     keep_items = {
         ITEM_SOV_GROSS_ON_BS, ITEM_SOV_RWA,
         ITEM_SOV_HFT, ITEM_SOV_FVTPL, ITEM_SOV_FVOCI, ITEM_SOV_AC,
@@ -1087,6 +1151,16 @@ def parse_capital_overview(
 
     Werte in EUR (Input ist m EUR → ×1e6).
     """
+    csv_path = Path(csv_path)
+    if not csv_path.exists():
+        fb = _derived(f"cap_df_{period}.parquet")
+        if fb.exists():
+            return pd.read_parquet(fb)
+        raise FileNotFoundError(
+            f"tr_oth.csv nicht gefunden ({csv_path}) und kein Derived-"
+            f"Fallback unter {fb}. `python backend/precompute_eba_cache.py` "
+            f"ausführen."
+        )
     keep_items = {
         ITEM_CET1_CAPITAL, ITEM_OCI, ITEM_CR_RWA, ITEM_SECURITISATION_RWA,
         ITEM_MR_RWA, ITEM_OP_RWA, ITEM_TOTAL_RWA, ITEM_TB_PNL,
@@ -1333,6 +1407,12 @@ def load_historical_capital_panel(
     wird die *neuere* Vintage bevorzugt — die EBA korrigiert in späteren
     Releases gelegentlich publizierte Daten der Vorperiode.
     """
+    eba_dir = Path(eba_dir)
+    # Cloud-Fallback: ohne Roh-tr_oth.csv die committete Panel-Parquet nutzen.
+    if not (eba_dir / "tr_oth.csv").exists():
+        fb = _derived("hist_capital_panel.parquet")
+        if fb.exists():
+            return pd.read_parquet(fb)
     panels = []
     for v in vintages:
         try:

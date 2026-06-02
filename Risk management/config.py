@@ -21,11 +21,12 @@ BASE_DIR = Path(__file__).resolve().parent if "__file__" in globals() else Path.
 
 DATA_DIR              = BASE_DIR / "data"
 CACHE_DIR             = DATA_DIR / "cache"
+DERIVED_DIR           = DATA_DIR / "derived"        # small precomputed EBA parquets (committed)
 EBA_DIR               = DATA_DIR / "eba"            # parsed parquet outputs
 EBA_TRANSPARENCY_DIR  = EBA_DIR / "transparency_2025"
 EBA_STRESS_DIR        = EBA_DIR / "stress_test_2025"
 OUTPUT_DIR            = BASE_DIR / "output"
-for p in (DATA_DIR, CACHE_DIR, EBA_DIR, EBA_TRANSPARENCY_DIR,
+for p in (DATA_DIR, CACHE_DIR, DERIVED_DIR, EBA_DIR, EBA_TRANSPARENCY_DIR,
           EBA_STRESS_DIR, OUTPUT_DIR):
     p.mkdir(parents=True, exist_ok=True)
 
