@@ -1469,3 +1469,6 @@ footer(
     "Datenbasis: Pillar-3 EU-CR6 bank-spezifisch (31.12.2024) + ICE Brent + Bundesbank "
     "Svensson · Backend-Module in `Risk management/backend/`"
 )
+
+# Build-Marker — bestätigt, welche Version in der Cloud live ist.
+st.caption("Build 2026-06-02 · derived-cache fallback aktiv")
