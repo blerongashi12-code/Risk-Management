@@ -159,7 +159,7 @@ def _wait_for_server(url: str, max_wait_seconds: float = 12.0) -> None:
 # =====================================================================
 def main() -> None:
     here = Path(__file__).resolve().parent
-    app_path = here / "streamlit_app" / "app.py"
+    app_path = here / "streamlit_app" / "Einführung_in_das_Modell.py"
 
     print("=" * 60)
     print(" EU Banking Credit Stress Cockpit · run_clean.py")

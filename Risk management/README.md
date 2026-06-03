@@ -560,7 +560,7 @@ Risk management/
 │   └── backtesting_walkforward.py     ← Quartals-Walk-Forward-Backtest
 │
 ├── streamlit_app/
-│   ├── app.py                         ← Landing-Page mit 5-Min-Tour
+│   ├── Einführung_in_das_Modell.py    ← Landing-Page (Tab 1) mit 5-Min-Tour
 │   ├── static/mckinsey.css            ← Cockpit-Aesthetic
 │   ├── components/
 │   │   ├── theme.py                   ← Plotly-Template + Breadcrumb

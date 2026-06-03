@@ -3,8 +3,11 @@
 Entry-Point. Streamlit erkennt Pages automatisch in `pages/` und rendert
 sie in der linken Navigation.
 
+Diese Datei ist der Entry-Point; ihr Dateiname bestimmt zugleich das
+Label des ersten Sidebar-Tabs ("Einführung in das Modell").
+
 Start:
-    streamlit run streamlit_app/app.py
+    streamlit run "streamlit_app/Einführung_in_das_Modell.py"
 """
 import sys
 from pathlib import Path
@@ -52,59 +55,147 @@ hero(
 # ======================================================================
 # 5-Minuten-Tour · Onboarding für Erstleser
 # ======================================================================
+# ----- Wiederverwendbare Onboarding-Bausteine (Stepper-Design) --------
+_ONB_STEPS = [
+    ("1", "Was das Modell misst"),
+    ("2", "Die zwei Macro-Faktoren"),
+    ("3", "Wirkung auf eine Bank"),
+    ("4", "Banken & Datenbasis"),
+    ("5", "Die drei Stress-Kanäle"),
+]
+
+
+def _onb_rail(active: int | None = None) -> None:
+    """Horizontaler 5-Schritte-Stepper — macht sofort sichtbar,
+    dass die Tour aus genau fünf Schritten besteht."""
+    items = []
+    for i, (num, label) in enumerate(_ONB_STEPS, start=1):
+        is_on = (active is None) or (i <= active)
+        circle_bg = "#051C2C" if is_on else "#FFFFFF"
+        circle_fg = "#FFFFFF" if is_on else "#B7C2CB"
+        circle_bd = "#051C2C" if is_on else "#D8DEE3"
+        lbl_color = "#051C2C" if is_on else "#9BA7B0"
+        items.append(
+            '<div style="flex:1;min-width:104px;display:flex;'
+            'flex-direction:column;align-items:center;text-align:center;'
+            'gap:0.45rem;">'
+            f'<div style="width:38px;height:38px;border-radius:50%;'
+            f'background:{circle_bg};color:{circle_fg};'
+            f'border:2px solid {circle_bd};display:flex;align-items:center;'
+            'justify-content:center;font-weight:700;font-size:1.02rem;'
+            "font-family:'Source Serif Pro',Georgia,serif;\">"
+            f'{num}</div>'
+            f'<div style="font-size:0.75rem;font-weight:600;'
+            f'color:{lbl_color};line-height:1.3;">{label}</div>'
+            '</div>'
+        )
+    arrow = ('<div style="display:flex;align-items:flex-start;color:#C4CDD4;'
+             'font-size:1.1rem;padding-top:7px;font-weight:600;">→</div>')
+    st.markdown(
+        '<div style="display:flex;gap:6px;align-items:flex-start;'
+        'flex-wrap:nowrap;overflow-x:auto;margin:0.2rem 0 1.7rem 0;'
+        'padding:0.5rem 0.2rem;background:#FAFBFC;border:1px solid #ECEFF1;'
+        'border-radius:10px;">'
+        + arrow.join(items)
+        + '</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _onb_step(num: str, title: str, sub: str) -> None:
+    """Markanter, nummerierter Schritt-Header (Badge + Titel + Subtitel)."""
+    st.markdown(
+        '<div style="display:flex;align-items:center;gap:0.95rem;'
+        'margin:2.0rem 0 0.9rem 0;padding-bottom:0.65rem;'
+        'border-bottom:2px solid #051C2C;">'
+        '<div style="flex:none;width:46px;height:46px;border-radius:50%;'
+        'background:#051C2C;color:#FFFFFF;display:flex;align-items:center;'
+        'justify-content:center;font-weight:700;font-size:1.35rem;'
+        "font-family:'Source Serif Pro',Georgia,serif;\">"
+        f'{num}</div>'
+        '<div style="flex:1;">'
+        '<div style="font-size:0.67rem;font-weight:700;letter-spacing:0.14em;'
+        'text-transform:uppercase;color:#A52F4D;margin-bottom:0.12rem;">'
+        f'Schritt {num} von 5</div>'
+        '<div style="font-family:\'Source Serif Pro\',Georgia,serif;'
+        'font-size:1.5rem;font-weight:600;color:#051C2C;line-height:1.22;">'
+        f'{title}</div>'
+        f'<div style="font-size:0.89rem;color:#6E6E6E;margin-top:0.22rem;'
+        f'line-height:1.5;">{sub}</div>'
+        '</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def _onb_sub(text: str) -> None:
+    """Leichtgewichtiger Unter-Abschnitt innerhalb eines Schritts."""
+    st.markdown(
+        '<div style="display:flex;align-items:center;gap:0.55rem;'
+        'margin:1.5rem 0 0.7rem 0;">'
+        '<div style="width:9px;height:9px;border-radius:50%;'
+        'background:#A52F4D;flex:none;"></div>'
+        '<div style="font-size:1.04rem;font-weight:600;color:#051C2C;'
+        "font-family:'Source Serif Pro',Georgia,serif;line-height:1.3;\">"
+        f'{text}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
 eyebrow("In 5 Minuten durch das Modell")
 
 st.markdown(
-    '<div style="background:#FAFAFA;border:1px solid #E6E6E6;'
-    'border-radius:8px;padding:1.1rem 1.4rem;margin:0.4rem 0 1.2rem 0;'
-    'color:#051C2C;font-size:0.92rem;line-height:1.7;">'
-    'Diese Tour erklärt das Modell von Grund auf — keine '
-    'Vorkenntnisse erforderlich. Wenn du dich danach durch die fünf '
-    'Tabs in der linken Sidebar klickst, kannst du jeden Chart und '
-    'jede Kennzahl konkret einordnen.'
+    '<div style="background:linear-gradient(180deg,#FFFFFF 0%,#FAFAFA 100%);'
+    'border:1px solid #E6E6E6;border-left:4px solid #051C2C;'
+    'border-radius:8px;padding:1.05rem 1.4rem;margin:0.4rem 0 1.3rem 0;'
+    'color:#051C2C;font-size:0.94rem;line-height:1.7;">'
+    'Diese Tour erklärt das Modell in <strong>fünf aufeinander '
+    'aufbauenden Schritten</strong> — von Grund auf, ohne '
+    'Vorkenntnisse. Jeder Schritt ist klar nummeriert; danach kannst '
+    'du dich durch die fünf Tabs in der linken Sidebar klicken und '
+    'jeden Chart und jede Kennzahl konkret einordnen.'
     '</div>',
     unsafe_allow_html=True,
 )
 
-# --- Step 1 & 2 (was + welche Faktoren) ----------------------------
-step_a, step_b = st.columns(2, gap="large")
+# Stepper-Überblick: die fünf Schritte auf einen Blick.
+_onb_rail()
 
-with step_a:
-    st.markdown("""
-**Schritt 1 · Was das Modell misst**
+# --- Schritt 1 · Was das Modell misst ------------------------------
+_onb_step("1", "Was das Modell misst",
+          "Die regulatorische Eigenkapitalquote der zehn größten "
+          "EU-Banken unter einem Macro-Schock.")
+st.markdown("""
+Das Cockpit zeigt, wie sich die **Eigenkapitalquote (CET1)** der zehn
+größten EU-Banken verändert, wenn der **Ölpreis** und der
+**10-Jahres-Zins** springen.
 
-Wie sich die **Eigenkapitalquote (CET1)** der zehn größten
-EU-Banken verändert, wenn der Ölpreis und der 10-Jahres-Zins
-springen.
-
-Die CET1-Quote ist die regulatorische Schlüsselkennzahl — sie
-sagt aus, wie viel hartes Eigenkapital eine Bank im Verhältnis
-zu ihren risikogewichteten Aktiva hat. Fällt sie unter
-**4.5 % (Pillar 1) → 7.0 % (inkl. CCB) → 8.0 % (SREP)**, greifen
-gestufte Aufsichtsmaßnahmen — bis hin zu Dividenden- und
-Bonus-Beschränkungen.
+Die CET1-Quote ist die regulatorische Schlüsselkennzahl — sie sagt aus,
+wie viel hartes Eigenkapital eine Bank im Verhältnis zu ihren
+risikogewichteten Aktiva hat. Fällt sie unter
+**4,5 % (Pillar 1) → 7,0 % (inkl. CCB) → 8,0 % (SREP)**, greifen gestufte
+Aufsichtsmaßnahmen — bis hin zu Dividenden- und Bonus-Beschränkungen.
 """)
 
-with step_b:
-    st.markdown("""
-**Schritt 2 · Die zwei Macro-Faktoren**
-
+# --- Schritt 2 · Die zwei Macro-Faktoren ---------------------------
+_onb_step("2", "Die zwei Macro-Faktoren",
+          "Ölpreis (Brent) und 10-Jahres-Zins — über die beiden Slider "
+          "links unabhängig steuerbar.")
+st.markdown("""
 - **ΔBrent** — Ölpreis-Veränderung als log-Return.
   +0.50 ≈ +65 % höher, −0.50 ≈ −40 % niedriger.
 - **Δr_10y** — 10-Jahres-Zins-Verschiebung in Prozentpunkten.
   +2.0 = +200 Basispunkte, −0.5 = −50 bp.
 
 Die zwei Slider in der linken Sidebar steuern beide Faktoren
-**unabhängig**. Empirisch ist ihre Korrelation über fünf Jahre
-nahezu null (Pearson ρ ≈ +0.07) — deshalb behandeln wir sie als
-separate Risikofaktoren. Im **Tab 1 · Faktor-Analyse & Transmission** findest du
-die vollständige Regressions-Analyse mit R-Style-Output, p-Werten
-und Konfidenzintervallen, die das empirisch belegt.
+**unabhängig**. Empirisch ist ihre Korrelation über fünf Jahre nahezu
+null (Pearson ρ ≈ +0.07) — deshalb behandeln wir sie als separate
+Risikofaktoren. Im **Tab 1 · Faktor-Analyse & Transmission** findest du
+die vollständige Regressions-Analyse mit R-Style-Output, p-Werten und
+Konfidenzintervallen, die das empirisch belegt.
 """)
 
 # --- Schritt 2b: ökonomische + mathematische Fundierung ------------
-st.markdown(" ")
-st.markdown("""**Schritt 2b · Warum genau diese Faktoren**""")
+_onb_sub("Vertiefung · Warum genau diese Faktoren")
 
 found_l, found_m, found_r = st.columns(3, gap="medium")
 
@@ -193,9 +284,10 @@ with found_r:
         unsafe_allow_html=True,
     )
 
-# --- Step 3: konkretes Zahlenbeispiel ------------------------------
-st.markdown(" ")
-st.markdown("""**Schritt 3 · Wirkung auf eine konkrete Bank**""")
+# --- Schritt 3 · Wirkung auf eine konkrete Bank --------------------
+_onb_step("3", "Wirkung auf eine Bank",
+          "Sektor-spezifische ΔPD/ΔLGD je Exposure-Klasse — derselbe "
+          "Schock trifft jede Klasse anders.")
 st.markdown("""
 Pro Exposure-Klasse (Corporate, Mortgage, Qualifying
 Revolving Retail = QRRE, Other Retail, SME-Corporate, Bank,
@@ -255,11 +347,11 @@ st.markdown(
 )
 
 # --- Schritt 3 · Vollbild: alle 7 Klassen einer Bank unter demselben Schock --
-st.markdown(" ")
+_onb_sub("Eine Bank, sieben Klassen, sieben Reaktionen")
 st.markdown(
-    "**Eine Bank, sieben Klassen, sieben Reaktionen** — derselbe Schock "
-    "trifft jede Exposure-Klasse anders. Real-Werte aus UniCredit "
-    "Pillar-3 EU-CR6 (31.12.2024) unter ΔBrent = +0,50 / Δr_10y = +200 bp:"
+    "Derselbe Schock trifft jede Exposure-Klasse anders. Real-Werte aus "
+    "UniCredit Pillar-3 EU-CR6 (31.12.2024) unter "
+    "ΔBrent = +0,50 / Δr_10y = +200 bp:"
 )
 
 # Real Pillar-3 baselines (UniCredit, alle 7 IRB-Klassen) ·
@@ -402,8 +494,7 @@ st.caption(
 )
 
 # --- Schritt 3b: Sektor-Sensitivitäten · Übersicht + optionaler Override ---
-st.markdown(" ")
-st.markdown("""**Schritt 3b · Sektor-Sensitivitäten**""")
+_onb_sub("Vertiefung · Sektor-Sensitivitäten (β-Werte)")
 
 st.markdown(
     "Diese Tabelle zeigt die Default-β-Werte je Exposure-Klasse. "
@@ -506,9 +597,10 @@ with st.expander("β-Werte überschreiben (Sensitivitäts-Analyse, advanced)",
             "Keine Overrides aktiv — alle Tabs nutzen die kalibrierten "
             "Default-Werte.")
 
-# --- Step 4: Datenbasis ----------------------------------------
-st.markdown(" ")
-st.markdown("""**Schritt 4 · Banken und Datenbasis**""")
+# --- Schritt 4 · Banken und Datenbasis -----------------------------
+_onb_step("4", "Banken & Datenbasis",
+          "Zehn IRB-Banken · €8,28 Bio. Exposure · bank-spezifische "
+          "Pillar-3-PDs/LGDs + EBA Transparency.")
 
 step4_l, step4_r = st.columns([3, 2], gap="large")
 with step4_l:
@@ -544,10 +636,10 @@ Alle Datenquellen sind frei verfügbar und im Cockpit pro
 Sektion explizit zitiert.
 """)
 
-# --- Step 5: Prozess-Map der drei Channels --------------------
-st.markdown(" ")
-st.markdown(" ")
-st.markdown("""**Schritt 5 · Die drei Stress-Kanäle**""")
+# --- Schritt 5 · Prozess-Map der drei Channels ---------------------
+_onb_step("5", "Die drei Stress-Kanäle",
+          "Kreditbuch, Sovereign-Buch und Handelsbuch — drei parallele "
+          "Kanäle, die sich in der CET1-Quote addieren.")
 
 # ----- 5.0  Großes „Worum geht es?"-Intro -----------------------
 st.markdown(

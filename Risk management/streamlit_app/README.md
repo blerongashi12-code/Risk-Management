@@ -14,7 +14,7 @@ pip install -r streamlit_app/requirements.txt
 python run_clean.py
 
 # Alternativ direkt:
-# streamlit run streamlit_app/app.py
+# streamlit run "streamlit_app/Einführung_in_das_Modell.py"
 ```
 
 App läuft auf <http://localhost:8501>.
@@ -23,7 +23,7 @@ App läuft auf <http://localhost:8501>.
 
 ```
 streamlit_app/
-├── app.py                          # Landing-Page + globale Sidebar
+├── Einführung_in_das_Modell.py     # Landing-Page (Tab 1) + globale Sidebar
 ├── requirements.txt
 ├── .streamlit/config.toml          # Theme-Primaries
 ├── static/
@@ -72,7 +72,7 @@ In Reihenfolge der Wahrscheinlichkeit:
 
 2. **Port 8501 belegt**
    ```bash
-   streamlit run streamlit_app/app.py --server.port 8502
+   streamlit run "streamlit_app/Einführung_in_das_Modell.py" --server.port 8502
    ```
 
 3. **Firewall / VPN blockt localhost** — temporär deaktivieren.
