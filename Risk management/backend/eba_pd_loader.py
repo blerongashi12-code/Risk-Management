@@ -48,6 +48,7 @@ API
 from __future__ import annotations
 
 import sys
+import unicodedata
 import warnings
 from pathlib import Path
 
@@ -62,7 +63,6 @@ if str(_ROOT) not in sys.path:
 # 1. CSV-Pfad
 # ----------------------------------------------------------------------
 DEFAULT_CSV_PATH = _ROOT / "data" / "pillar3_bank_pd_lgd.csv"
-LEGACY_CSV_PATH  = _ROOT / "data" / "eba_risk_dashboard_pd_lgd.csv"
 
 _CACHED: pd.DataFrame | None = None
 
@@ -79,21 +79,11 @@ def load_pd_table(path: Path | str | None = None) -> pd.DataFrame:
         return _CACHED.copy()
     p = Path(path) if path else DEFAULT_CSV_PATH
     if not p.exists():
-        # Legacy-Fallback für ältere Umgebungen
-        if LEGACY_CSV_PATH.exists():
-            warnings.warn(
-                f"pillar3_bank_pd_lgd.csv nicht gefunden — falle auf "
-                f"Legacy-CSV {LEGACY_CSV_PATH.name} zurück. Bitte die neue "
-                f"CSV anlegen (Pillar-3 EU-CR6-extrahiert).",
-                stacklevel=2,
-            )
-            p = LEGACY_CSV_PATH
-        else:
-            raise FileNotFoundError(
-                f"PD/LGD-Tabelle nicht gefunden: {p}. Bitte sicherstellen, "
-                f"dass `data/pillar3_bank_pd_lgd.csv` existiert (extrahiert "
-                f"aus den Pillar-3-Reports der 10 Banken)."
-            )
+        raise FileNotFoundError(
+            f"PD/LGD-Tabelle nicht gefunden: {p}. Bitte sicherstellen, "
+            f"dass `data/pillar3_bank_pd_lgd.csv` existiert (extrahiert "
+            f"aus den Pillar-3-Reports der 10 Banken)."
+        )
     df = pd.read_csv(p)
     df["pd_pct"]  = pd.to_numeric(df["pd_pct"],  errors="coerce")
     df["lgd_pct"] = pd.to_numeric(df["lgd_pct"], errors="coerce")
@@ -175,17 +165,27 @@ def get_top10_bank_names() -> dict:
     return dict(zip(df["LEI"], df["bank_name"]))
 
 
+def _strip_accents(s: str) -> str:
+    """Entfernt diakritische Zeichen (é→e, ö→o, …) via NFKD-Normalisierung.
+
+    Nötig, weil die kuratierte CSV ASCII-Namen führt ("Societe Generale"),
+    die EBA-Metadaten aber Akzente ("Société générale S.A.") — ohne diesen
+    Schritt scheiterte das Matching und SocGen fiel aus der 10er-Liste.
+    """
+    return "".join(c for c in unicodedata.normalize("NFKD", s)
+                   if not unicodedata.combining(c))
+
+
 def _name_match(eba_name: str, universe_name: str) -> bool:
-    """Robustes Substring-Matching zwischen CSV-Namen und Universe-Namen."""
-    a = eba_name.lower()
-    b = universe_name.lower()
-    a_core = (a.replace("groupe ", "").replace("banco ", "")
-                .replace("coöperatieve ", "").replace(" n.v.", "")
-                .replace(" s.a.", "").replace("groep", "").strip())
-    b_core = (b.replace("groupe ", "").replace("banco ", "")
-                .replace("coöperatieve ", "").replace(" n.v.", "")
-                .replace(" s.a.", "").replace("groep", "").strip())
-    return a_core in b or b in a_core or a_core in b_core
+    """Robustes, akzent-insensitives Substring-Matching."""
+    a = _strip_accents(eba_name).lower()
+    b = _strip_accents(universe_name).lower()
+    for tok in ("groupe ", "banco ", "cooperatieve ",
+                "confederation nationale du ", " n.v.", " s.a.", "groep"):
+        a = a.replace(tok, "")
+        b = b.replace(tok, "")
+    a, b = a.strip(), b.strip()
+    return bool(a) and bool(b) and (a in b or b in a)
 
 
 def filter_universe_to_top10(universe):
@@ -202,15 +202,37 @@ def filter_universe_to_top10(universe):
     df = load_pd_table()
     target_names = df["bank_name"].unique().tolist()
     name_to_lei  = dict(zip(df["bank_name"], df["LEI"]))
+    curated_leis = set(df["LEI"].unique())
 
     filtered = {}
     universe_to_lei = {}
     for bank_name, portfolio in universe.banks.items():
+        # 1) Primär: exakter LEI-Match (robust, akzent-/schreibweise-immun)
+        port_lei = getattr(portfolio, "lei", "") or ""
+        if port_lei and port_lei in curated_leis:
+            filtered[bank_name] = portfolio
+            universe_to_lei[bank_name] = port_lei
+            continue
+        # 2) Fallback: akzent-insensitiver Namensvergleich
         for eba_name in target_names:
             if _name_match(eba_name, bank_name):
                 filtered[bank_name] = portfolio
                 universe_to_lei[bank_name] = name_to_lei[eba_name]
                 break
+
+    # Guard: stilles Verschlucken einer kuratierten Bank verhindern.
+    matched_leis = set(universe_to_lei.values())
+    missing_leis = curated_leis - matched_leis
+    if missing_leis:
+        lei_to_name = dict(zip(df["LEI"], df["bank_name"]))
+        missing_names = sorted(lei_to_name.get(l, l) for l in missing_leis)
+        warnings.warn(
+            f"filter_universe_to_top10: {len(missing_leis)} kuratierte "
+            f"Bank(en) konnten NICHT im EBA-Universe gematcht werden und "
+            f"fehlen daher im Modell: {missing_names}. Erwartet wurden alle "
+            f"{len(curated_leis)} Banken aus pillar3_bank_pd_lgd.csv.",
+            stacklevel=2,
+        )
 
     pd_lookup = df.set_index(["LEI", "vasicek_class"])[["pd_pct", "lgd_pct",
                                                           "status"]]
@@ -229,8 +251,9 @@ def filter_universe_to_top10(universe):
 
     universe.banks = filtered
     universe.source = (f"{universe.source} | PDs/LGDs aus "
-                       f"pillar3_bank_pd_lgd.csv ({n_overrides} Segmente, "
-                       f"davon {n_verified} Pillar-3-verifiziert)")
+                       f"pillar3_bank_pd_lgd.csv ({len(filtered)} Banken, "
+                       f"{n_overrides} Segmente, davon {n_verified} "
+                       f"Pillar-3-verifiziert)")
     return universe
 
 

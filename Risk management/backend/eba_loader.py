@@ -214,6 +214,7 @@ DURATION_BY_BUCKET: dict[int, float] = {
 SYNTHETIC_BANKS = {
     "BNP Paribas": {
         "country": "FR",
+        "lei": "R0MUWSFPU8MPRO8K5P83",
         "rwa_total_bn": 720,
         "segments": [
             ("Large Corp",      "corporate",     480, 0.014, 0.45, 3.0, None),
@@ -224,8 +225,9 @@ SYNTHETIC_BANKS = {
             ("Other Retail",    "other_retail",   85, 0.022, 0.45, 0.0, None),
         ],
     },
-    "Credit Agricole": {
+    "Groupe Crédit Agricole": {
         "country": "FR",
+        "lei": "FR969500TJ5KRTCJQWXH",
         "rwa_total_bn": 380,
         "segments": [
             ("Large Corp",      "corporate",     290, 0.013, 0.45, 3.0, None),
@@ -238,6 +240,7 @@ SYNTHETIC_BANKS = {
     },
     "Banco Santander": {
         "country": "ES",
+        "lei": "5493006QMFDDMYWIAM13",
         "rwa_total_bn": 620,
         "segments": [
             ("Large Corp",      "corporate",     310, 0.018, 0.45, 3.0, None),
@@ -250,6 +253,7 @@ SYNTHETIC_BANKS = {
     },
     "Deutsche Bank": {
         "country": "DE",
+        "lei": "7LTWFZYICNSX8D621K86",
         "rwa_total_bn": 360,
         "segments": [
             ("Large Corp",      "corporate",     230, 0.011, 0.45, 3.0, None),
@@ -260,8 +264,9 @@ SYNTHETIC_BANKS = {
             ("Other Retail",    "other_retail",   30, 0.020, 0.45, 0.0, None),
         ],
     },
-    "ING Group": {
+    "ING Groep N.V.": {
         "country": "NL",
+        "lei": "549300NYKK9MWM7GGW15",
         "rwa_total_bn": 330,
         "segments": [
             ("Large Corp",      "corporate",     250, 0.012, 0.45, 3.0, None),
@@ -274,6 +279,7 @@ SYNTHETIC_BANKS = {
     },
     "UniCredit": {
         "country": "IT",
+        "lei": "549300TRUWO2CD2G5692",
         "rwa_total_bn": 320,
         "segments": [
             ("Large Corp",      "corporate",     220, 0.020, 0.45, 3.0, None),
@@ -284,8 +290,9 @@ SYNTHETIC_BANKS = {
             ("Other Retail",    "other_retail",   45, 0.030, 0.45, 0.0, None),
         ],
     },
-    "Intesa Sanpaolo": {
-        "country": "IT",
+    "Groupe BPCE": {
+        "country": "FR",
+        "lei": "FR9695005MSX1OYEMGDF",
         "rwa_total_bn": 290,
         "segments": [
             ("Large Corp",      "corporate",     200, 0.022, 0.45, 3.0, None),
@@ -296,8 +303,9 @@ SYNTHETIC_BANKS = {
             ("Other Retail",    "other_retail",   42, 0.032, 0.45, 0.0, None),
         ],
     },
-    "BBVA": {
-        "country": "ES",
+    "Confédération Nationale du Crédit Mutuel": {
+        "country": "FR",
+        "lei": "9695000CG7B84NLR5984",
         "rwa_total_bn": 360,
         "segments": [
             ("Large Corp",      "corporate",     180, 0.020, 0.45, 3.0, None),
@@ -308,8 +316,9 @@ SYNTHETIC_BANKS = {
             ("Other Retail",    "other_retail",   55, 0.028, 0.45, 0.0, None),
         ],
     },
-    "Societe Generale": {
+    "Société générale S.A.": {
         "country": "FR",
+        "lei": "O2RNE8IBXP4R0TD8PU41",
         "rwa_total_bn": 380,
         "segments": [
             ("Large Corp",      "corporate",     260, 0.015, 0.45, 3.0, None),
@@ -320,8 +329,9 @@ SYNTHETIC_BANKS = {
             ("Other Retail",    "other_retail",   50, 0.024, 0.45, 0.0, None),
         ],
     },
-    "Commerzbank": {
-        "country": "DE",
+    "Coöperatieve Rabobank": {
+        "country": "NL",
+        "lei": "DG3RU1DBUFHT4ZF9WN62",
         "rwa_total_bn": 165,
         "segments": [
             ("Large Corp",      "corporate",     115, 0.013, 0.45, 3.0, None),
@@ -414,10 +424,20 @@ class EbaUniverse:
 
 
 def from_synthetic(vintage: str = "2025") -> EbaUniverse:
-    """Baut die Synthetic-Replik der EBA-Daten auf."""
+    """Baut die Synthetic-Replik der EBA-Daten auf.
+
+    Wird nur als Fallback genutzt, wenn weder EBA-Rohdaten noch der
+    Derived-Cache vorliegen (im ausgelieferten ZIP feuert er nicht, da der
+    Derived-Cache mitgeliefert wird). Die Bank-Identitäten (Name + LEI) sind
+    identisch mit der kuratierten Top-10-Welt (`top10_irb_banks.csv`), sodass
+    auch der Fallback exakt dieselben 10 Banken adressiert. Die PD/LGD- und
+    EAD-Werte bleiben hier bewusst synthetisch (gerundete Größenordnungen);
+    den Live-Pfad reichert `filter_universe_to_top10` mit den echten
+    Pillar-3-Werten an.
+    """
     universe = EbaUniverse(source=f"synthetic ({vintage})")
     for bank_name, spec in SYNTHETIC_BANKS.items():
-        portfolio = BankPortfolio(bank_name)
+        portfolio = BankPortfolio(bank_name, lei=spec.get("lei", ""))
         for seg_name, exp_class, ead_bn, pd_val, lgd, mat, sales in spec["segments"]:
             portfolio.add(PortfolioSegment(
                 name=seg_name,
@@ -695,7 +715,7 @@ def build_bank_portfolios(
 
     for lei, group in seg_df.groupby("LEI_Code"):
         bank_name = lei_to_name.get(lei, f"LEI {lei[:8]}…")
-        portfolio = BankPortfolio(bank_name)
+        portfolio = BankPortfolio(bank_name, lei=str(lei))
         for _, row in group.iterrows():
             v_class = row["v_class"]
             if row["ead_eur"] <= 0:
@@ -1613,6 +1633,31 @@ def _test_exposure_mapping_complete():
         assert c in MATURITY_BY_VASICEK_CLASS, f"Maturity missing for class {c}"
 
 
+def _test_filter_keeps_all_10_curated_banks():
+    """Regression: filter_universe_to_top10 darf KEINE kuratierte Bank
+    verlieren. Früher fiel Société Générale wegen Akzent-Mismatch
+    ("Societe Generale" vs. "Société générale S.A.") still aus → 9 statt 10
+    Banken. Jetzt LEI-First-Matching + Guard.
+
+    Testet den realen Pfad, falls Daten/Derived-Cache vorhanden — sonst
+    den synthetischen Fallback (beide tragen jetzt alle 10 LEIs).
+    """
+    import warnings as _w
+    from eba_pd_loader import filter_universe_to_top10
+    try:
+        u = load_eba_universe(vintage="2025", top_n=10)
+    except Exception:
+        u = from_synthetic("2025")
+    # Der eingebaute Guard warnt, falls eine kuratierte Bank nicht gematcht
+    # wird; als Error behandelt fängt das die SocGen-Regression hart ab.
+    # (CA/BPCE werden über den Namens-Fallback gebrückt, da EBA-Metadaten
+    #  FR-präfixierte LEIs führen, die Pillar-3-CSV die kanonischen.)
+    with _w.catch_warnings():
+        _w.simplefilter("error", UserWarning)
+        filter_universe_to_top10(u)
+    assert u.n_banks == 10, f"Erwartet 10 gefilterte Banken, gefunden {u.n_banks}"
+
+
 if __name__ == "__main__":
     import sys
     if sys.platform == "win32":
@@ -1627,6 +1672,7 @@ if __name__ == "__main__":
         ("Adverse anchor present",            _test_adverse_anchor_present),
         ("Exposure mapping complete",         _test_exposure_mapping_complete),
         ("Real loader smoke (if files present)", _test_real_loader_if_files_present),
+        ("Filter keeps all 10 curated banks", _test_filter_keeps_all_10_curated_banks),
     ]
     for label, fn in tests:
         try:

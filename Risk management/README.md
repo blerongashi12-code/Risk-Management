@@ -384,7 +384,10 @@ nutzen wir die Country-Aggregate aus:
 Parameters Annex Q4 2024", veröffentlicht März 2025 (gleicher Stichtag
 31.12.2024 wie die Pillar-3-Disclosures).
 **URL:** https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/risk-dashboard
-**Lokale Datei:** `data/eba_risk_dashboard_pd_lgd.csv` (Legacy-Quelle).
+**Lokale Datei:** Diese Übergangs-Werte sind direkt in
+`data/pillar3_bank_pd_lgd.csv` enthalten und dort in der Spalte `status`
+mit `country_proxy_pending_pillar3` markiert (eine separate Legacy-CSV gibt
+es nicht mehr — Single Source of Truth ist `pillar3_bank_pd_lgd.csv`).
 
 ### 4.2 · EBA Transparency Exercise 2025
 
@@ -577,7 +580,7 @@ Risk management/
 │       └── 5_Validierung.py           ← Walk-Forward-Backtest
 │
 └── data/
-    ├── eba_risk_dashboard_pd_lgd.csv  ← 70 Zeilen, 10 Banken × 7 Klassen
+    ├── pillar3_bank_pd_lgd.csv        ← 70 Zeilen, 10 Banken × 7 Klassen (Single Source of Truth)
     ├── top10_irb_banks.csv            ← Top-10-Selektions-Tabelle
     ├── bundesbank_svensson.csv
     ├── tr_cre.csv  (~123 MB, gitignored)
@@ -736,10 +739,11 @@ dokumentiert. Falls für eine spätere Vintage neu extrahiert wird:
 sämtliche 10 Banken konsistent auf den neuen Stichtag bringen (sonst
 schlägt der Loader-Test `_test_vintage_consistency` fehl).
 
-**EBA Risk Dashboard Q4 2024 (Fallback-Quelle für 5 Klassen-Zellen):**
-Bereits enthalten unter `data/eba_risk_dashboard_pd_lgd.csv`
-(Country-Aggregate, Stichtag 31.12.2024, gleiche Vintage wie die
-Pillar-3-Daten).
+**EBA Risk Dashboard Q4 2024 (Übergangs-Werte für die Country-Proxy-Zellen):**
+Diese Country-Aggregate (Stichtag 31.12.2024, gleiche Vintage wie die
+Pillar-3-Daten) sind direkt in `data/pillar3_bank_pd_lgd.csv` integriert und
+über die Spalte `status = country_proxy_pending_pillar3` gekennzeichnet —
+eine separate CSV existiert nicht mehr.
 
 ### 10.3 · Cockpit starten
 

@@ -393,6 +393,7 @@ class BankPortfolio:
 
     name: str
     segments: list[PortfolioSegment] = field(default_factory=list)
+    lei: str = ""   # offizieller LEI-Code — robuster Join-Key zur Pillar-3-CSV
 
     def add(self, *segments: PortfolioSegment) -> "BankPortfolio":
         self.segments.extend(segments)
