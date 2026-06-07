@@ -176,15 +176,24 @@ def _strip_accents(s: str) -> str:
                    if not unicodedata.combining(c))
 
 
-def _name_match(eba_name: str, universe_name: str) -> bool:
-    """Robustes, akzent-insensitives Substring-Matching."""
-    a = _strip_accents(eba_name).lower()
-    b = _strip_accents(universe_name).lower()
-    for tok in ("groupe ", "banco ", "cooperatieve ",
-                "confederation nationale du ", " n.v.", " s.a.", "groep"):
-        a = a.replace(tok, "")
-        b = b.replace(tok, "")
-    a, b = a.strip(), b.strip()
+def _norm_name(s: str) -> str:
+    """Normalisiert einen Banknamen: Akzente weg, lowercase, Interpunktion
+    zu Leerzeichen, Mehrfach-Spaces kollabiert. KEINE aggressive Wort-
+    Entfernung (ein früherer Versuch reduzierte "ING Groep" auf "ing" und
+    matchte dann InvesterING/HoldING/… → 16 statt 10 Banken)."""
+    a = _strip_accents(s).lower()
+    for ch in (",", ".", "-", "/", "'", '"'):
+        a = a.replace(ch, " ")
+    return " ".join(a.split())
+
+
+def _name_match(curated_name: str, universe_name: str) -> bool:
+    """Akzent-/interpunktions-insensitiver Substring-Match auf vollständigen
+    Namen (keine Mini-Cores). Töchter, die denselben Substring teilen
+    (z. B. "BNP Paribas Fortis"), werden NICHT hier ausgeschlossen — das
+    erledigt die Größten-EAD-Auswahl in filter_universe_to_top10."""
+    a = _norm_name(curated_name)
+    b = _norm_name(universe_name)
     return bool(a) and bool(b) and (a in b or b in a)
 
 
@@ -200,37 +209,48 @@ def filter_universe_to_top10(universe):
         F-IRB-default — je nach `status`)
     """
     df = load_pd_table()
-    target_names = df["bank_name"].unique().tolist()
-    name_to_lei  = dict(zip(df["bank_name"], df["LEI"]))
-    curated_leis = set(df["LEI"].unique())
+    # Genau die kuratierten (Name, LEI) — Reihenfolge der CSV, dedupliziert.
+    curated = list(dict.fromkeys(zip(df["bank_name"], df["LEI"])))
+    items = list(universe.banks.items())   # (universe_name, portfolio)
 
+    # INVERTIERT: pro kuratierter Bank GENAU EINE Universe-Bank wählen.
+    # So kann das Universe niemals mehr als 10 Banken zurückgeben, auch
+    # wenn es (top_n=None) alle ~67 IRB-Banken inkl. Töchtern enthält.
     filtered = {}
     universe_to_lei = {}
-    for bank_name, portfolio in universe.banks.items():
-        # 1) Primär: exakter LEI-Match (robust, akzent-/schreibweise-immun)
-        port_lei = getattr(portfolio, "lei", "") or ""
-        if port_lei and port_lei in curated_leis:
-            filtered[bank_name] = portfolio
-            universe_to_lei[bank_name] = port_lei
-            continue
-        # 2) Fallback: akzent-insensitiver Namensvergleich
-        for eba_name in target_names:
-            if _name_match(eba_name, bank_name):
-                filtered[bank_name] = portfolio
-                universe_to_lei[bank_name] = name_to_lei[eba_name]
+    used = set()
+    unmatched = []
+    for cname, clei in curated:
+        chosen = None
+        # 1) Exakter LEI-Match (robust, schreibweise-/akzent-immun)
+        for bn, pf in items:
+            if bn in used:
+                continue
+            if (getattr(pf, "lei", "") or "") == clei:
+                chosen = (bn, pf)
                 break
+        # 2) Sonst: Namens-Match; bei mehreren Treffern die größte EAD
+        #    (= Konzern-Mutter, nicht Tochter wie "Santander Consumer").
+        if chosen is None:
+            cands = [(bn, pf) for bn, pf in items
+                     if bn not in used and _name_match(cname, bn)]
+            if cands:
+                chosen = max(cands, key=lambda t: t[1].total_ead)
+        if chosen is None:
+            unmatched.append(cname)
+            continue
+        bn, pf = chosen
+        used.add(bn)
+        filtered[bn] = pf
+        universe_to_lei[bn] = clei
 
     # Guard: stilles Verschlucken einer kuratierten Bank verhindern.
-    matched_leis = set(universe_to_lei.values())
-    missing_leis = curated_leis - matched_leis
-    if missing_leis:
-        lei_to_name = dict(zip(df["LEI"], df["bank_name"]))
-        missing_names = sorted(lei_to_name.get(l, l) for l in missing_leis)
+    if unmatched:
         warnings.warn(
-            f"filter_universe_to_top10: {len(missing_leis)} kuratierte "
+            f"filter_universe_to_top10: {len(unmatched)} kuratierte "
             f"Bank(en) konnten NICHT im EBA-Universe gematcht werden und "
-            f"fehlen daher im Modell: {missing_names}. Erwartet wurden alle "
-            f"{len(curated_leis)} Banken aus pillar3_bank_pd_lgd.csv.",
+            f"fehlen daher im Modell: {sorted(unmatched)}. Erwartet wurden "
+            f"alle {len(curated)} Banken aus pillar3_bank_pd_lgd.csv.",
             stacklevel=2,
         )
 

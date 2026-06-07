@@ -1658,6 +1658,27 @@ def _test_filter_keeps_all_10_curated_banks():
     assert u.n_banks == 10, f"Erwartet 10 gefilterte Banken, gefunden {u.n_banks}"
 
 
+def _test_curated_leis_in_bank_dir():
+    """Alle 10 kuratierten LEIs müssen EXAKT im EBA-Bank-Directory liegen.
+    Sonst fallen Banken aus den cap_df-/Sovereign-/Walk-Forward-Joins
+    (gefiltert per get_top10_leis) → ein Tab zeigt z. B. 8 statt 10 Banken.
+    Historischer Fall: CA/BPCE hatten kanonische LEIs in der CSV, die
+    EBA-Daten aber FR-präfixierte. Überspringt ohne EBA-Daten/Metadata.
+    """
+    from config import EBA_RAW_DIR
+    meta = EBA_RAW_DIR / "TR_Metadata.xlsx"
+    if not meta.exists() and not _derived("bank_dir.parquet").exists():
+        return
+    from eba_pd_loader import get_top10_leis
+    eba_leis = set(load_bank_directory(meta)["lei"])
+    missing = get_top10_leis() - eba_leis
+    assert not missing, (
+        f"Kuratierte LEIs fehlen im EBA-Directory: {missing}. "
+        f"pillar3_bank_pd_lgd.csv muss dieselben LEI-Codes wie die "
+        f"EBA-Transparency-Daten verwenden (gemeinsamer Join-Key)."
+    )
+
+
 if __name__ == "__main__":
     import sys
     if sys.platform == "win32":
@@ -1673,6 +1694,7 @@ if __name__ == "__main__":
         ("Exposure mapping complete",         _test_exposure_mapping_complete),
         ("Real loader smoke (if files present)", _test_real_loader_if_files_present),
         ("Filter keeps all 10 curated banks", _test_filter_keeps_all_10_curated_banks),
+        ("Curated LEIs match EBA directory",  _test_curated_leis_in_bank_dir),
     ]
     for label, fn in tests:
         try:

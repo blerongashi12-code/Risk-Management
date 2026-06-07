@@ -106,9 +106,14 @@ def _load_factor_cov():
 
 with st.sidebar:
     with st.expander("Universe configuration", expanded=False):
-        top_n = st.slider("Top-N banks (by EAD)", 5, 30, 10, 1,
-                          key="capadeq_top_n")
+        st.caption(
+            "Feste Datenbasis: **10 kuratierte EU-IRB-Banken** mit "
+            "bank-spezifischen Pillar-3-PDs/LGDs (31.12.2024, "
+            "`pillar3_bank_pd_lgd.csv`). Keine variable Top-N-Auswahl — "
+            "alle Tabs nutzen dasselbe 10-Banken-Universe."
+        )
 
+top_n = 10  # konstant: das Universe ist auf die kuratierten 10 Banken fixiert
 cap_df, bank_dir = _load_capital(top_n)
 universe = _load_universe(top_n)
 sov_mat = _load_sov_pnl()
