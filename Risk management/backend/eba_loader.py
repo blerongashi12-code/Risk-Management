@@ -1471,44 +1471,46 @@ def cet1_ratio_bridge(
     capital_df: pd.DataFrame,
     loan_book_bridge_per_bank: dict[str, dict],
     sovereign_pnl_per_bank: dict[str, float],
-    tb_stress_df: pd.DataFrame,
+    tb_stress_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Vollständige Drei-Kanal-CET1-Ratio-Decomposition pro Bank.
+    """Zwei-Kanal-CET1-Ratio-Decomposition pro Bank.
+
+    V1 modelliert zwei Stress-Kanäle auf die CET1-Quote — den Kreditbuch-
+    und den Sovereign-Kanal. Der frühere Trading-Book-Kanal wurde entfernt
+    (die Handels­bücher der zehn überwiegend Retail-/Corporate-lastigen
+    Banken sind klein, und eine belastbare FRTB-Sensitivität ließe sich aus
+    den EBA-Aggregaten nicht sauber kalibrieren). Das Markt-Risiko bleibt im
+    Marktbuch-Tab rein deskriptiv. `tb_stress_df` ist nur noch ein optionaler
+    Legacy-Parameter und wird, falls übergeben, ignoriert.
 
     Architektur:
       Numerator (CET1):
         CET1_stress = CET1_base
                       − ΔEL_loan_book          (Loan-Book Provisions-Hit)
-                      − Δ_sovereign_MtM         (Sovereign FVOCI/AfS via OCI)
-                      + Δ_tb_pnl                (Trading-Book P&L change, signed)
+                      + Δ_sovereign_MtM         (Sovereign FVOCI/AfS via OCI, signiert)
 
       Denominator (Total RWA):
         RWA_stress = RWA_base
                      + ΔRWA_credit_loan_book   (from loan_book bridge)
-                     + ΔRWA_market_TB          (from tb_stress)
-                     + RWA_operational_base    (unchanged)
 
     Parameters
     ----------
     capital_df : Output von parse_capital_overview
-                 (per-bank CET1, RWA-Breakdown, OCI, TB-PnL)
+                 (per-bank CET1, RWA-Breakdown, OCI)
     loan_book_bridge_per_bank : dict {LEI: bridge dict from
                  BankPortfolio.capital_bridge}
     sovereign_pnl_per_bank : dict {LEI: signed P&L EUR from
                  rate_shock_pnl}
-    tb_stress_df : Output von trading_book_stress
+    tb_stress_df : deprecated/ignored (Trading-Book-Kanal entfernt)
 
     Returns
     -------
     DataFrame mit Spalten:
         LEI_Code, cet1_base, cet1_stress, cet1_ratio_base, cet1_ratio_stress,
-        delta_cet1_loan, delta_cet1_sovereign, delta_cet1_tb,
-        delta_rwa_credit, delta_rwa_market, rwa_total_base, rwa_total_stress
+        delta_cet1_loan, delta_cet1_sovereign, delta_cet1_tb (=0),
+        delta_rwa_credit, delta_rwa_market (=0), rwa_total_base, rwa_total_stress
     """
-    df = capital_df.merge(
-        tb_stress_df[["LEI_Code", "delta_rwa_market_eur", "delta_tb_pnl_eur"]],
-        on="LEI_Code", how="left",
-    )
+    df = capital_df
 
     rows = []
     for _, r in df.iterrows():
@@ -1528,16 +1530,15 @@ def cet1_ratio_bridge(
         # Channel 2 — Sovereign MtM (negative = loss; flow through OCI)
         d_sov_mtm = float(sovereign_pnl_per_bank.get(lei, 0.0))
 
-        # Channel 3 — Trading Book (signed P&L change + RWA uplift)
-        d_tb_pnl     = float(r.get("delta_tb_pnl_eur", 0.0) or 0.0)
-        d_rwa_market = float(r.get("delta_rwa_market_eur", 0.0) or 0.0)
+        # Trading-Book-Kanal entfernt (V1) — Beiträge fest 0.
+        d_tb_pnl     = 0.0
+        d_rwa_market = 0.0
 
-        # Numerator effect
-        cet1_stress = cet1_base - d_el_loan + d_sov_mtm + d_tb_pnl
-        # (note: d_sov_mtm is signed — negative under adverse rate-up)
+        # Numerator effect (signiert: d_sov_mtm < 0 unter Zins-up)
+        cet1_stress = cet1_base - d_el_loan + d_sov_mtm
 
         # Denominator effect
-        rwa_total_stress = rwa_base + d_rwa_credit + d_rwa_market
+        rwa_total_stress = rwa_base + d_rwa_credit
 
         ratio_base   = cet1_base / rwa_base       if rwa_base > 0 else float("nan")
         ratio_stress = cet1_stress / rwa_total_stress if rwa_total_stress > 0 else float("nan")

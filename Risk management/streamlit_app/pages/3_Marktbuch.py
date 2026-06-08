@@ -1122,8 +1122,11 @@ defensible Schätzung der ersten Ordnung.
             f"€{(sys_market+delta_mr_rwa)/1e9:.0f} bn</strong> "
             f"({delta_mr_rwa/1e9:+.1f} bn unter FRTB-Multiplier). "
             f"Trading-Book-P&L-Δ: <strong>€{delta_tb_pnl/1e9:+.1f} bn</strong>. "
-            f"Beide schlagen direkt durch die CET1-Quote — siehe Tab 4 "
-            f"<em>Eigenkapital</em> für die volle 3-Channel-Decomposition."
+            f"<strong>Hinweis:</strong> Diese Markt-Risiko-Sicht ist in V1 "
+            f"rein <em>deskriptiv</em> und fließt NICHT in die CET1-Bridge "
+            f"ein — die CET1-Quote (Tab 4) nutzt die 2-Kanal-Decomposition "
+            f"(Loan-Book + Sovereign). Begründung: kleine Handelsbücher der "
+            f"10 Banken, keine belastbare FRTB-Kalibrierung aus EBA-Aggregaten."
         )
 
         # Top-betroffene Banken

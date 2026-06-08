@@ -22,7 +22,7 @@ setup()
 
 from eba_loader import (load_eba_universe,                       # type: ignore
                          parse_credit_risk_csv, loan_book_class_breakdown,
-                         parse_capital_overview, trading_book_stress,
+                         parse_capital_overview,
                          cet1_ratio_bridge, load_bank_directory,
                          parse_sovereign_csv, sovereign_maturity_ladder,
                          rate_shock_pnl)
@@ -1335,10 +1335,10 @@ else:
 st.divider()
 
 # CET1-Impact-Strip wurde entfernt — Redundanz mit Tab 4 (Eigenkapital).
-# Die volle 3-Channel-CET1-Bridge lebt jetzt ausschließlich dort.
+# Die volle 2-Kanal-CET1-Bridge lebt jetzt ausschließlich dort.
 st.info(
     "**CET1-Wirkung anschauen?** → Wechsle zu Tab 4 **Eigenkapital-Wirkung** "
-    "für die volle 3-Channel-Decomposition (Loan + Sovereign + Trading Book), "
+    "für die volle 2-Kanal-Decomposition (Loan-Book + Sovereign), "
     "Threshold-Analyse (4.5% / 7% / 8% Breaches) und CET1-Sensitivity-Curve."
 )
 

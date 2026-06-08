@@ -1,17 +1,18 @@
-"""Capital Adequacy · CET1-Ratio under three-channel stress.
+"""Capital Adequacy · CET1-Ratio under two-channel stress.
 
 Architektur (siehe Annahmen-Page):
   Numerator (CET1):
     CET1_stress = CET1_base
                   − ΔEL_loan_book           (Loan-Book Provisions-Hit)
                   + Δ_sovereign_MtM_signed    (Sovereign FVOCI/AfS via OCI)
-                  + Δ_tb_pnl_signed           (Trading-Book P&L change)
 
   Denominator (Total RWA):
     RWA_stress = RWA_base
                  + ΔRWA_credit_loan_book   (from Vasicek capital_bridge)
-                 + ΔRWA_market_TB          (FRTB-style RWA uplift)
-                 + RWA_operational_base    (unchanged)
+                 (Market- + Operational-RWA unverändert in V1)
+
+  Der frühere Trading-Book-Kanal wurde entfernt (kleine Handelsbücher,
+  keine belastbare FRTB-Kalibrierung aus EBA-Aggregaten).
 
   CET1-Ratio = CET1 / Total-RWA — Basel-III Pillar-1-Threshold = 4.5%,
   Pillar-2 + CCB ≈ 7-10.5%.
@@ -40,7 +41,7 @@ from eba_loader import (                                            # type: igno
     load_eba_universe, load_bank_directory,
     parse_capital_overview, parse_sovereign_csv,
     sovereign_maturity_ladder, rate_shock_pnl,
-    trading_book_stress, cet1_ratio_bridge,
+    cet1_ratio_bridge,
 )
 from macro_factor import (anchor_from_eba,                          # type: ignore
                           factor_stats)
@@ -60,12 +61,11 @@ config = render_sidebar()
 
 hero(
     "Eigenkapital-Wirkung · CET1-Quote",
-    eyebrow="Tab 4 · 3-Channel CET1 stress · 2-Faktor-Modell · 10 IRB-Banken",
-    deck="Die zwei Macro-Faktoren (ΔBrent + Δr_10y) treiben drei "
-         "Risiko-Channels simultan: Loan-Book-Provisions (sektor-"
-         "differenzierte ΔPD und ΔLGD pro Exposure-Klasse), Sovereign-"
-         "Mark-to-Market (Modified-Duration · Δr_10y), und Trading-"
-         "Book (Market-RWA + P&L). Alle drei wirken auf Zähler "
+    eyebrow="Tab 4 · 2-Kanal CET1-Stress · 2-Faktor-Modell · 10 IRB-Banken",
+    deck="Die zwei Macro-Faktoren (ΔBrent + Δr_10y) treiben zwei "
+         "Risiko-Kanäle simultan: Loan-Book-Provisions (sektor-"
+         "differenzierte ΔPD und ΔLGD pro Exposure-Klasse) und Sovereign-"
+         "Mark-to-Market (Modified-Duration · Δr_10y). Beide wirken auf Zähler "
          "(CET1) und Nenner (RWA) der regulatorischen Headline-"
          "Kennzahl. Daten: bank-spezifische Pillar-3 EU-CR6 (31.12.2024) "
          "für PDs/LGDs (CRR Art. 180-konform, 10/10 Banken Pillar-3-"
@@ -147,7 +147,7 @@ cov_factors = fac_stats["sigma"] if fac_stats else np.array([[4e-4, 2e-5], [2e-5
 anchor = anchor_from_eba("2025")
 mapping = {"m_hybrid": 0.0, "m_anchor": 0.0, "m_data": 0.0}
 
-# Compute the three channels per bank in the universe -----------------
+# Compute the two channels per bank in the universe -------------------
 # Channel 1 — loan book bridge via 2-Faktor-Modell (KEIN conditional_pd-Shift)
 loan_bridges: dict[str, dict] = {}
 name_to_lei: dict[str, str] = {}
@@ -181,17 +181,14 @@ sov_pnl_lookup: dict[str, float] = dict(
     zip(sov_pnl_df.get("LEI_Code", []), sov_pnl_df.get("delta_pnl_eur", []))
 )
 
-# Channel 3 — Trading Book stress
-tb_stress_df = trading_book_stress(cap_df, m_factor=0.0)
-
 # Restrict capital_df to universe banks only
 universe_leis = list(name_to_lei.values())
 cap_universe = cap_df[cap_df["LEI_Code"].isin(universe_leis)].copy()
-tb_stress_universe = tb_stress_df[tb_stress_df["LEI_Code"].isin(universe_leis)].copy()
 
-# Compute the three-channel CET1 bridge -------------------------------
+# Compute the two-channel CET1 bridge (Loan-Book + Sovereign) ---------
+# Trading-Book-Kanal in V1 entfernt — siehe cet1_ratio_bridge-Docstring.
 bridge_df = cet1_ratio_bridge(
-    cap_universe, loan_bridges, sov_pnl_lookup, tb_stress_universe,
+    cap_universe, loan_bridges, sov_pnl_lookup,
 )
 bridge_df = bridge_df.merge(bank_dir[["lei", "bank_name"]],
                             left_on="LEI_Code", right_on="lei", how="left")
@@ -240,10 +237,9 @@ if not _is_stressed:
     insight(
         "<strong>Kein Macro-Schock aktiv.</strong> Bewege die zwei "
         "Slider in der Sidebar (ΔBrent + Δr_10y), um zu sehen, wie die "
-        "drei Transmissions-Kanäle — Loan-Book-Provisions (sektor-"
-        "differenzierte ΔPD und ΔLGD), Sovereign-Mark-to-Market "
-        "(Duration · Δr), Trading-Book-P&amp;L + Market-RWA — zur "
-        "regulatorischen CET1-Quote zusammenwirken."
+        "zwei Transmissions-Kanäle — Loan-Book-Provisions (sektor-"
+        "differenzierte ΔPD und ΔLGD) und Sovereign-Mark-to-Market "
+        "(Duration · Δr) — zur regulatorischen CET1-Quote zusammenwirken."
     )
 else:
     insight(
@@ -362,29 +358,26 @@ if _is_stressed:
 
     d_loan_pp   = (sel_row["delta_cet1_loan"] / rwa_b) * 100
     d_sov_pp    = (sel_row["delta_cet1_sovereign"] / rwa_b) * 100
-    d_tb_pp     = (sel_row["delta_cet1_tb"] / rwa_b) * 100
     # Aggregate denominator effect (after numerator already shifted)
     d_rwa_pp    = (ratio_after_den - ratio_after_num) * 100
 
     wf = go.Figure(go.Waterfall(
         orientation="v",
-        measure=["absolute", "relative", "relative", "relative", "relative", "total"],
+        measure=["absolute", "relative", "relative", "relative", "total"],
         x=["CET1 Ratio base",
            "− Loan-Book Δ (Provisions)",
            "+ Sovereign Δ (OCI)",
-           "+ Trading Book Δ (P&L)",
            "Δ from RWA expansion",
            "CET1 Ratio stress"],
         text=[f"{base_ratio*100:.2f}%",
               f"{d_loan_pp:+.2f} pp",
               f"{d_sov_pp:+.2f} pp",
-              f"{d_tb_pp:+.2f} pp",
               f"{d_rwa_pp:+.2f} pp",
               f"{sel_row['cet1_ratio_stress']*100:.2f}%"],
         textposition="outside",
         textfont=dict(size=11, color=COLORS["navy"]),
         y=[base_ratio*100,
-           d_loan_pp, d_sov_pp, d_tb_pp, d_rwa_pp,
+           d_loan_pp, d_sov_pp, d_rwa_pp,
            sel_row["cet1_ratio_stress"]*100],
         connector={"line": {"color": COLORS["hairline"], "width": 1}},
         increasing={"marker": {"color": COLORS["teal"]}},
@@ -425,7 +418,6 @@ if _is_stressed:
             ("CET1 base",                   sel_row["cet1_base"]/1e9),
             ("Loan-Book Provisions impact", sel_row["delta_cet1_loan"]/1e9),
             ("Sovereign MtM (via OCI)",     sel_row["delta_cet1_sovereign"]/1e9),
-            ("Trading-Book P&L change",     sel_row["delta_cet1_tb"]/1e9),
             ("CET1 stress",                 sel_row["cet1_stress"]/1e9),
         ], columns=["Channel", "EUR bn"])
         num_table["EUR bn"] = num_table["EUR bn"].map(lambda v: f"{v:+.2f}")
@@ -437,8 +429,7 @@ if _is_stressed:
         den_table = pd.DataFrame([
             ("RWA base (Credit + Market + Op)", sel_row["rwa_total_base"]/1e9),
             ("ΔRWA Credit (Vasicek IRB stress)", sel_row["delta_rwa_credit"]/1e9),
-            ("ΔRWA Market (FRTB-style uplift)", sel_row["delta_rwa_market"]/1e9),
-            ("RWA Operational (unchanged)",     0.0),
+            ("RWA Market + Operational (unchanged)", 0.0),
             ("RWA stress",                       sel_row["rwa_total_stress"]/1e9),
         ], columns=["Component", "EUR bn"])
         den_table["EUR bn"] = den_table["EUR bn"].map(lambda v: f"{v:+.2f}" if abs(v) < 50 else f"{v:+.0f}")
@@ -553,7 +544,7 @@ st.markdown(
     'font-size:0.88rem;line-height:1.65;">'
     '<strong>Was diese Kurve zeigt:</strong> Wir scannen den 10y-Zins-Schock '
     'von −1 bis +5 Prozentpunkten und rechnen für jeden Punkt das volle '
-    '2-Faktor-Modell durch (alle drei Stress-Kanäle, alle 10 Banken '
+    '2-Faktor-Modell durch (beide Stress-Kanäle, alle 10 Banken '
     'aggregiert). Der Brent-Schock bleibt auf dem aktuellen Sidebar-Wert. '
     '<br><br>'
     '<strong>Wozu?</strong> Du siehst auf einen Blick: ab welchem '
@@ -623,7 +614,7 @@ def _two_factor_sensitivity(
         delta_el  = float(kpi_stress["el_eur"]) - el_base_total
         delta_rwa = float(kpi_stress["rwa"])    - rwa_base_loan
 
-        # Sovereign-MtM and Trading-Book scaling (linear approx.)
+        # Sovereign-MtM scaling (linear approx. in Δr)
         sov_dp = sov_pnl_per_pp * float(d_r)
 
         # Reset für nächste Iteration
@@ -742,10 +733,9 @@ with bp_r:
         f"<strong>Wie ist die Kurve zu lesen?</strong> Bei Δr = 0 "
         f"(keine Zinsschock-Komponente, Baseline) liegt die Aggregat-"
         f"CET1-Quote bei <strong>{ratio_at_zero:.2f} %</strong>. "
-        f"Steigt Δr, fällt die Quote — drei Effekte überlagern sich: "
+        f"Steigt Δr, fällt die Quote — zwei Effekte überlagern sich: "
         f"(1) höhere Loan-PDs/LGDs erhöhen ΔRWA und ΔEL, "
-        f"(2) Sovereign-Bonds verlieren MtM-Wert, "
-        f"(3) Trading-Book wird über FRTB-Multiplier belastet. Der "
+        f"(2) Sovereign-Bonds verlieren MtM-Wert (OCI). Der "
         f"EBA-Adverse-Stress-Test 2025 unterstellt typisch +200 bp — "
         f"bei diesem Δr siehst du am Kurvenverlauf, wie nah die "
         f"Aggregat-Bank an den Schwellen liegt."
@@ -754,43 +744,47 @@ with bp_r:
 st.divider()
 
 # === Methodology footer =============================================
-with st.expander("Methodology · CET1 three-channel architecture",
+with st.expander("Methodik · CET1-Zwei-Kanal-Architektur",
                  expanded=False):
     st.markdown(r"""
-**Numerator (CET1 capital):**
+**Ökonomische Logik.** Ein Macro-Schock (Ölpreis, Zins) trifft die
+CET1-Quote = CET1-Kapital / RWA über **zwei** Bilanz-Kanäle: das
+**Kreditbuch** (höhere Ausfallvorsorge senkt das Kapital, höhere
+Risikogewichte erhöhen die RWA) und das **Sovereign-Buch** (Zinsanstieg
+drückt den Marktwert der Staatsanleihen, der FVOCI-Anteil mindert über die
+OCI-Reserve das Kapital). Der frühere Trading-Book-Kanal ist in V1
+**entfernt** — siehe „Was nicht modelliert wird".
+
+**Numerator (CET1-Kapital):**
 
 $$\text{CET1}^{\text{stress}} = \text{CET1}^{\text{base}}
 - \Delta\text{EL}_{\text{loan}}
-+ \Delta\text{MtM}_{\text{sov}}
-+ \Delta\text{P\&L}_{\text{TB}}$$
++ \Delta\text{MtM}_{\text{sov}}$$
 
 - $\Delta\text{EL}_{\text{loan}}$ — Vasicek-Capital-Bridge ΔEL pro Bank
   (PD-Channel + LGD-Channel via downturn-LGD), reduziert CET1 als
-  zusätzliche Provisions-Aufwendung.
+  zusätzliche Provisions-Aufwendung. Quelle: BCBS 2017 / CRR Art. 153.
 - $\Delta\text{MtM}_{\text{sov}}$ — signiert; bei Rate-Up negativ über alle
   Maturity-Buckets, fließt für FVOCI-Bestände durch OCI direkt zur CET1.
-  V1 modelliert die gesamte Sovereign-Exposure-Maturity-Ladder als FVOCI-
-  ähnlich (konservativ — überschätzt den OCI-Channel).
-- $\Delta\text{P\&L}_{\text{TB}}$ — Trading-Book-Earnings-Haircut bei
-  adversem Stress (κ_PnL = 0.50/2.5 ≈ 0.20 pro |M|).
+  $\Delta\text{MtM} = -D_{\text{mod}} \cdot \Delta y \cdot \text{Exposure}$
+  (Modified Duration; Tuckman/Serrat 2012). V1 modelliert die gesamte
+  Sovereign-Maturity-Ladder als FVOCI-ähnlich (konservativ).
 
 **Denominator (Total RWA):**
 
-$$\text{RWA}^{\text{stress}} = \text{RWA}_{\text{cr}}^{\text{base}} + \Delta\text{RWA}_{\text{cr}}
-+ \text{RWA}_{\text{mr}}^{\text{base}} + \Delta\text{RWA}_{\text{mr}}
-+ \text{RWA}_{\text{op}}^{\text{base}}$$
+$$\text{RWA}^{\text{stress}} = \text{RWA}^{\text{base}} + \Delta\text{RWA}_{\text{cr}}$$
 
 - $\Delta\text{RWA}_{\text{cr}}$ — Vasicek-Capital-Bridge ΔRWA (= K · 12.5 · EAD,
-  K via IRB-Formel mit gestressten PD/LGD).
-- $\Delta\text{RWA}_{\text{mr}}$ — FRTB-style Multiplier auf Market-RWA
-  (κ_RWA = 0.30/2.5 ≈ 0.12 pro |M|), stellt VaR/SVaR-Multiplier-Anstieg ab.
-- Operational-RWA bleibt konstant (out-of-stress in V1).
+  K via IRB-Formel mit gestressten PD/LGD). Quelle: CRR Art. 153.
+- Market- und Operational-RWA bleiben konstant (out-of-stress in V1).
 
-**Was nicht modelliert wird:**
-- Banking-Book-Securities-FVOCI-Channel separat von Sovereign (Limitation:
-  EBA-Public-Disclosure unterscheidet Asset-Kategorie, aber nicht
-  Instrument-Typ within Kategorie)
-- Equity-Holdings (kleine Position, unter 3% bei Top-EU-Banks)
+**Was nicht modelliert wird (bewusste V1-Grenzen):**
+- **Trading-Book / Markt-Risiko-Kanal** — entfernt: die Handelsbücher der
+  zehn überwiegend Retail-/Corporate-lastigen Banken sind klein, und eine
+  belastbare FRTB-Sensitivität ließe sich aus den EBA-Aggregaten nicht
+  sauber kalibrieren. Das Markt-Risiko bleibt im Marktbuch-Tab deskriptiv.
+- Banking-Book-Securities-FVOCI-Channel separat von Sovereign
+- Equity-Holdings (kleine Position, < 3 % bei Top-EU-Banken)
 - Operational-Risk-Stress (Pillar 2)
 - Sovereign-Spread-Risiko separat von Rate-Shift
 - IFRS-9-Lifetime-EL-Migration (Stage 2 / 3)
@@ -802,8 +796,8 @@ $$\text{RWA}^{\text{stress}} = \text{RWA}_{\text{cr}}^{\text{base}} + \Delta\tex
 """)
 
 footer(
-    f"Three-channel CET1 architecture · Vasicek IRB + Sovereign Duration "
-    f"+ Trading Book FRTB-style · ΔBrent = {_d_brent:+.2f}, Δr = {_d_r_10y_pp:+.2f} pp · "
-    f"κ_LGD = {KAPPA_DOWNTURN_LGD:.2f} · See Annahmen page for full "
-    f"approximations inventory."
+    f"Zwei-Kanal-CET1-Architektur · Vasicek IRB (CRR Art. 153) + Sovereign "
+    f"Duration (Tuckman/Serrat 2012) · ΔBrent = {_d_brent:+.2f}, "
+    f"Δr = {_d_r_10y_pp:+.2f} pp · κ_LGD = {KAPPA_DOWNTURN_LGD:.2f} · "
+    f"Annahmen-Inventar auf der Validierungs-Seite."
 )

@@ -12,7 +12,7 @@ Stufen (jeweils Formel + Chart + Live-Aussage):
   2. ΔPD pro Klasse      — 2-Faktor-Sensitivitäten je Exposure-Class
   3. ΔLGD pro Klasse     — Downturn-LGD-Aufschlag aus dem 2-Faktor-Modell
   4. PD + LGD → Capital  — IRB-Capital-Bridge (BCBS 2017, weiterhin aktiv)
-  5. Drei Channels → CET1 — Loan + Sovereign + Trading-Book aggregiert
+  5. Zwei Kanäle → CET1   — Loan-Book + Sovereign aggregiert
 """
 import sys
 from pathlib import Path
@@ -36,7 +36,7 @@ setup()
 from eba_loader import (load_eba_universe,                          # type: ignore
                          parse_capital_overview,
                          parse_sovereign_csv, sovereign_maturity_ladder,
-                         rate_shock_pnl, trading_book_stress,
+                         rate_shock_pnl,
                          cet1_ratio_bridge, load_bank_directory)
 from macro_factor import (anchor_from_eba,                          # type: ignore
                            factor_returns, factor_stats)
@@ -1096,13 +1096,13 @@ st.divider()
 
 
 # =====================================================================
-# Stage 5 · Drei Channels → CET1-Quote
+# Stage 5 · Zwei Kanäle → CET1-Quote
 # =====================================================================
-eyebrow("Stufe 5 · Drei Kanäle → CET1-Quote (vorher / nachher)")
+eyebrow("Stufe 5 · Zwei Kanäle → CET1-Quote (vorher / nachher)")
 st.caption(
     f"Datenbasis · **Aggregat über alle {N_TOTAL} "
-    "IRB-Banken** · drei Risiko-Kanäle zur CET1-Quote (Loan-Book + "
-    "Sovereign-Bonds + Trading-Book). Klicke unten auf die einzelnen "
+    "IRB-Banken** · zwei Risiko-Kanäle zur CET1-Quote (Loan-Book + "
+    "Sovereign-Bonds). Klicke unten auf die einzelnen "
     "Bridge-Positionen für die jeweilige Berechnung."
 )
 
@@ -1175,16 +1175,11 @@ if _is_stressed:
     sov_lookup = dict(zip(sov_pnl_df.get("LEI_Code", []),
                           sov_pnl_df.get("delta_pnl_eur", [])))
 
-    # Trading-Book-Stress aus 2-Faktor-Schock-Magnitude (kein M mehr).
-    # |Schock| = |ΔBrent| + |Δr_10y|, gespiegelt als adverse z-Faktor für
-    # die vorhandene trading_book_stress-Funktion (sie erwartet m_factor).
-    _shock_mag = abs(delta_brent_log) + abs(delta_r_pp)
-    tb_stress = trading_book_stress(cap_over, m_factor=-_shock_mag)
+    # Zwei-Kanal-CET1-Bridge (Loan-Book + Sovereign) — Trading-Book-Kanal
+    # in V1 entfernt (siehe cet1_ratio_bridge-Docstring).
     universe_leis = list(name_to_lei.values())
     cap_uni = cap_over[cap_over["LEI_Code"].isin(universe_leis)]
-    tb_uni  = tb_stress[tb_stress["LEI_Code"].isin(universe_leis)]
-    cet1_bridge = cet1_ratio_bridge(cap_uni, loan_bridges_lei,
-                                     sov_lookup, tb_uni)
+    cet1_bridge = cet1_ratio_bridge(cap_uni, loan_bridges_lei, sov_lookup)
 
     # Aggregate channel contributions
     cet1_b = float(cet1_bridge["cet1_base"].sum())
@@ -1194,12 +1189,10 @@ if _is_stressed:
     delta_cet1 = cet1_s - cet1_b
     delta_rwa  = rwa_s  - rwa_b
 
-    # Decompose ΔCET1 into channels (loan-EL, sovereign-FV, TB-PnL)
+    # Decompose ΔCET1 into channels (loan-EL, loan-RWA, sovereign-FV)
     delta_loan_el = -float(sum(b["delta_el"] for b in loan_bridges_lei.values()))
     delta_sov_fv  = float(sum(sov_lookup.values())) if sov_lookup else 0.0
-    delta_tb_pnl  = float(tb_uni["delta_tb_pnl_eur"].sum())
     delta_loan_rwa   = float(sum(b["delta_rwa"] for b in loan_bridges_lei.values()))
-    delta_market_rwa = float(tb_uni["delta_rwa_market_eur"].sum())
 
     ratio_b = cet1_b / rwa_b if rwa_b > 0 else 0.0
     ratio_s = cet1_s / rwa_s if rwa_s > 0 else 0.0
@@ -1218,39 +1211,33 @@ if _is_stressed:
 
         ch_loan_el  = _pp_contrib(delta_loan_el, 0.0)
         ch_sov_fv   = _pp_contrib(delta_sov_fv, 0.0)
-        ch_tb_pnl   = _pp_contrib(delta_tb_pnl, 0.0)
         ch_loan_rwa = _pp_contrib(0.0, delta_loan_rwa)
-        ch_tb_rwa   = _pp_contrib(0.0, delta_market_rwa)
 
         # Residual to ensure waterfall ends exactly on stressed ratio
-        explained = ch_loan_el + ch_sov_fv + ch_tb_pnl + ch_loan_rwa + ch_tb_rwa
+        explained = ch_loan_el + ch_sov_fv + ch_loan_rwa
         actual_change_pp = (ratio_s - ratio_b) * 100
         residual = actual_change_pp - explained
 
         wf = go.Figure(go.Waterfall(
             orientation="v",
             measure=["absolute", "relative", "relative", "relative",
-                     "relative", "relative", "relative", "total"],
+                     "relative", "total"],
             x=["CET1-Quote<br>Baseline",
                "Loan-Book<br>ΔEL (Expected Loss)",
                "Loan-Book<br>ΔRWA (Vasicek)",
                "Sovereign-Bonds<br>ΔFV (Duration-MtM)",
-               "Trading Book<br>ΔP&L (Haircut)",
-               "Market-RWA<br>Uplift (FRTB)",
                "Second-Order-<br>Korrektur",
                "CET1-Quote<br>nach Stress"],
             text=[f"{ratio_b*100:.2f}%",
                   f"{ch_loan_el:+.2f} pp",
                   f"{ch_loan_rwa:+.2f} pp",
                   f"{ch_sov_fv:+.2f} pp",
-                  f"{ch_tb_pnl:+.2f} pp",
-                  f"{ch_tb_rwa:+.2f} pp",
                   f"{residual:+.2f} pp",
                   f"{ratio_s*100:.2f}%"],
             textposition="outside",
             textfont=dict(size=10, color=COLORS["navy"]),
             y=[ratio_b * 100, ch_loan_el, ch_loan_rwa, ch_sov_fv,
-               ch_tb_pnl, ch_tb_rwa, residual, ratio_s * 100],
+               residual, ratio_s * 100],
             connector={"line": {"color": COLORS["hairline"], "width": 1}},
             increasing={"marker": {"color": COLORS["teal"]}},
             decreasing={"marker": {"color": COLORS["crimson"]}},
@@ -1266,7 +1253,7 @@ if _is_stressed:
                      annotation_position="left",
                      annotation_font=dict(size=9, color=COLORS["amber"]))
         wf.update_layout(
-            title=f"CET1-Quote (Common Equity Tier 1) · 3-Channel-Decomposition · "
+            title=f"CET1-Quote (Common Equity Tier 1) · 2-Kanal-Decomposition · "
                   f"Aggregat Top-{universe.n_banks} EU-Banken",
             yaxis_title="CET1-Quote [%] = Hartes Kernkapital ÷ Risk-Weighted Assets",
             height=460, showlegend=False,
@@ -1275,11 +1262,13 @@ if _is_stressed:
 
     with cc_col_r:
         st.markdown(r"""
-**CET1-Quote unter Stress** — 3 Channels:
+**CET1-Quote unter Stress** — 2 Kanäle:
 
 1. **Loan-Book**:  ΔEL ↓ CET1-Kapital direkt, ΔRWA ↓ Quote über Nenner
-2. **Sovereign**:  ΔFV durchläuft P&L (HfT/FVTPL) und OCI (FVOCI) → CET1
-3. **Trading Book**:  TB-P&L direkt durch CET1, Market-RWA-Uplift via Nenner
+2. **Sovereign**:  ΔFV (Modified-Duration · Δy) fließt über OCI (FVOCI) → CET1
+
+*(Trading-Book-Kanal in V1 entfernt — Markt-Risiko nur deskriptiv im
+Marktbuch-Tab.)*
 
 **Regulatorische Thresholds** (gestrichelte Linien):
 - 4.5% CET1-Minimum (Pillar 1)
@@ -1305,17 +1294,14 @@ if _is_stressed:
     biggest_drop = min(
         [("Loan-Book EL", ch_loan_el),
          ("Loan-Book ΔRWA", ch_loan_rwa),
-         ("Sovereign ΔFV", ch_sov_fv),
-         ("Trading Book P&L", ch_tb_pnl),
-         ("Market-RWA Uplift", ch_tb_rwa)],
+         ("Sovereign ΔFV", ch_sov_fv)],
         key=lambda x: x[1],
     )
     insight(
-        f"<strong>Dominanter Channel:</strong> {biggest_drop[0]} "
+        f"<strong>Dominanter Kanal:</strong> {biggest_drop[0]} "
         f"({biggest_drop[1]:+.2f} pp). "
         f"Loan-Book trägt {(ch_loan_el+ch_loan_rwa):+.2f} pp · "
-        f"Sovereign-FV {ch_sov_fv:+.2f} pp · "
-        f"Trading-Book {(ch_tb_pnl+ch_tb_rwa):+.2f} pp. "
+        f"Sovereign-FV {ch_sov_fv:+.2f} pp. "
         f"Full bank-by-bank-Decomposition auf der "
         f"<em>Capital Adequacy</em>-Page."
     )
@@ -1333,7 +1319,7 @@ if _is_stressed:
         unsafe_allow_html=True,
     )
 
-    info_cols = st.columns(7, gap="small")
+    info_cols = st.columns(5, gap="small")
     with info_cols[0]:
         with st.expander("ⓘ CET1 base", expanded=False):
             st.markdown(
@@ -1411,60 +1397,19 @@ if _is_stressed:
                 "**Wirkung.** Reduziert CET1 wenn Zinsen steigen."
             )
     with info_cols[4]:
-        with st.expander("ⓘ TB-P&L", expanded=False):
-            st.markdown(
-                "**Definition.** Trading-Book-P&L-Haircut bei "
-                "adversem Stress. Reduziert das Net-Income und damit "
-                "direkt CET1.\n\n**Berechnung.**"
-            )
-            st.latex(
-                r"\Delta \text{P\&L}_{\text{TB}} = -h \cdot "
-                r"|\text{Schock}| \cdot \text{TB-P\&L}_{\text{base}}"
-            )
-            st.markdown(
-                "mit h = 0.20 pro Einheit |Schock| (kalibriert aus EBA "
-                "Stress Test 2025 §3.4) und |Schock| = "
-                "|ΔBrent| + |Δr_10y|.\n\n"
-                f"**Aktueller Beitrag.** {ch_tb_pnl:+.2f} pp = "
-                f"{delta_tb_pnl/1e9:+.1f} Mrd. EUR TB-P&L-Verlust.\n\n"
-                "**Wirkung.** Reduziert CET1-Zähler unter Stress."
-            )
-    with info_cols[5]:
-        with st.expander("ⓘ Market-RWA", expanded=False):
-            st.markdown(
-                "**Definition.** FRTB-Multiplier auf das aggregate "
-                "Markt-Risiko-RWA bei adversem Stress (Proxy für "
-                "VaR/SVaR-Anstieg).\n\n**Berechnung.**"
-            )
-            st.latex(
-                r"\Delta \text{RWA}_{\text{mr}} = k \cdot "
-                r"|\text{Schock}| \cdot \text{RWA}_{\text{mr}}^"
-                r"{\text{base}}"
-            )
-            st.markdown(
-                "mit k = 0.15 pro Einheit |Schock|, kalibriert aus "
-                "EBA Stress Test 2025 §7.\n\n"
-                f"**Aktueller Beitrag.** {ch_tb_rwa:+.2f} pp = "
-                f"ΔRWA {delta_market_rwa/1e9:+.0f} Mrd. EUR (via "
-                "Nenner).\n\n"
-                "**Wirkung.** Erhöht RWA-Nenner unter Stress."
-            )
-    with info_cols[6]:
         with st.expander("ⓘ CET1 stress", expanded=False):
             st.markdown(
                 "**Definition.** CET1-Quote nach Stress = "
-                "aggregierte Eigenkapital-Quote über alle drei "
-                "Channels.\n\n**Berechnung.**"
+                "aggregierte Eigenkapital-Quote über beide "
+                "Kanäle (Loan-Book + Sovereign).\n\n**Berechnung.**"
             )
             st.latex(
                 r"\text{Quote}^{\text{stress}} = "
                 r"\frac{\text{CET1}^{\text{base}} - "
                 r"\Delta\text{EL}_{\text{loan}} + "
-                r"\Delta\text{FV}_{\text{sov}} + "
-                r"\Delta\text{P\&L}_{\text{TB}}}"
+                r"\Delta\text{FV}_{\text{sov}}}"
                 r"{\text{RWA}_{\text{base}} + "
-                r"\Delta\text{RWA}_{\text{cr}} + "
-                r"\Delta\text{RWA}_{\text{mr}}}"
+                r"\Delta\text{RWA}_{\text{cr}}}"
             )
             st.markdown(
                 f"**Aktueller Wert.** {ratio_s*100:.2f} % "
@@ -1475,7 +1420,7 @@ if _is_stressed:
             )
 
 else:
-    st.info("Schock anwenden, um die 3-Channel-CET1-Bridge live zu sehen.")
+    st.info("Schock anwenden, um die 2-Kanal-CET1-Bridge live zu sehen.")
 
 st.divider()
 
@@ -1559,9 +1504,8 @@ summary_rows = [
      (f"ΔK = €{bridge['delta_K']/1e9:+.1f} Mrd. · "
       f"ΔRWA = €{bridge['delta_rwa']/1e9:+.0f} Mrd."
       if _is_stressed else "Baseline (kein Schock angelegt)")),
-    ("5. Drei Kanäle → CET1-Quote",
-     "Loan-Book (ΔRWA + ΔEL) + Sovereign (ΔFair-Value · IFRS-9-Filter) + "
-     "Trading-Book (ΔP&L + ΔMarkt-RWA)",
+    ("5. Zwei Kanäle → CET1-Quote",
+     "Loan-Book (ΔRWA + ΔEL) + Sovereign (ΔFair-Value · IFRS-9-Filter)",
      (f"CET1-Quote: {ratio_b*100:.2f} % → {ratio_s*100:.2f} % "
       f"({(ratio_s-ratio_b)*100:+.2f} pp)"
       if _is_stressed else "Baseline (kein Schock angelegt)")),

@@ -204,7 +204,7 @@ def tab_breadcrumb(current: int) -> None:
         ("3", "Marktbuch",
          "Yield-Curve · Sovereigns · Trading-Book"),
         ("4", "Eigenkapital",
-         "3-Channel · CET1-Quote · Schwellen"),
+         "2-Kanal · CET1-Quote · Schwellen"),
         ("5", "Validierung",
          "Walk-Forward-Backtest · Annahmen"),
     ]

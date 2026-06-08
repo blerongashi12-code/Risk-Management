@@ -658,10 +658,10 @@ Alle Datenquellen sind frei verfügbar und im Cockpit pro
 Sektion explizit zitiert.
 """)
 
-# --- Schritt 5 · Prozess-Map der drei Channels ---------------------
-_onb_step("5", "Die drei Stress-Kanäle",
-          "Kreditbuch, Sovereign-Buch und Handelsbuch — drei parallele "
-          "Kanäle, die sich in der CET1-Quote addieren.")
+# --- Schritt 5 · Prozess-Map der zwei Channels ---------------------
+_onb_step("5", "Die zwei Stress-Kanäle",
+          "Kreditbuch und Sovereign-Buch — zwei parallele Kanäle, die "
+          "sich in der CET1-Quote addieren.")
 
 # ----- 5.0  Großes „Worum geht es?"-Intro -----------------------
 st.markdown(
@@ -834,8 +834,11 @@ with st.expander("Mini-Glossar (EL · RWA · MtM · IFRS-9 · FRTB · NIM) — "
         'Sensitivitäten gegenüber regulatorisch vorgegebenen '
         'Risiko-Faktoren (Zinsen, Spreads, FX, Aktien, Rohstoffe) und '
         'aggregiert über Stress-Perioden.<br>'
-        '<em>CET1-Wirkung:</em> bei Macro-Stress steigt die Markt-RWA → '
-        '<strong>Nenner</strong> wächst → Quote sinkt.</td></tr>'
+        '<em>CET1-Wirkung:</em> grundsätzlich erhöht Markt-Stress die '
+        'Markt-RWA (Nenner). Im V1-Cockpit ist dieser Kanal jedoch '
+        '<strong>nicht als CET1-Treiber abgebildet</strong> (kleine '
+        'Handelsbücher der 10 Banken); Markt-Risiko erscheint nur '
+        'deskriptiv im Marktbuch-Tab.</td></tr>'
 
         # --- NIM ---
         '<tr><td style="padding:0.45rem 0.5rem 0.45rem 0;vertical-align:top;'
@@ -860,7 +863,7 @@ with st.expander("Mini-Glossar (EL · RWA · MtM · IFRS-9 · FRTB · NIM) — "
 st.markdown(
     '<div style="font-size:0.96rem;line-height:1.75;color:#051C2C;'
     'margin:0.4rem 0 1.4rem 0;">'
-    'Im Modell wirken <strong>drei Kanäle parallel</strong> auf die '
+    'Im Modell wirken <strong>zwei Kanäle parallel</strong> auf die '
     'CET1-Quote. Jeder Kanal hat seinen eigenen Bilanz-Bereich, seine '
     'eigene Formel und seine eigene Logik — die Effekte addieren sich '
     'am Ende auf. Wir gehen sie nacheinander durch, immer in derselben '
@@ -873,7 +876,7 @@ st.markdown(
 )
 
 # ============================================================
-# Gemeinsames CSS für die drei Kanal-Karten
+# Gemeinsames CSS für die zwei Kanal-Karten
 # ============================================================
 st.markdown(
     '<style>'
@@ -937,7 +940,7 @@ st.markdown(
 # ============================================================
 st.markdown(
     '<div class="ch-card">'
-    '<div class="ch-eyebrow">Kanal 1 von 3 · Kreditbuch '
+    '<div class="ch-eyebrow">Kanal 1 von 2 · Kreditbuch '
     '(englisch: Loan Book)</div>'
     '<div class="ch-title">Was die Bank an Krediten vergeben hat</div>'
     '<div class="ch-lead">'
@@ -1061,7 +1064,7 @@ st.markdown(
 # ============================================================
 st.markdown(
     '<div class="ch-card">'
-    '<div class="ch-eyebrow">Kanal 2 von 3 · Sovereign Book '
+    '<div class="ch-eyebrow">Kanal 2 von 2 · Sovereign Book '
     '(deutsch: Staatsanleihen-Bestand)</div>'
     '<div class="ch-title">Was die Bank an Staatsanleihen hält</div>'
     '<div class="ch-lead">'
@@ -1196,143 +1199,7 @@ st.markdown(
 )
 
 # ============================================================
-# KANAL 3 · Trading Book
-# ============================================================
-st.markdown(
-    '<div class="ch-card">'
-    '<div class="ch-eyebrow">Kanal 3 von 3 · Trading Book '
-    '(deutsch: Handelsbuch)</div>'
-    '<div class="ch-title">Was die Bank aktiv handelt</div>'
-    '<div class="ch-lead">'
-    'Das <strong>Handelsbuch</strong> umfasst alle Positionen, die '
-    'die Bank aktiv kauft und verkauft — Anleihen, Aktien, Derivate, '
-    'Fremdwährungen, Rohstoffe. Anders als die Kredite im Kreditbuch '
-    'oder die Halte-Bestände im Sovereign Book werden Handels­'
-    'positionen <em>täglich</em> zum Marktpreis bewertet und sind '
-    'sehr direkt von Markt­volatilität betroffen. Ein Schock hat hier '
-    'zwei Effekte gleichzeitig: erstens steigt die regulatorisch '
-    'vorgeschriebene Markt-Risiko-Kapital­unterlegung (mehr RWA), '
-    'zweitens entstehen unmittelbar Bewertungs­verluste im laufenden '
-    'Handels­ergebnis.'
-    '</div>'
-
-    '<div class="ch-formula-label">Die Formel</div>'
-    '<div class="ch-formula">'
-    'RWA<sub>market, stress</sub> = RWA<sub>market, 0</sub> · '
-    '(1 + k · |Schock|) '
-    '&nbsp;&nbsp;|&nbsp;&nbsp; '
-    'ΔP&amp;L = −h · P&amp;L<sub>trading</sub>'
-    '</div>'
-
-    '<div class="ch-formula-label">Was die Begriffe bedeuten</div>'
-    '<ul class="ch-terms">'
-    '<li><strong>RWA<sub>market, 0</sub></strong> · die Markt-Risiko-'
-    'gewichteten Aktiva der Bank im Normalfall — eine regulatorische '
-    'Größe, die das aktuelle Verlustrisiko des Handelsbuchs misst. '
-    'Wir lesen sie direkt aus dem EBA-Transparency-Datensatz '
-    '(Item 2520210) ab.</li>'
-    '<li><strong>|Schock|</strong> · die Summe der absoluten Faktor-'
-    'Bewegungen: |ΔBrent| + |Δr_10y|. Wir nehmen die Beträge, weil '
-    'Markt­stress unabhängig vom Vorzeichen wirkt — Volatilität ist '
-    'symmetrisch, sowohl ein Crash als auch eine Rally erhöhen die '
-    'Markt-RWA.</li>'
-    '<li><strong>k</strong> · ein Skalierungs­faktor (Wert: 0,15). Er '
-    'bildet vereinfacht die Mechanik der Markt-RWA-Modelle nach FRTB '
-    'ab — FRTB steht für „Fundamental Review of the Trading Book" '
-    'und ist der Basel-Standard für Markt-Risiko-Kapital seit 2019. '
-    'Der konkrete Wert k = 0,15 ist an die EBA-Stress-Test-2025-'
-    'Annahmen kalibriert.</li>'
-    '<li><strong>P&amp;L<sub>trading</sub></strong> · das jährliche '
-    'Handels­ergebnis (Profit-and-Loss, also Gewinn aus Trading-'
-    'Aktivitäten). Wir lesen es ebenfalls aus den EBA-Daten '
-    '(Item 2520311).</li>'
-    '<li><strong>h</strong> · die Haircut-Quote (Wert: 0,50, also '
-    '50 %). Annahme: in einem Stress-Szenario halbiert sich der '
-    'Trading-Gewinn — die Bank verliert die Hälfte ihres üblichen '
-    'Handels­einkommens.</li>'
-    '</ul>'
-
-    '<div class="ch-example-label">Ein konkretes Zahlen-Beispiel</div>'
-    '<div class="ch-example">'
-    'Eine Bank hat Markt-RWA von €40&nbsp;Mrd. und ein '
-    'Trading-Jahres­ergebnis von €1,2&nbsp;Mrd. Schock: Brent +50 % '
-    'und Δr_10y = +2,0&nbsp;pp.'
-    '<br><br>'
-    'Schock-Magnitude:<br>'
-    '<span class="calc">|Schock| = |+0.50| + |+2.0| = 2.5</span><br><br>'
-    'Daraus folgt:<br>'
-    '<span class="calc">ΔRWA = €40 Mrd · 0.15 · 2.5 = '
-    '<strong>+€15 Mrd.</strong></span> zusätzliche Markt-RWA.<br><br>'
-    'Und der Bewertungs­verlust:<br>'
-    '<span class="calc">ΔP&amp;L = −0.50 · €1.2 Mrd = '
-    '<strong>−€0,6 Mrd.</strong></span>'
-    '</div>'
-
-    '<div class="ch-assumption-label">Woher die Zahlen im Beispiel '
-    'stammen</div>'
-    '<div class="ch-assumption">'
-    '<table>'
-    '<tr><td class="a-val">Markt-RWA = €40 Mrd.</td>'
-    '<td class="a-src">Mediane Markt-Risiko-RWA der Top-10 EU-IRB-'
-    'Banken aus EBA Transparency 2025, Item 2520210 (regulatorisch '
-    'publizierte Größe). Spannweite: rund €8 Mrd. bei kleineren '
-    'Häusern (Rabobank, Crédit Mutuel) bis ca. €70 Mrd. bei BNP '
-    'Paribas oder Deutsche Bank.</td></tr>'
-    '<tr><td class="a-val">Trading-Jahresergebnis = €1,2 Mrd.</td>'
-    '<td class="a-src">Mediane Net Trading Income der Top-10 IRB-'
-    'Banken laut EBA Transparency 2025, Item 2520311 (Geschäftsjahr '
-    '2024). Spannweite €0,3 bis €3,5 Mrd. — stark konzentriert bei '
-    'den großen Investment-Banken (DB, BNP, SocGen).</td></tr>'
-    '<tr><td class="a-val">k = 0,15 (Skalierungs-Faktor Markt-RWA)</td>'
-    '<td class="a-src">Kalibrierung: laut EBA Stress Test 2025 '
-    '§7 (Market-Risk-Methodology) steigt die Markt-RWA großer EU-'
-    'Banken unter dem Adverse-Szenario im Median um etwa 30–40 % '
-    'gegenüber Baseline. Bei einer typischen Schock-Magnitude von '
-    '|ΔBrent| + |Δr| ≈ 2 in Adverse-Szenarien entspricht das '
-    '0,30 / 2 ≈ 0,15. Konsistent mit ECB-SSM-MR-RWA-Statistik '
-    '(quartalsweise).</td></tr>'
-    '<tr><td class="a-val">h = 50 % (Haircut Trading-Ergebnis)</td>'
-    '<td class="a-src">Kalibrierung: EBA Stress Test 2025 Methodology '
-    'Note §3.4 („Net Trading Income under stress") sieht für das '
-    'Adverse-Szenario eine Reduktion der Net Trading Income um etwa '
-    '40–60 % gegenüber Baseline vor; das EBA Stress Test 2023 '
-    '(§3.2) nutzte denselben Korridor. Wir nehmen den Mittelpunkt '
-    '50 %. Grundlage: BCBS „Principles for Sound Stress Testing" '
-    '(2018) — Stress-Annahmen sollen <em>conservative</em>, aber '
-    'plausibel sein.</td></tr>'
-    '<tr><td class="a-val">|Schock| = |ΔBrent| + |Δr_10y|</td>'
-    '<td class="a-src">Additive Aggregation gewählt, weil Brent und '
-    '10y-Zins empirisch nahezu unkorreliert sind (Pearson '
-    'ρ ≈ +0,07 über 5 Jahre, vgl. Schritt 2 und die Korrelations-'
-    'Analyse in Tab 1) — ihre Volatilitäts-Beiträge addieren sich '
-    'damit ohne Korrelations-Korrektur.</td></tr>'
-    '</table>'
-    '</div>'
-
-    '<div class="ch-result">'
-    '<div class="ch-result-label">Auswirkung auf die CET1-Quote</div>'
-    'Der <strong>Zähler</strong> (Eigenkapital) sinkt um '
-    '<strong>€0,6&nbsp;Mrd</strong> (der halbierte Handels­gewinn '
-    'fließt direkt durch die GuV). Der <strong>Nenner</strong> '
-    'steigt um <strong>€15&nbsp;Mrd</strong> zusätzliche Markt-RWA.'
-    '</div>'
-
-    '<div class="ch-source">'
-    '<strong>Fundament:</strong> FRTB-Rahmenwerk (BCBS 2019, '
-    'Basel III Phase 2) · EBA Transparency 2025: Markt-RWA aus '
-    'Item 2520210, Trading-P&amp;L aus Item 2520311 · '
-    'k-Multiplikator kalibriert an EBA Stress Test 2025 §7 · '
-    'Haircut-Annahme an EBA Stress Test 2025 §3.4 / 2023 §3.2 sowie '
-    'BCBS „Principles for Sound Stress Testing" (2018).'
-    '</div>'
-
-    '</div>',
-    unsafe_allow_html=True,
-)
-
-
-# ============================================================
-# Zusammenführung: die drei Kanäle in der CET1-Formel
+# Zusammenführung: die zwei Kanäle in der CET1-Formel
 # ============================================================
 st.markdown(
     '<div style="text-align:center;font-size:0.74rem;color:#6E6E6E;'
@@ -1345,7 +1212,7 @@ st.markdown(
     'padding:1.3rem 1.6rem;margin:0.2rem 0 1.0rem 0;">'
     '<div style="text-align:center;font-size:1.05rem;line-height:1.6;'
     'font-weight:600;margin-bottom:0.7rem;">'
-    'So addieren sich die drei Kanäle in der CET1-Quote'
+    'So addieren sich die zwei Kanäle in der CET1-Quote'
     '</div>'
 
     '<div style="background:rgba(255,255,255,0.06);'
@@ -1355,14 +1222,12 @@ st.markdown(
     '<strong>Neuer Zähler</strong> &nbsp;=&nbsp; '
     'Eigenkapital<sub>vorher</sub> &nbsp;−&nbsp; '
     'Kredit-Vorsorge (Kanal&nbsp;1) &nbsp;−&nbsp; '
-    'Marktwert-Verlust Sovereigns (Kanal&nbsp;2) &nbsp;−&nbsp; '
-    'Trading-Bewertungsverlust (Kanal&nbsp;3)'
+    'Marktwert-Verlust Sovereigns (Kanal&nbsp;2)'
     '<div style="border-top:1px solid #FFFFFF;width:80%;margin:0.7rem auto;'
     'opacity:0.5;"></div>'
     '<strong>Neuer Nenner</strong> &nbsp;=&nbsp; '
     'RWA<sub>vorher</sub> &nbsp;+&nbsp; '
-    'zusätzliche Kredit-RWA (Kanal&nbsp;1) &nbsp;+&nbsp; '
-    'zusätzliche Markt-RWA (Kanal&nbsp;3)'
+    'zusätzliche Kredit-RWA (Kanal&nbsp;1)'
     '</div>'
 
     '<div style="font-size:0.88rem;color:#E6E6E6;margin-top:0.8rem;'
@@ -1395,9 +1260,10 @@ st.markdown(
     '<li><strong>Tab 2 · Kreditbuch</strong> — Kanal 1 mit detailliertem '
     'Worked Example pro Bank.</li>'
     '<li><strong>Tab 3 · Marktbuch</strong> — Yield-Curve, Kanal 2 '
-    '(Sovereigns mit IFRS-9-Aufteilung), Banking-Book-Bonds und '
-    'Kanal 3 (Trading).</li>'
-    '<li><strong>Tab 4 · Eigenkapital</strong> — alle drei Kanäle '
+    '(Sovereigns mit IFRS-9-Aufteilung), Banking-Book-Bonds und eine '
+    'deskriptive Markt-Risiko-Übersicht (Trading-Book, nicht Teil der '
+    'CET1-Bridge).</li>'
+    '<li><strong>Tab 4 · Eigenkapital</strong> — beide Kanäle '
     'aggregiert, mit Schwellen-Analyse.</li>'
     '<li><strong>Tab 5 · Validierung</strong> — Backtest und '
     'Methodologie.</li>'
@@ -1489,7 +1355,7 @@ st.divider()
 eyebrow("Modell-Architektur · die Wirkungskette in einem Bild")
 
 st.markdown(
-    "Drei voneinander unabhängige Stress-Kanäle, alle gespeist aus den "
+    "Zwei voneinander unabhängige Stress-Kanäle, beide gespeist aus den "
     "zwei Macro-Faktoren — am Ende konvergieren sie zur einen "
     "regulatorischen Headline: der CET1-Quote."
 )
@@ -1504,13 +1370,9 @@ arch_df = pd.DataFrame([
      "Sovereign-Buch",
      "Δr × Modified Duration",
      "Δ Fair Value (IFRS-9: HfT / FVTPL / FVOCI / AC)"),
-    ("③",
-     "Handelsbuch",
-     "FRTB-style Multiplier auf Market-RWA",
-     "Δ RWA + P&L-Haircut"),
 ], columns=["#", "Channel", "Treiber", "CET1-Wirkung"])
 st.dataframe(arch_df, hide_index=True, use_container_width=True,
-             height=145)
+             height=110)
 
 st.markdown(
     '<div style="background:#FAFAFA;border:1px solid #E6E6E6;'
@@ -1568,7 +1430,7 @@ nav_row2 = st.columns(2, gap="small")
 with nav_row2[0]:
     st.page_link("pages/4_Eigenkapital.py",
                  label="4 · Eigenkapital",
-                 help="3-Channel CET1-Waterfall · Threshold-Analyse · "
+                 help="2-Kanal CET1-Waterfall · Threshold-Analyse · "
                       "Sensitivitäts-Curve",
                  use_container_width=True)
 with nav_row2[1]:
