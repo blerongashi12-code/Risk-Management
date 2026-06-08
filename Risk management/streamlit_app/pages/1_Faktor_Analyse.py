@@ -117,35 +117,16 @@ _total_ead_full = sum(e for _, e in _bank_ead_pairs)
 
 
 with st.sidebar:
-    with st.expander("Aggregat · Bank-Auswahl", expanded=False):
+    with st.expander("Datenbasis", expanded=False):
         st.caption(
-            f"Datenbasis: **{N_TOTAL} Banken** aus der EBA Transparency "
-            f"Exercise 2025 (Stichtag Juni 2025). Σ EAD = "
-            f"€{_total_ead_full/1e12:.1f} Bio."
+            f"Feste Datenbasis: **alle {N_TOTAL} kuratierten EU-IRB-Banken** "
+            f"mit bank-spezifischen Pillar-3-PDs/LGDs (31.12.2024). "
+            f"Σ EAD = €{_total_ead_full/1e12:.1f} Bio. Keine Top-N- oder "
+            f"Einzelauswahl — alle Tabs nutzen dasselbe 10-Banken-Universe."
         )
-        agg_mode = st.radio(
-            "Modus",
-            ["Alle Banken", "Top-N nach EAD", "Eigene Auswahl"],
-            index=0, key="tx_agg_mode",
-            help="Standard: alle Banken aggregiert. Optional einschränken auf "
-                 "Top-N nach Exposure (EAD) oder freie Bank-Auswahl.",
-        )
-        if agg_mode == "Top-N nach EAD":
-            top_n_pick = st.slider(
-                "Anzahl Banken (Top-N nach EAD)",
-                5, N_TOTAL, min(10, N_TOTAL), 1, key="tx_top_n",
-            )
-            selected_banks = _all_bank_names[:top_n_pick]
-        elif agg_mode == "Eigene Auswahl":
-            selected_banks = st.multiselect(
-                "Banken auswählen", _all_bank_names,
-                default=_all_bank_names[:10], key="tx_custom_pick",
-            )
-            if not selected_banks:
-                st.warning("Mindestens 1 Bank wählen — verwende Top-10 als Fallback.")
-                selected_banks = _all_bank_names[:10]
-        else:  # "Alle Banken"
-            selected_banks = _all_bank_names
+
+# Feste Datenbasis: immer alle 10 kuratierten Banken (keine Teilauswahl).
+selected_banks = _all_bank_names
 
 # Build the filtered universe (lightweight view over the full one)
 from eba_loader import EbaUniverse  # type: ignore
@@ -786,7 +767,7 @@ st.caption(
     unsafe_allow_html=True,
 )
 st.caption(
-    f"Datenbasis · **Aggregat über {universe.n_banks} von {N_TOTAL} "
+    f"Datenbasis · **Aggregat über alle {N_TOTAL} "
     f"IRB-Banken** · EAD-gewichtete Mittelung der PD pro Exposure-Klasse "
     f"(Corporate · SME-Corporate · Mortgage · QRRE · Other Retail · Bank · "
     f"Sovereign)."
@@ -983,7 +964,7 @@ st.caption(
     "Anforderung K und damit in RWA = K · 12.5 · EAD um."
 )
 st.caption(
-    f"Datenbasis · **Aggregat über {universe.n_banks} von {N_TOTAL} "
+    f"Datenbasis · **Aggregat über alle {N_TOTAL} "
     "IRB-Banken** · konsolidiert in ein virtuelles Aggregat-Portfolio "
     "(Summe aller Segmente). Capital-Bridge zeigt PD-Effekt + LGD-Effekt "
     "additiv."
@@ -1119,7 +1100,7 @@ st.divider()
 # =====================================================================
 eyebrow("Stufe 5 · Drei Kanäle → CET1-Quote (vorher / nachher)")
 st.caption(
-    f"Datenbasis · **Aggregat über {universe.n_banks} von {N_TOTAL} "
+    f"Datenbasis · **Aggregat über alle {N_TOTAL} "
     "IRB-Banken** · drei Risiko-Kanäle zur CET1-Quote (Loan-Book + "
     "Sovereign-Bonds + Trading-Book). Klicke unten auf die einzelnen "
     "Bridge-Positionen für die jeweilige Berechnung."
@@ -1594,7 +1575,7 @@ st.dataframe(summary_df, use_container_width=True, hide_index=True, height=230)
 
 footer(
     f"Datenquelle: {universe.source} · Korrelations-Stichprobe: "
-    f"{cov_source} · Aggregat über {universe.n_banks} von {N_TOTAL} "
+    f"{cov_source} · Aggregat über alle {N_TOTAL} "
     f"IRB-Banken · PDs/LGDs bank-spezifisch aus Pillar-3 EU-CR6 "
     f"(31.12.2024) · "
     f"β-Sensitivitäten kalibriert nach EBA Stress Test 2025 + Literatur"

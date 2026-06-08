@@ -797,33 +797,14 @@ st.divider()
 # === Bank-by-bank EL bar (baseline vs stressed) =======================
 eyebrow("Expected Loss pro Bank · Baseline vs. Stress")
 
-# Top-N-Toggle: Default = Top 10 (lesbar) · optional alle 67 Banken
-el_show_l, el_show_r = st.columns([1, 4], gap="small")
-with el_show_l:
-    el_view_mode = st.radio(
-        "Ansicht",
-        ["Top 10", f"Alle {len(league)}"],
-        index=0, key="el_view_mode",
-        horizontal=False,
-        label_visibility="collapsed",
-    )
-with el_show_r:
-    st.caption(
-        "**Top 10** zeigt die zehn Banken mit dem höchsten Stress-EL "
-        "(größte Risiko-Träger). **Alle 67** öffnet die volle Liste mit "
-        "auto-skalierter Höhe — jede Bank bleibt lesbar."
-    )
+st.caption(
+    f"Alle {len(league)} Banken der kuratierten Datenbasis, absteigend "
+    f"nach Stress-Expected-Loss sortiert (größte Risiko-Träger oben)."
+)
 
-# Sortiert absteigend nach EL_stress (große oben)
-ranked_full = league.sort_values("EL stress bn", ascending=False)
-
-if el_view_mode == "Top 10":
-    ranked = ranked_full.head(10)
-    chart_height = 460
-else:
-    ranked = ranked_full
-    # Skalierung: ~26 px pro Bank für saubere Lesbarkeit aller 67
-    chart_height = max(560, 28 * len(ranked) + 120)
+# Feste Datenbasis: alle 10 kuratierten Banken, keine Top-N-Auswahl.
+ranked = league.sort_values("EL stress bn", ascending=False)
+chart_height = max(460, 34 * len(ranked) + 120)
 
 # Plotly will plot Y in reverse order — wir kehren ranked um, damit die
 # größte Bank oben steht
@@ -851,7 +832,7 @@ fig.add_trace(go.Bar(
 _shock_label = (f"ΔBrent = {_d_brent:+.2f} · Δr_10y = {_d_r_10y_pp:+.1f} pp"
                 if _is_stressed else "kein Schock")
 fig.update_layout(
-    title=(f"Expected Loss · {el_view_mode} · "
+    title=(f"Expected Loss · alle {len(ranked)} Banken · "
            f"Baseline (blau) vs. Stress (crimson) · {_shock_label}"),
     xaxis_title="Expected Loss [Mrd. EUR]",
     yaxis=dict(automargin=True, tickfont=dict(size=10)),
