@@ -507,15 +507,37 @@ st.markdown(
 )
 
 import pandas as pd
-_beta_table = pd.DataFrame([
-    ("Corporate",       "+0.30", "+0.20", "Hosszú/Király 2018; EBA ST 2025 §3.4"),
-    ("SME Corporate",   "+0.40", "+0.25", "Castro 2013; höhere Sensitivität bei kleineren Firmen"),
-    ("Mortgage",        "+0.05", "+0.30", "Drehmann/Juselius 2014 (DSR-Channel)"),
-    ("QRRE",            "+0.40", "+0.15", "Castro 2013; Konsumenten-DSR via Energie-Inflation"),
-    ("Other Retail",    "+0.25", "+0.20", "EBA ST 2025 §3.4"),
-    ("Bank",            "+0.05", "−0.05", "NIM-Profit-Effekt bei steigenden Zinsen (Kritik 7)"),
-    ("Sovereign",       "0.00",  "+0.00", "Sovereign-PD nur über Spread-Channel, hier nicht modelliert"),
-], columns=["Exposure-Klasse", "β_oil", "β_rate", "Quelle / Logik"])
+# β-Werte werden LIVE aus der two_factor_stress.SENSITIVITY_MATRIX gezogen —
+# Single Source of Truth, damit Intro-Doku und Modell nie auseinanderlaufen.
+# Der statische Fallback (gleiche Werte) greift nur, falls das Backend-Modul
+# einmal nicht importierbar ist.
+_beta_rows_meta = [
+    ("Corporate",     "corporate",     (0.30,  0.20), "Hosszú/Király 2018; EBA ST 2025 §3.4"),
+    ("SME Corporate", "sme_corporate", (0.45,  0.35), "Castro 2013; höhere Sensitivität bei kleineren Firmen"),
+    ("Mortgage",      "mortgage",      (0.05,  0.30), "Drehmann/Juselius 2014 (DSR-Channel)"),
+    ("QRRE",          "qrre",          (0.40,  0.15), "Castro 2013; Konsumenten-DSR via Energie-Inflation"),
+    ("Other Retail",  "other_retail",  (0.30,  0.25), "EBA ST 2025 §3.4"),
+    ("Bank",          "bank",          (0.05, -0.05), "NIM-Profit-Effekt bei steigenden Zinsen (Kritik 7)"),
+    ("Sovereign",     "sovereign",     (0.00,  0.00), "Sovereign-PD nur über Spread-Channel, hier nicht modelliert"),
+]
+try:
+    from two_factor_stress import SENSITIVITY_MATRIX as _SENS  # type: ignore
+except Exception:
+    _SENS = {}
+
+
+def _fmt_beta(v: float) -> str:
+    return ("0.00" if v == 0 else f"{v:+.2f}").replace("-", "−")
+
+
+_beta_table = pd.DataFrame(
+    [(name,
+      _fmt_beta(_SENS.get(key, {}).get("pd_oil",  fb[0])),
+      _fmt_beta(_SENS.get(key, {}).get("pd_rate", fb[1])),
+      src)
+     for name, key, fb, src in _beta_rows_meta],
+    columns=["Exposure-Klasse", "β_oil", "β_rate", "Quelle / Logik"],
+)
 st.dataframe(_beta_table, hide_index=True, use_container_width=True,
              height=290)
 
