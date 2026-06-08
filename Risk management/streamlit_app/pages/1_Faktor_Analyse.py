@@ -580,10 +580,14 @@ else:
     with cv_l:
         st.markdown("**Test 2 · Rolling-252d-Korrelation als Zeitreihe**")
         st.caption(
-            "Wenn die Korrelation über Zeit stabil nahe null bleibt, ist "
-            "die Unabhängigkeitsannahme robust. Springt sie phasenweise "
-            "(z.B. in Krisen), wäre eine zeitvariable Modellierung "
-            "angemessener."
+            "Ökonomisch: Wenn die Korrelation über Zeit stabil nahe null "
+            "bleibt, ist die Unabhängigkeitsannahme robust. Springt sie "
+            "phasenweise (z.B. in Krisen), wäre eine zeitvariable "
+            "Modellierung angemessener. — Formel: ρ_t = Pearson-Korrelation "
+            "über das Fenster [t−251, t]. Fenster = 252 Handelstage ≈ ein "
+            "Kalenderjahr (Markt-Standard; J.P. Morgan RiskMetrics 1996). "
+            "Kürzere Fenster sind verrauschter, längere glätten echte "
+            "Regimewechsel weg."
         )
         fig_roll = go.Figure()
         roll_df = _rolling.dropna()

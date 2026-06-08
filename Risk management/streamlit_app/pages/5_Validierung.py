@@ -110,7 +110,8 @@ with tab_bt:
         'Veränderung — bereinigt um den Volumeneffekt '
         '(siehe Bedienung „Bereinigung" weiter unten).<br><br>'
         '<strong>Datenbasis.</strong> 22 Quartals-Stichtage Sep 2019 – Jun '
-        '2025, gefiltert auf die 67 IRB-Banken der EBA Transparency 2025. '
+        '2025, gefiltert auf die kuratierten Top-10-IRB-Banken '
+        '(Pillar-3-Basis; Anzahl je nach historischer Datenverfügbarkeit). '
         'Macro: Brent (ICE) + Bundesbank-Svensson, daily.<br>'
         '<strong>Was leistet das?</strong> Quantifiziert, wo das Modell '
         'die Wirklichkeit gut/schlecht trifft — die wichtigste '
@@ -178,12 +179,33 @@ Kredit-Stress. Ihr Wachstum dient daher als sauberer Proxy für die
     - \Delta\mathrm{RWA}_{\text{credit}}^{\text{Volumen}}
 """)
         st.markdown("""
-**Fehler-Metriken** über alle Bank-Quartal-Paare:
-- **MAE** (Mean Absolute Error) — durchschnittlicher Betrag des Fehlers
-- **Bias** — systematische Über-/Unterprognose des Modells
-- **Hit-Rate** — Anteil der Beobachtungen, bei denen Modell und
-  Realität dasselbe Vorzeichen haben
-- **Korrelation** — Stärke des linearen Zusammenhangs Vorhersage vs. Ist
+**Fehler-Metriken** über alle N Bank-Quartal-Paare (Forecast f_i vs.
+realisiertes y_i):
+""")
+        st.latex(r"""
+\text{MAE} = \frac{1}{N}\sum_{i=1}^{N}\lvert f_i - y_i\rvert
+\quad\;\;
+\text{Bias} = \frac{1}{N}\sum_{i=1}^{N}\bigl(f_i - y_i\bigr)
+""")
+        st.latex(r"""
+\text{Hit-Rate} = \frac{1}{N}\sum_{i=1}^{N}\mathbf{1}\!\left[\operatorname{sign}(f_i)=\operatorname{sign}(y_i)\right]
+\quad\;\;
+\rho = \frac{\operatorname{Cov}(f,y)}{\sigma_f\,\sigma_y}
+""")
+        st.markdown("""
+- **MAE** (Mean Absolute Error) — durchschnittlicher Fehlerbetrag
+  (≥ 0; 0 = perfekt). Normiert als MAE / RWA_credit_start lesbar.
+- **Bias** — Vorzeichen-behaftetes Mittel; > 0 = Modell überschätzt
+  systematisch, < 0 = unterschätzt.
+- **Hit-Rate** — Anteil korrekter Richtungs-Treffer (Indikator-Funktion
+  𝟙); 50 % = Zufall, > 50 % = Mehrwert.
+- **Korrelation** ρ — Pearson-Korrelation Vorhersage vs. Ist (linearer
+  Zusammenhang).
+
+**Quelle der Metriken:** Standard-Forecast-Evaluation (Hyndman &
+Athanasopoulos, *Forecasting: Principles and Practice*, 3. Aufl. 2021,
+Kap. 5.8); Vorzeichen-Hit-Rate analog zu Pesaran & Timmermann
+(*JBES* 1992) Direktional-Accuracy-Test.
 
 **Wichtige Limitation.** Wir nehmen einen *uniformen* Skalierungs-
 Faktor `scale(M)` für alle Banken an. Bank-individuelle Heterogenität
@@ -522,14 +544,16 @@ und würde Segment-Level-EAD pro Vintage erfordern.
     st.divider()
 
     # === System-aggregate time-series · Modell vs Realität ===============
-    eyebrow("System-Aggregat · Σ über alle 67 IRB-Banken pro Quartal")
+    eyebrow(f"System-Aggregat · Σ über die {n_banks_wf} Banken der "
+            f"kuratierten Top-10-Basis pro Quartal")
     st.markdown(
         '<div style="background:#F4F4F4;padding:0.7rem 1.0rem;'
         'border-radius:6px;margin:0.3rem 0 0.9rem 0;color:#051C2C;'
         'font-size:0.86rem;line-height:1.55;">'
         '<strong>Was zeigt diese Grafik?</strong> Quartal für Quartal '
         'addieren wir Modell-Vorhersage und tatsächliche risiko-getriebene '
-        'Veränderung über <em>alle</em> 67 IRB-Banken auf — das ist die '
+        f'Veränderung über die <em>{n_banks_wf}</em> Banken der kuratierten '
+        'Top-10-Basis auf (mit historischem Panel-Datensatz) — das ist die '
         'System-View. Optimal: blaue (Modell) und rote (Ist bereinigt) '
         'Balken haben dieselbe Höhe und Richtung in jedem Quartal.'
         '</div>',

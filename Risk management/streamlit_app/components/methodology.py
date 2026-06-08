@@ -182,8 +182,9 @@ Maturity-Bucket.
 Ein steigender 10y-Zins lässt den Marktwert der Anleihen sinken
 (klassischer Bond-MtM-Verlust). Je mehr eine Bank hält und je länger
 die Restlaufzeit, desto stärker schlägt das auf die CET1-Quote durch
-— das ist der **zweite** der drei Stress-Kanäle unseres Modells
-(Kreditbuch · Marktbuch · Trading-Book).
+— das ist der **zweite** der zwei Stress-Kanäle unseres Modells
+(Kreditbuch + Sovereign; der Trading-Book-Kanal ist in V1 nicht
+abgebildet — siehe Marktbuch-Trading-Book-Sub-Tab).
 
 **Was lassen wir bewusst weg?**
 - Derivative-Engagements auf Staatsanleihen (z.B. Sovereign-CDS)

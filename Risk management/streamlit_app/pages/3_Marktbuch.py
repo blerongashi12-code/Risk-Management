@@ -948,7 +948,13 @@ with tab_tb:
 Beide Größen werden **bank-aggregat** publiziert — es gibt keinen
 Issuer- oder Tranche-Detail in der öffentlichen Disclosure.
 
-**Stress-Mechanik in unserem Modell (FRTB-konform):**
+**Einordnung:** Diese Markt-Risiko-Sicht ist in V1 **deskriptiv** und
+fließt **nicht** in die CET1-Bridge (Tab 4) ein — die CET1-Quote nutzt
+nur die zwei Kanäle Kreditbuch + Sovereign. Grund: kleine Handelsbücher
+der zehn Banken, keine belastbare FRTB-Kalibrierung aus EBA-Aggregaten.
+Die folgende Mechanik zeigt, *wie* ein Markt-RWA-Stress aussähe.
+
+**Stress-Mechanik (FRTB-style, deskriptiv):**
 
 Die Markt-RWA-Sensitivität wird über einen einfachen linearen
 Multiplier modelliert:
