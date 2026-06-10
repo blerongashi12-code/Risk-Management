@@ -1,18 +1,15 @@
-"""Bonds · Sovereigns + Banking-Book + Trading-Book / ABS-MBS.
+"""Marktbuch · Zins-/Sovereign-Kanal des 2-Kanal-Modells.
 
-Drei Sub-Tabs:
-  1. Sovereigns           — Maturity-Ladder, Country-Konzentration, FVOCI/AC
-                            Accounting-Class-Split, CET1-Impact via OCI/P&L.
-  2. Banking-Book Bonds   — Financials / Corporates / Covered Bonds aus
-                            tr_cre.csv Exposure-Class. Aggregat enthält
-                            sowohl Bonds als auch Loans (EBA-Limit).
-                            CET1-Impact via 2-Faktor-getriebene ΔRWA.
-  3. Trading Book + ABS   — Market-RWA (Item 2520210) und
-                            Securitisation-RWA (Item 2520209). FRTB-
-                            Style Stress, kein Issuer-Detail.
+Zwei Sub-Tabs:
+  1. Yield-Curve (Input)  — Bundesbank-Svensson-Kurve als zentraler
+                            Makro-Input (Δr_10y) für beide Stress-Kanäle.
+  2. Sovereigns           — Maturity-Ladder, Country-Konzentration (Doom-
+                            Loop), IFRS-9-Klassen-Split (FVOCI/AC), CET1-
+                            Impact via ΔMtM = −D·Δy·Exposure (OCI/P&L).
+                            DIES ist der Sovereign-Kanal der CET1-Bridge.
 
-Kein erfundener Daten. Wo etwas fehlt, klare "Datenbasis & Annahmen"-Box
-mit Datenlücken-Disclaimer.
+Datenbasis durchgängig: die 10 kuratierten IRB-Banken (Pillar-3 EU-CR6,
+31.12.2024). Kein erfundener Daten; Datenlücken werden offen markiert.
 """
 import sys
 from pathlib import Path
@@ -27,64 +24,57 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from components.theme import (tab_breadcrumb, apply_theme, hero, eyebrow, insight, footer,
-                              COLORS, PALETTE_DISCRETE, SEQ_COOL_TO_WARM)
+                              COLORS, SEQ_COOL_TO_WARM)
 from components.sidebar import render_sidebar
 from components.methodology import render_sovereign_methodology
 from components.legacy_views import render_yield_curve_tab
 from components.backend_path import setup
 setup()
 
-from config import EBA_RAW_DIR, KAPPA_DOWNTURN_LGD                  # type: ignore
+from config import EBA_RAW_DIR                                      # type: ignore
 from eba_loader import (                                            # type: ignore
     parse_sovereign_csv, sovereign_concentration,
     sovereign_maturity_ladder, domestic_share_per_bank,
-    sovereign_kpis_per_bank, attach_country_names,
-    rate_shock_pnl,
+    attach_country_names, rate_shock_pnl,
     sovereign_by_accounting_class, sovereign_cet1_impact,
-    parse_credit_risk_csv, loan_book_class_breakdown,
-    parse_capital_overview, trading_book_stress,
-    load_bank_directory, load_country_dim, load_eba_universe,
-    EXPOSURE_TO_BOND_CATEGORY,
+    load_bank_directory, load_country_dim,
 )
 
 
-st.set_page_config(page_title="Marktbuch · Bonds + Yield-Curve", layout="wide")
+st.set_page_config(page_title="Marktbuch · Sovereign-/Zins-Kanal", layout="wide")
 apply_theme()
 config = render_sidebar()
 
 hero(
-    "Marktbuch · Bonds + Yield-Curve Channel",
-    eyebrow="Tab 3 · 2-Faktor-Modell · 10 IRB-Banken · 4 Sub-Tabs",
-    deck="Vier Sub-Tabs für den Markt-Channel: (1) Yield-Curve als "
-         "zentraler Eingangs-Input (Bundesbank Svensson Q4 2025), "
-         "(2) Sovereigns granular nach Land × Restlaufzeit × IFRS-9-"
-         "Klasse mit Duration-basiertem Mark-to-Market unter Δr_10y, "
-         "(3) Banking-Book-Bonds (Financials / Corporates / Covered) "
-         "aus dem EBA-IRB-Aggregat, (4) Trading-Book + ABS/MBS via "
-         "Market-Risk-RWA. Der Zins-Schock wirkt primär hier, der "
-         "Brent-Schock nur indirekt via Trading-Book-P&L. Datenquelle "
-         "für PDs/LGDs: bank-spezifische Pillar-3 EU-CR6 (31.12.2024, "
-         "alle 10 Banken Pillar-3-verifiziert).",
+    "Marktbuch · Sovereign-/Zins-Kanal",
+    eyebrow="Tab 3 · 2-Faktor-Modell · 10 IRB-Banken · 2 Sub-Tabs",
+    deck="Der Marktbuch-Tab bildet den zins-getriebenen Sovereign-Kanal "
+         "der CET1-Bridge ab — einen der zwei Kanäle unseres Modells "
+         "(neben dem Kreditbuch). Zwei Sub-Tabs: (1) Yield-Curve als "
+         "zentraler Makro-Input (Bundesbank Svensson Q4 2025) für den "
+         "Δr_10y-Schock, (2) Sovereigns granular nach Land × "
+         "Restlaufzeit × IFRS-9-Klasse mit Duration-basiertem "
+         "Mark-to-Market: ΔFV = −D·Δy·Exposure. Nur HfT/FVTPL/FVOCI "
+         "schlagen auf CET1 durch (AC bleibt zu Buchwert). Datenbasis "
+         "durchgängig die 10 kuratierten Banken (Pillar-3 EU-CR6, "
+         "31.12.2024).",
 )
 
 tab_breadcrumb(3)
 # === Live macro shock from sidebar ===================================
 delta_r_pp = config["d_r_10y_pp"]    # already in pp (unit-bug fixed)
-d_brent    = config["d_brent"]
 
 
 # === Cached data loaders =============================================
-@st.cache_data(ttl=24*3600, show_spinner="Loading EBA Bonds-data …")
+@st.cache_data(ttl=24*3600, show_spinner="Loading EBA Sovereign-data …")
 def _load_data():
     sov_raw = parse_sovereign_csv(EBA_RAW_DIR / "tr_sov.csv", period=202506)
     bank_dir = load_bank_directory(EBA_RAW_DIR / "TR_Metadata.xlsx")
     cty_dim  = load_country_dim(EBA_RAW_DIR / "TR_Metadata.xlsx")
-    cre_raw  = parse_credit_risk_csv(EBA_RAW_DIR / "tr_cre.csv", period=202506)
-    cap_df   = parse_capital_overview(EBA_RAW_DIR / "tr_oth.csv", period=202506)
-    return sov_raw, bank_dir, cty_dim, cre_raw, cap_df
+    return sov_raw, bank_dir, cty_dim
 
 
-sov_raw, bank_dir, cty_dim, cre_raw, cap_df = _load_data()
+sov_raw, bank_dir, cty_dim = _load_data()
 
 # === Top-10 universe filter =========================================
 # Datenbasis aller Analysen: die 10 Banken aus pillar3_bank_pd_lgd.csv
@@ -95,8 +85,8 @@ from eba_pd_loader import get_top10_leis                              # type: ig
 _IRB_LEIS = get_top10_leis()
 N_IRB_BANKS = len(_IRB_LEIS)
 
-# Pre-compute the three derived dataframes used across sub-tabs — filtered
-# to the 67-IRB-bank universe.
+# Pre-compute the derived sovereign dataframes — alle konsequent auf die
+# 10 kuratierten IRB-Banken gefiltert (einheitliche Datenbasis über alle Tabs).
 conc       = sovereign_concentration(sov_raw, period=202506)
 conc       = conc[conc["LEI_Code"].isin(_IRB_LEIS)].copy()
 conc_named = attach_country_names(conc, cty_dim)
@@ -104,17 +94,14 @@ mat        = sovereign_maturity_ladder(sov_raw, period=202506)
 mat        = mat[mat["LEI_Code"].isin(_IRB_LEIS)].copy()
 acct_split = sovereign_by_accounting_class(sov_raw, period=202506)
 acct_split = acct_split[acct_split["LEI_Code"].isin(_IRB_LEIS)].copy()
-lb_class   = loan_book_class_breakdown(cre_raw, period=202506)
 
 
 # =====================================================================
-# Four tabs (Yield-Curve als 1. Sub-Tab integriert)
+# Two tabs · Yield-Curve (Input) + Sovereigns (der Sovereign-Kanal)
 # =====================================================================
-tab_yc, tab_sov, tab_bb, tab_tb = st.tabs([
+tab_yc, tab_sov = st.tabs([
     "1 · Yield-Curve (Input)",
     "2 · Sovereigns",
-    "3 · Banking-Book Bonds (Financials · Corporates · Covered)",
-    "4 · Trading Book + ABS / MBS",
 ])
 
 
@@ -244,8 +231,8 @@ with tab_sov:
         'dieser Bonds halten, schwächt das ihr Eigenkapital — was '
         'wiederum den Staat zwingt einzuspringen, was die Staatsfinanzen '
         'weiter belastet. Eine Abwärtsspirale.<br><br>'
-        '<strong>Was zeigt die Heatmap?</strong> Zeilen = die 15 größten '
-        f'Halter unter den {N_IRB_BANKS} IRB-Banken, Spalten = die 12 '
+        '<strong>Was zeigt die Heatmap?</strong> Zeilen = alle '
+        f'{N_IRB_BANKS} kuratierten IRB-Banken, Spalten = die 12 '
         'größten Schuldnerländer im EU-System. Zellwert = Sovereign-'
         'Exposure in Mrd. EUR. Dunkelrot = hohes Engagement. '
         '<span style="color:#C9A227;font-weight:600;">Amber-Quadrate</span> '
@@ -260,7 +247,7 @@ with tab_sov:
     iso_to_name = (cty_dim.set_index("iso")["country_name"].to_dict()
                    if "iso" in cty_dim.columns else {})
 
-    bank_totals = conc.groupby("LEI_Code")["exposure_eur"].sum().nlargest(15)
+    bank_totals = conc.groupby("LEI_Code")["exposure_eur"].sum().nlargest(N_IRB_BANKS)
     country_totals = (conc_named.groupby(["country_iso"])["exposure_eur"]
                       .sum().nlargest(12))
     # First merge, then filter on the merged DataFrame (Index-aligned).
@@ -432,10 +419,10 @@ with tab_sov:
                          use_container_width=True, hide_index=True, height=200)
 
     with a_r:
-        # Stacked bar: per top-15 bank, FV by accounting class
-        top15 = (acct_split.groupby("LEI_Code")["exposure_eur"].sum()
-                 .nlargest(15).index)
-        sub = acct_split[acct_split["LEI_Code"].isin(top15)]
+        # Stacked bar: alle 10 Banken, FV by accounting class
+        top_banks = (acct_split.groupby("LEI_Code")["exposure_eur"].sum()
+                     .nlargest(N_IRB_BANKS).index)
+        sub = acct_split[acct_split["LEI_Code"].isin(top_banks)]
         sub = sub.merge(bank_dir[["lei", "bank_name"]],
                          left_on="LEI_Code", right_on="lei")
         pivoted = sub.pivot_table(index="bank_name", columns="accounting_class",
@@ -458,7 +445,7 @@ with tab_sov:
                 marker_line_width=0,
             ))
         fig_st.update_layout(
-            title="Top-15 Banken · Sovereign FV nach IFRS-9-Class (bn EUR)",
+            title=f"Alle {N_IRB_BANKS} Banken · Sovereign FV nach IFRS-9-Class (bn EUR)",
             barmode="stack", height=480,
             xaxis_title="Fair Value [bn EUR]",
             legend=dict(orientation="h", yanchor="bottom", y=1.02,
@@ -563,8 +550,8 @@ with tab_sov:
         unsafe_allow_html=True,
     )
 
-    # ALL 67 IRB banks in the drop-down, sorted by sovereign exposure,
-    # type-to-search via the selectbox built-in.
+    # Alle 10 kuratierten IRB-Banken im Dropdown, nach Sovereign-Exposure
+    # sortiert, Type-to-Search via Selectbox.
     sov_per_bank = (conc.groupby("LEI_Code")["exposure_eur"].sum()
                        .sort_values(ascending=False))
     lei_to_name = bank_dir.set_index("lei")["bank_name"].to_dict()
@@ -648,538 +635,8 @@ with tab_sov:
             )
 
 
-# =====================================================================
-# SUB-TAB 2 · Banking-Book Bonds (Financials / Corporates / Covered)
-# =====================================================================
-with tab_bb:
-
-    with st.expander("Datenbasis & Annahmen · Banking-Book Bonds",
-                     expanded=False):
-        st.markdown("""
-**Datenbasis:** EBA Transparency 2025, `tr_cre.csv`, Banking-Book IRB,
-Reporting-Stichtag Juni 2025.
-- **Financials**  = Exposure-Codes 202, 203, 204 (Banks / Institutions)
-- **Corporates**  = Exposure-Codes 301–308, 311, 312 (alle Corporate-Subsets)
-- **Covered Bonds** = Exposure-Code 603
-
-**Wichtige Limitation (Critique 6 / Datenrealität).**
-Die EBA-Public-Disclosure aggregiert in jeder dieser Klassen **Loans
-+ Bonds + sonstige Banking-Book-Exposures zusammen**. Eine Trennung in
-"reine Bond-Position" ist aus EBA-Daten **nicht möglich**. Wir zeigen
-deshalb die **gesamte Banking-Book-IRB-Exposure** dieser Klassen.
-
-**Stress-Wirkung (2-Faktor-Modell):**
-- ΔPD pro Klasse = β_oil · ΔBrent + β_rate · Δr_10y
-- ΔLGD pro Klasse = γ_oil · ΔBrent + γ_rate · Δr_10y
-- ΔRWA → CET1-Impact via Basel-III-IRB-Capital-Bridge
-  (siehe Tab 2 Kreditbuch für die volle Mechanik)
-
-**Was nicht modelliert wird:**
-- Bond-spezifische Spread-Shocks (keine Marktspread-Daten im Projekt)
-- Maturity-Effekte für Non-Sovereign-Bonds (EBA gibt keine Maturity)
-- Issuer-Detail-Konzentration (keine Top-Issuer-Listen)
-""")
-
-    if lb_class.empty:
-        st.error("Banking-Book-Bond-Class-Breakdown leer — Datenladelogik prüfen.")
-    else:
-        # Aggregate per category system-wide
-        sys_cat = (lb_class.groupby("bond_category", as_index=False)
-                          .agg(ead_eur=("ead_eur", "sum"),
-                               rwa_eur=("rwa_eur", "sum"),
-                               defaulted_eur=("defaulted_eur", "sum"),
-                               oe_eur=("oe_eur", "sum")))
-        sys_cat["rwa_density"] = sys_cat["rwa_eur"] / sys_cat["ead_eur"].replace(0, pd.NA)
-        sys_cat["npl_ratio"]   = sys_cat["defaulted_eur"] / sys_cat["oe_eur"].replace(0, pd.NA)
-
-        # === Aggregate KPIs per category ===
-        eyebrow("System-wide Banking-Book Bond-Categories")
-        b1, b2, b3 = st.columns(3, gap="small")
-        for col, cat in zip([b1, b2, b3],
-                             ["Financials", "Corporates", "Covered Bonds"]):
-            row = sys_cat[sys_cat["bond_category"] == cat]
-            if len(row) > 0:
-                r = row.iloc[0]
-                col.metric(cat,
-                           f"€{r['ead_eur']/1e12:.2f} tn EAD",
-                           f"RWA-Density {r['rwa_density']*100:.0f}% · "
-                           f"NPL {r['npl_ratio']*100:.2f}%",
-                           delta_color="off")
-            else:
-                col.metric(cat, "—", delta_color="off")
-
-        st.divider()
-
-        # === NEW: System-wide aggregation analysis ===
-        # Because per-issuer granularity is unavailable in EBA-Public-Disclosure,
-        # we compensate with system-level concentration + dispersion metrics
-        # across banks. These tell the regulator/professor where the systemic
-        # risk concentration sits without requiring issuer detail.
-        eyebrow("Aggregierte Systemanalyse · Konzentration & Verteilung")
-
-        st.caption(
-            "Weil EBA keine Issuer-Granularität für Non-Sovereign-Bonds "
-            "publiziert, ersetzen wir den fehlenden Issuer-Detail durch "
-            "**System-Konzentrations- und Cross-Bank-Verteilungsmetriken**. "
-            "Diese antworten auf 'wo sitzt das Risiko im EU-System' ohne "
-            "Issuer-Listen zu benötigen."
-        )
-
-        agg_rows = []
-        dispersion_rows = []
-        for cat in ["Financials", "Corporates", "Covered Bonds"]:
-            sub_c = lb_class[lb_class["bond_category"] == cat].copy()
-            if sub_c.empty:
-                continue
-            sub_c = sub_c.sort_values("ead_eur", ascending=False)
-            tot_ead   = float(sub_c["ead_eur"].sum())
-            tot_rwa   = float(sub_c["rwa_eur"].sum())
-            n_banks_c = sub_c["LEI_Code"].nunique()
-            # HHI on EAD shares (×10000 by convention)
-            shares = (sub_c["ead_eur"] / tot_ead).to_numpy() if tot_ead > 0 else np.zeros(0)
-            hhi    = float((shares ** 2).sum() * 10000)
-            top3   = float(sub_c["ead_eur"].head(3).sum() / tot_ead * 100) if tot_ead > 0 else 0.0
-            top5   = float(sub_c["ead_eur"].head(5).sum() / tot_ead * 100) if tot_ead > 0 else 0.0
-            agg_rows.append({
-                "Category":         cat,
-                "Σ EAD bn":         round(tot_ead/1e9, 0),
-                "Σ RWA bn":         round(tot_rwa/1e9, 0),
-                "RWA density":      f"{tot_rwa/tot_ead*100:.0f}%" if tot_ead > 0 else "—",
-                "n banks reporting": n_banks_c,
-                "HHI (EAD)":        round(hhi, 0),
-                "Top-3 share":      f"{top3:.0f}%",
-                "Top-5 share":      f"{top5:.0f}%",
-            })
-            # Dispersion of implied PD (NPL ratio) across banks
-            pds = sub_c["implied_pd"].dropna().to_numpy() * 100
-            if len(pds) >= 3:
-                dispersion_rows.append({
-                    "Category":    cat,
-                    "metric":      "Implied PD across banks [%]",
-                    "p10":         float(np.percentile(pds, 10)),
-                    "p50":         float(np.percentile(pds, 50)),
-                    "p90":         float(np.percentile(pds, 90)),
-                    "max":         float(pds.max()),
-                })
-            # Dispersion of RWA-density across banks
-            rwd = (sub_c["rwa_eur"] / sub_c["ead_eur"].replace(0, np.nan)).dropna().to_numpy() * 100
-            if len(rwd) >= 3:
-                dispersion_rows.append({
-                    "Category":    cat,
-                    "metric":      "RWA density across banks [%]",
-                    "p10":         float(np.percentile(rwd, 10)),
-                    "p50":         float(np.percentile(rwd, 50)),
-                    "p90":         float(np.percentile(rwd, 90)),
-                    "max":         float(rwd.max()),
-                })
-
-        agg_l, agg_r = st.columns([1, 1], gap="medium")
-
-        with agg_l:
-            st.markdown("**Konzentration pro Bond-Category**")
-            agg_df = pd.DataFrame(agg_rows)
-            st.dataframe(agg_df, use_container_width=True, hide_index=True,
-                         height=160)
-            st.caption(
-                "HHI < 1500 = niedrig konzentriert, 1500–2500 = moderat, "
-                "> 2500 = hoch (DOJ/FTC Merger-Konventionen)."
-            )
-
-        with agg_r:
-            st.markdown("**Cross-Bank Verteilung (p10 / Median / p90 / max)**")
-            disp_df = pd.DataFrame(dispersion_rows)
-            if not disp_df.empty:
-                disp_df_show = disp_df.copy()
-                for c in ("p10", "p50", "p90", "max"):
-                    disp_df_show[c] = disp_df_show[c].round(2).astype(str) + "%"
-                st.dataframe(disp_df_show, use_container_width=True,
-                             hide_index=True, height=260)
-                st.caption(
-                    "Breite Spannweite (p90 − p10) signalisiert heterogenes "
-                    "Underwriting-Profil über EU-Banken hinweg — ein klassisches "
-                    "Modellrisiko-Frühwarnzeichen."
-                )
-
-        # Top-5 concentration chart per category (horizontal stacked bar share)
-        eyebrow("Top-5 Banken-Konzentration pro Category (EAD-Anteil)")
-        conc_traces = []
-        for cat in ["Financials", "Corporates", "Covered Bonds"]:
-            sub_c = (lb_class[lb_class["bond_category"] == cat]
-                     .merge(bank_dir[["lei", "bank_name"]],
-                            left_on="LEI_Code", right_on="lei")
-                     .sort_values("ead_eur", ascending=False)
-                     .head(5))
-            if sub_c.empty:
-                continue
-            tot = float(lb_class[lb_class["bond_category"] == cat]["ead_eur"].sum())
-            shares = (sub_c["ead_eur"] / tot * 100) if tot > 0 else sub_c["ead_eur"] * 0
-            conc_traces.append((cat, sub_c["bank_name"].tolist(), shares.tolist()))
-
-        if conc_traces:
-            fig_conc = go.Figure()
-            cat_colors = {"Financials":    COLORS["mid_blue"],
-                          "Corporates":    COLORS["crimson"],
-                          "Covered Bonds": COLORS["amber"]}
-            for cat, banks_c, sh in conc_traces:
-                fig_conc.add_trace(go.Bar(
-                    name=cat, y=[cat]*len(banks_c), x=sh,
-                    orientation="h",
-                    marker_color=cat_colors.get(cat, COLORS["stone"]),
-                    text=[f"{b[:18]} {s:.0f}%" for b, s in zip(banks_c, sh)],
-                    textposition="inside",
-                    textfont=dict(size=10, color=COLORS["white"]),
-                    showlegend=False, marker_line_width=0,
-                ))
-            fig_conc.update_layout(
-                title="EU-System: Top-5-Banken-Anteil am Category-EAD [%]",
-                barmode="stack", height=260, bargap=0.25,
-                xaxis=dict(range=[0, 100], title="Σ Top-5 Anteil [%]"),
-            )
-            st.plotly_chart(fig_conc, use_container_width=True)
-
-        st.divider()
-
-        # === Per-category exposure breakdown table ===
-        eyebrow("Top-15 Banken pro Bond-Category")
-
-        cat_choice = st.selectbox(
-            "Category",
-            ["Financials", "Corporates", "Covered Bonds"],
-            key="bb_cat",
-        )
-        sub_cat = (lb_class[lb_class["bond_category"] == cat_choice]
-                   .merge(bank_dir[["lei", "bank_name"]],
-                          left_on="LEI_Code", right_on="lei")
-                   .sort_values("ead_eur", ascending=False).head(15))
-        if len(sub_cat) > 0:
-            disp = pd.DataFrame({
-                "Bank":            sub_cat["bank_name"],
-                "EAD bn":          (sub_cat["ead_eur"]/1e9).round(1),
-                "RWA bn":          (sub_cat["rwa_eur"]/1e9).round(1),
-                "RWA density":     (sub_cat["rwa_eur"]/sub_cat["ead_eur"].replace(0, pd.NA)*100).round(0).astype(str) + "%",
-                "Defaulted bn":    (sub_cat["defaulted_eur"]/1e9).round(2),
-                "Implied PD":      (sub_cat["implied_pd"]*100).round(2).astype(str) + "%",
-            })
-            st.dataframe(disp, use_container_width=True, hide_index=True,
-                         height=440)
-        else:
-            st.info(f"Keine Daten für {cat_choice}.")
-
-        st.divider()
-
-        # === CET1-Impact für gewählte Bond-Kategorie (2-Faktor-Stress) ===
-        eyebrow(f"{cat_choice} · CET1-Impact via 2-Faktor-getriebene ΔRWA")
-
-        if abs(config["d_brent"]) < 1e-3 and abs(delta_r_pp) < 1e-3:
-            st.info(
-                "Apply a macro shock in the sidebar to see ΔRWA → CET1-Impact "
-                "via the Vasicek-Bridge (Capital-Adequacy-Tab zeigt die volle "
-                "Decomposition aller drei Channels)."
-            )
-        else:
-            # Use the universe-loaded portfolios for this; skip detailed
-            # rebuild here. Refer to Capital-Adequacy page for full detail.
-            st.markdown(f"""
-**Hinweis:** Die volle CET1-Wirkungskette (PD-Shift × LGD-Shift × RWA-
-Decomposition × CET1-Quote vorher/nachher) für **{cat_choice}** ist auf
-der **Credit Risk · Loan Book**-Page sichtbar. Diese Sektion zeigt nur
-die Banking-Book-Exposure-Größen, weil eine isolierte Re-Berechnung
-ohne Segment-Granularität dieselben Vasicek-Inputs erneut bemühen
-würde — siehe oben "Datenbasis & Annahmen".
-""")
-            # Show category share of total Banking Book RWA (allocation)
-            tot_rwa_bb = float(sys_cat["rwa_eur"].sum())
-            cat_row = sys_cat[sys_cat["bond_category"] == cat_choice]
-            if len(cat_row) > 0:
-                cat_rwa = float(cat_row.iloc[0]["rwa_eur"])
-                share = cat_rwa / tot_rwa_bb if tot_rwa_bb > 0 else 0
-                ci_l, ci_r = st.columns(2, gap="medium")
-                ci_l.metric(f"{cat_choice} RWA",
-                            f"€{cat_rwa/1e9:.0f} bn",
-                            f"{share*100:.1f}% of BB-RWA",
-                            delta_color="off")
-                ci_r.metric("Allocation key for ΔCET1",
-                            f"{share*100:.1f}%",
-                            "of Loan-Book ΔRWA-Channel",
-                            delta_color="off")
-
-
-# =====================================================================
-# SUB-TAB 3 · Trading Book + ABS / MBS
-# =====================================================================
-with tab_tb:
-
-    # === Erstleser-Einführung ========================================
-    st.markdown(
-        '<div style="background:#FAFAFA;border:1px solid #E6E6E6;'
-        'border-left:2px solid #051C2C;padding:0.95rem 1.2rem;'
-        'border-radius:4px;margin:0.4rem 0 1.2rem 0;color:#051C2C;'
-        'font-size:0.92rem;line-height:1.7;">'
-        '<strong>Was ist das Handelsbuch (Trading Book)?</strong><br>'
-        'Im Handelsbuch hält die Bank Wertpapiere, die kurzfristig '
-        'gehandelt werden sollen — Aktien, Bond-Positionen, Derivate, '
-        'Devisen. Anders als das Bankbuch (Loans + Hold-to-Maturity-'
-        'Bonds) werden alle Handelsbuch-Positionen <em>täglich</em> zu '
-        'Marktpreisen bewertet (Mark-to-Market). Daher schlagen '
-        'Marktbewegungen direkt durch die P&amp;L auf das Eigenkapital.'
-        '<br><br>'
-        '<strong>Wie misst die Aufsicht das Risiko hier?</strong><br>'
-        'Über das <strong>FRTB-Framework</strong> (Fundamental Review of '
-        'the Trading Book, Basel III Phase 2). Es ersetzt die alte '
-        'Internal-Models-Approach durch ein standardisiertes Verfahren, '
-        'das Sensitivitäten gegen vorgegebene Risiko-Faktoren misst und '
-        'daraus ein Markt-Risiko-RWA (Risk-Weighted Assets) erzeugt. '
-        'Die Bank meldet dieses Markt-RWA quartalsweise an die EBA.'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
-    with st.expander("Datenbasis und Annahmen · Trading Book + ABS/MBS",
-                     expanded=False):
-        st.markdown("""
-**Datenbasis:** EBA Transparency 2025, `tr_oth.csv`, Stichtag Juni 2025.
-
-| Größe | EBA-Item-Code | Inhalt |
-|-------|---------------|--------|
-| Market-RWA | 2520210 | Markt-Risiko-RWA aus Position, FX, Commodities — Handelsbuch-Aggregat |
-| Securitisation-RWA | 2520209 | Verbriefungs-RWA im Bankbuch (nach Cap) |
-| Trading-Book P&L | 2520311 | Year-to-Date-Handelsbuch-Gewinn/Verlust |
-
-Beide Größen werden **bank-aggregat** publiziert — es gibt keinen
-Issuer- oder Tranche-Detail in der öffentlichen Disclosure.
-
-**Einordnung:** Diese Markt-Risiko-Sicht ist in V1 **deskriptiv** und
-fließt **nicht** in die CET1-Bridge (Tab 4) ein — die CET1-Quote nutzt
-nur die zwei Kanäle Kreditbuch + Sovereign. Grund: kleine Handelsbücher
-der zehn Banken, keine belastbare FRTB-Kalibrierung aus EBA-Aggregaten.
-Die folgende Mechanik zeigt, *wie* ein Markt-RWA-Stress aussähe.
-
-**Stress-Mechanik (FRTB-style, deskriptiv):**
-
-Die Markt-RWA-Sensitivität wird über einen einfachen linearen
-Multiplier modelliert:
-
-```
-RWA_market_stress = RWA_market_base · (1 + k · Schock-Magnitude)
-```
-
-mit k ≈ 0.12 pro Einheit Schock-Magnitude (kalibriert aus EBA Stress
-Test 2025 Methodology Note, Sec. 7). Die Schock-Magnitude ist die
-Summe der absoluten Faktor-Bewegungen |ΔBrent| + |Δr_10y|.
-
-Trading-Book-P&L wird analog mit einem Haircut belegt (Annahme:
-bei großem Schock fällt der Year-to-Date-Gewinn typischerweise um
-~50% bei einem 2-Standardabweichungs-Schock).
-
-**Was die FRTB-Mechanik konkret abbildet:**
-- Zinsschocks treffen Bond-Positionen direkt (Duration-Effekt)
-- Brent-Schocks treffen Commodity- und Energie-Aktien-Positionen
-- Indirekt: Volatilitäts-Anstieg in Stress-Phasen erhöht VaR/SVaR
-- Securitisation-RWA bleibt konstant (Spread-Stress auf ABS/MBS
-  ohne Tranche-Detail nicht modellierbar)
-
-**Limitation transparent:** Wir nutzen einen vereinfachten linearen
-Multiplier statt der vollen FRTB-Sensitivitäts-Matrix. Eine reale
-FRTB-Rechnung würde Bucket-Sensitivitäten gegen 14 Risiko-Klassen
-und ihre Korrelations-Struktur berücksichtigen. Da diese Daten
-nicht öffentlich verfügbar sind, ist unsere Approximation eine
-defensible Schätzung der ersten Ordnung.
-""")
-
-    # System totals
-    sys_market = float(cap_df["rwa_market_eur"].sum())
-    sys_secur  = float(cap_df.get("rwa_securitisation_eur",
-                                  pd.Series([0])).sum())
-    sys_tb_pnl = float(cap_df["tb_pnl_eur"].sum())
-
-    eyebrow("Trading Book + ABS/MBS · System totals")
-    t1, t2, t3 = st.columns(3, gap="small")
-    t1.metric("Market RWA (Trading Book)",
-              f"€{sys_market/1e9:.0f} bn",
-              "Item 2520210", delta_color="off")
-    t2.metric("Securitisation RWA",
-              f"€{sys_secur/1e9:.0f} bn",
-              "Item 2520209 · Banking Book", delta_color="off")
-    t3.metric("Trading Book P&L (current)",
-              f"€{sys_tb_pnl/1e9:+.1f} bn",
-              "Item 2520311 · YTD", delta_color="off")
-
-    st.divider()
-
-    # === NEW: Aggregierte Systemanalyse für Trading Book + ABS ===
-    # Same pattern as Banking-Book tab — since no issuer/tranche detail
-    # is published, we provide cross-bank concentration + dispersion.
-    eyebrow("Aggregierte Systemanalyse · Konzentration Market-RWA + Securitisation-RWA")
-
-    st.caption(
-        "Trading-Book und Securitisation-RWA werden nur als Bank-Aggregate "
-        "publiziert (kein Issuer-/Tranche-Detail). Ersatz: Konzentration der "
-        "Risiko-Träger im EU-System."
-    )
-
-    cap_with_name = cap_df.merge(bank_dir[["lei", "bank_name"]],
-                                  left_on="LEI_Code", right_on="lei")
-
-    tb_agg_rows = []
-    tb_dispersion_rows = []
-    for label, col in [
-        ("Market RWA (Trading Book)",       "rwa_market_eur"),
-        ("Securitisation RWA",              "rwa_securitisation_eur"),
-    ]:
-        if col not in cap_with_name.columns:
-            continue
-        s = cap_with_name.sort_values(col, ascending=False)
-        tot = float(s[col].sum())
-        n   = int((s[col] > 0).sum())
-        if tot <= 0 or n == 0:
-            continue
-        shares = (s[col] / tot).to_numpy()
-        hhi    = float((shares ** 2).sum() * 10000)
-        top3   = float(s[col].head(3).sum() / tot * 100)
-        top5   = float(s[col].head(5).sum() / tot * 100)
-        tb_agg_rows.append({
-            "Category":           label,
-            "Σ RWA bn":           round(tot/1e9, 0),
-            "n banks > 0":        n,
-            "HHI (RWA shares)":   round(hhi, 0),
-            "Top-3 share":        f"{top3:.0f}%",
-            "Top-5 share":        f"{top5:.0f}%",
-        })
-        vals = s[col][s[col] > 0].to_numpy() / 1e9
-        if len(vals) >= 3:
-            tb_dispersion_rows.append({
-                "Category":   label,
-                "p10 bn":     round(float(np.percentile(vals, 10)), 2),
-                "p50 bn":     round(float(np.percentile(vals, 50)), 2),
-                "p90 bn":     round(float(np.percentile(vals, 90)), 2),
-                "max bn":     round(float(vals.max()), 2),
-            })
-
-    tb_l, tb_r = st.columns([1, 1], gap="medium")
-    with tb_l:
-        st.markdown("**Konzentration**")
-        if tb_agg_rows:
-            st.dataframe(pd.DataFrame(tb_agg_rows),
-                         use_container_width=True, hide_index=True, height=140)
-            st.caption("HHI > 2500 = stark konzentriert: wenige Banken tragen "
-                       "fast alle Market-/Securitisation-Risiken.")
-    with tb_r:
-        st.markdown("**Cross-Bank Verteilung (bn EUR, nur Banken > 0)**")
-        if tb_dispersion_rows:
-            st.dataframe(pd.DataFrame(tb_dispersion_rows),
-                         use_container_width=True, hide_index=True, height=140)
-
-    # Concentration stacked bar — top 5 banks per category
-    eyebrow("Top-5 Konzentration · Market-RWA + Securitisation-RWA")
-    conc2_traces = []
-    for label, col in [
-        ("Market RWA",       "rwa_market_eur"),
-        ("Securitisation RWA", "rwa_securitisation_eur"),
-    ]:
-        if col not in cap_with_name.columns:
-            continue
-        s = cap_with_name.sort_values(col, ascending=False).head(5)
-        tot = float(cap_with_name[col].sum())
-        if tot <= 0:
-            continue
-        sh = (s[col] / tot * 100).tolist()
-        conc2_traces.append((label, s["bank_name"].tolist(), sh))
-
-    if conc2_traces:
-        fig_conc2 = go.Figure()
-        tb_colors = {"Market RWA":          COLORS["bright_blue"],
-                     "Securitisation RWA":  COLORS["crimson"]}
-        for label, banks_c, sh in conc2_traces:
-            fig_conc2.add_trace(go.Bar(
-                name=label, y=[label]*len(banks_c), x=sh,
-                orientation="h",
-                marker_color=tb_colors.get(label, COLORS["stone"]),
-                text=[f"{b[:18]} {s:.0f}%" for b, s in zip(banks_c, sh)],
-                textposition="inside",
-                textfont=dict(size=10, color=COLORS["white"]),
-                showlegend=False, marker_line_width=0,
-            ))
-        fig_conc2.update_layout(
-            title="EU-System: Top-5-Banken-Anteil am Category-RWA [%]",
-            barmode="stack", height=240, bargap=0.25,
-            xaxis=dict(range=[0, 100], title="Σ Top-5 Anteil [%]"),
-        )
-        st.plotly_chart(fig_conc2, use_container_width=True)
-
-    st.divider()
-
-    # === 2-Faktor-Stress auf Handelsbuch ============================
-    if abs(config["d_brent"]) > 1e-3 or abs(delta_r_pp) > 1e-3:
-        # Schock-Magnitude = |ΔBrent| + |Δr_10y| treibt FRTB-Multiplier
-        _shock_mag = abs(config["d_brent"]) + abs(delta_r_pp)
-        # Wir nutzen die existierende trading_book_stress-Funktion mit
-        # einem effektiven m_factor = -Schock-Magnitude (negativ = adverse).
-        # Das ist die Brücke zwischen 2-Faktor-Sidebar und FRTB-Engine.
-        _effective_m = -_shock_mag
-        tb_stress = trading_book_stress(cap_df, m_factor=_effective_m)
-        delta_mr_rwa = float(tb_stress["delta_rwa_market_eur"].sum())
-        delta_tb_pnl = float(tb_stress["delta_tb_pnl_eur"].sum())
-
-        insight(
-            f"<strong>Handelsbuch-Stress unter ΔBrent = "
-            f"{config['d_brent']:+.2f}, Δr = {delta_r_pp:+.2f} pp.</strong> "
-            f"Schock-Magnitude = {_shock_mag:.2f}. "
-            f"Market-RWA bewegt sich von <strong>€{sys_market/1e9:.0f} bn → "
-            f"€{(sys_market+delta_mr_rwa)/1e9:.0f} bn</strong> "
-            f"({delta_mr_rwa/1e9:+.1f} bn unter FRTB-Multiplier). "
-            f"Trading-Book-P&L-Δ: <strong>€{delta_tb_pnl/1e9:+.1f} bn</strong>. "
-            f"<strong>Hinweis:</strong> Diese Markt-Risiko-Sicht ist in V1 "
-            f"rein <em>deskriptiv</em> und fließt NICHT in die CET1-Bridge "
-            f"ein — die CET1-Quote (Tab 4) nutzt die 2-Kanal-Decomposition "
-            f"(Loan-Book + Sovereign). Begründung: kleine Handelsbücher der "
-            f"10 Banken, keine belastbare FRTB-Kalibrierung aus EBA-Aggregaten."
-        )
-
-        # Top-betroffene Banken
-        eyebrow("Top-10 Banken nach Market-RWA-Stress-Wirkung")
-        tb_named = tb_stress.merge(bank_dir[["lei","bank_name"]],
-                                    left_on="LEI_Code", right_on="lei")
-        top_tb = tb_named.sort_values("delta_rwa_market_eur",
-                                       ascending=False).head(10)
-        disp_tb = pd.DataFrame({
-            "Bank": top_tb["bank_name"],
-            "Market-RWA Baseline (Mrd. €)":   (top_tb["rwa_market_eur"]/1e9).round(1),
-            "Market-RWA Stress (Mrd. €)":     (top_tb["rwa_market_eur_stress"]/1e9).round(1),
-            "Δ Market-RWA (Mrd. €)":          (top_tb["delta_rwa_market_eur"]/1e9).round(2),
-            "Δ Trading-Book P&L (Mrd. €)":    (top_tb["delta_tb_pnl_eur"]/1e9).round(2),
-        })
-        st.dataframe(disp_tb, use_container_width=True, hide_index=True,
-                     height=380)
-    else:
-        st.info(
-            "Bewege die zwei Slider in der Sidebar (ΔBrent + Δr_10y), "
-            "um die FRTB-Markt-RWA-Stress-Wirkung und den "
-            "Trading-Book-P&L-Haircut zu sehen."
-        )
-
-    st.divider()
-
-    # ABS/MBS table
-    eyebrow("Securitisation-RWA · top-10 banks (Item 2520209)")
-    secur_df = (cap_df[["LEI_Code", "rwa_securitisation_eur"]]
-                .merge(bank_dir[["lei","bank_name"]],
-                       left_on="LEI_Code", right_on="lei")
-                .sort_values("rwa_securitisation_eur", ascending=False).head(10))
-    disp_secur = pd.DataFrame({
-        "Bank":           secur_df["bank_name"],
-        "Securit. RWA bn": (secur_df["rwa_securitisation_eur"]/1e9).round(2),
-    })
-    st.dataframe(disp_secur, use_container_width=True, hide_index=True,
-                 height=380)
-    st.caption(
-        "ABS/MBS-Banking-Book-RWA. Issuer-/Tranche-Detail nicht im EBA-"
-        "Public-Disclosure. V1 keine separate Stress-Funktion — "
-        "Limitation in Annahmen-Tab dokumentiert."
-    )
-
-
 footer(
-    f"Three sub-tabs · Sovereigns (full FVOCI/AC split) · Banking-Book-Bonds "
-    f"(Financials / Corporates / Covered) · Trading Book + ABS-MBS · "
-    f"Daten: EBA Transparency 2025, Stichtag Juni 2025"
+    f"Zwei Sub-Tabs · Yield-Curve (Bundesbank-Svensson-Input) · Sovereigns "
+    f"(Doom-Loop + IFRS-9-Split, ΔMtM-Kanal der CET1-Bridge) · "
+    f"Daten: EBA Transparency 2025 (Stichtag Juni 2025) · 10 IRB-Banken"
 )

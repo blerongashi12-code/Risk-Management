@@ -1259,10 +1259,9 @@ st.markdown(
     'Stress-Bridge ΔBrent + Δr → ΔPD → ΔLGD → Capital → CET1.</li>'
     '<li><strong>Tab 2 · Kreditbuch</strong> — Kanal 1 mit detailliertem '
     'Worked Example pro Bank.</li>'
-    '<li><strong>Tab 3 · Marktbuch</strong> — Yield-Curve, Kanal 2 '
-    '(Sovereigns mit IFRS-9-Aufteilung), Banking-Book-Bonds und eine '
-    'deskriptive Markt-Risiko-Übersicht (Trading-Book, nicht Teil der '
-    'CET1-Bridge).</li>'
+    '<li><strong>Tab 3 · Marktbuch</strong> — Kanal 2: die Yield-Curve '
+    'als Zins-Input und der Sovereign-Kanal (Staatsanleihen nach '
+    'IFRS-9-Klasse, ΔMtM = −D·Δy·Exposure über OCI auf die CET1).</li>'
     '<li><strong>Tab 4 · Eigenkapital</strong> — beide Kanäle '
     'aggregiert, mit Schwellen-Analyse.</li>'
     '<li><strong>Tab 5 · Validierung</strong> — Backtest und '
@@ -1421,8 +1420,8 @@ with nav_row1[1]:
 with nav_row1[2]:
     st.page_link("pages/3_Marktbuch.py",
                  label="3 · Marktbuch",
-                 help="Yield-Curve · Sovereigns mit IFRS-9-Split · "
-                      "Banking-Book Bonds · Trading-Book",
+                 help="Yield-Curve (Zins-Input) · Sovereign-Kanal "
+                      "(IFRS-9-Split, ΔMtM via OCI)",
                  use_container_width=True)
 
 st.markdown(" ")

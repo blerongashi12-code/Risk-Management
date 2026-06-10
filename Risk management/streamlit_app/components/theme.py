@@ -202,7 +202,7 @@ def tab_breadcrumb(current: int) -> None:
         ("2", "Kreditbuch",
          "Loan-Book · ΔPD/ΔLGD · Capital-Bridge"),
         ("3", "Marktbuch",
-         "Yield-Curve · Sovereigns · Trading-Book"),
+         "Yield-Curve · Sovereign-Kanal (ΔMtM via OCI)"),
         ("4", "Eigenkapital",
          "2-Kanal · CET1-Quote · Schwellen"),
         ("5", "Validierung",
