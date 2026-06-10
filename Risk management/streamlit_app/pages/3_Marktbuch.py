@@ -35,8 +35,10 @@ from config import EBA_RAW_DIR                                      # type: igno
 from eba_loader import (                                            # type: ignore
     parse_sovereign_csv, sovereign_concentration,
     sovereign_maturity_ladder, domestic_share_per_bank,
-    attach_country_names, rate_shock_pnl,
+    sovereign_kpis_per_bank, attach_country_names,
+    rate_shock_pnl,
     sovereign_by_accounting_class, sovereign_cet1_impact,
+    parse_capital_overview,
     load_bank_directory, load_country_dim,
 )
 
@@ -52,12 +54,14 @@ hero(
          "der CET1-Bridge ab — einen der zwei Kanäle unseres Modells "
          "(neben dem Kreditbuch). Zwei Sub-Tabs: (1) Yield-Curve als "
          "zentraler Makro-Input (Bundesbank Svensson Q4 2025) für den "
-         "Δr_10y-Schock, (2) Sovereigns granular nach Land × "
-         "Restlaufzeit × IFRS-9-Klasse mit Duration-basiertem "
-         "Mark-to-Market: ΔFV = −D·Δy·Exposure. Nur HfT/FVTPL/FVOCI "
-         "schlagen auf CET1 durch (AC bleibt zu Buchwert). Datenbasis "
-         "durchgängig die 10 kuratierten Banken (Pillar-3 EU-CR6, "
-         "31.12.2024).",
+         "Δr_10y-Schock (mit historischer Episoden-Plausibilisierung), "
+         "(2) Sovereigns granular nach Land × Restlaufzeit × "
+         "IFRS-9-Klasse mit Duration-basiertem Mark-to-Market "
+         "(ΔFV = −D·Δy·Exposure), Doom-Loop-Quantifizierung, latenten "
+         "AC-Verlusten, Duration/BPV-Profil und Δr-Sensitivitätskurve. "
+         "Nur HfT/FVTPL/FVOCI schlagen auf CET1 durch (AC bleibt zu "
+         "Buchwert). Datenbasis durchgängig die 10 kuratierten Banken "
+         "(Pillar-3 EU-CR6, 31.12.2024).",
 )
 
 tab_breadcrumb(3)
@@ -71,10 +75,14 @@ def _load_data():
     sov_raw = parse_sovereign_csv(EBA_RAW_DIR / "tr_sov.csv", period=202506)
     bank_dir = load_bank_directory(EBA_RAW_DIR / "TR_Metadata.xlsx")
     cty_dim  = load_country_dim(EBA_RAW_DIR / "TR_Metadata.xlsx")
-    return sov_raw, bank_dir, cty_dim
+    # CET1-Kapital pro Bank aus tr_oth.csv — hier ausschliesslich als
+    # NORMIERUNGSGROESSE (Sovereign-Exposure / CET1, Verlust in % des
+    # CET1). KEIN Trading-Book-Stress: dieser Kanal bleibt entfernt.
+    cap_raw  = parse_capital_overview(EBA_RAW_DIR / "tr_oth.csv", period=202506)
+    return sov_raw, bank_dir, cty_dim, cap_raw
 
 
-sov_raw, bank_dir, cty_dim = _load_data()
+sov_raw, bank_dir, cty_dim, cap_raw = _load_data()
 
 # === Top-10 universe filter =========================================
 # Datenbasis aller Analysen: die 10 Banken aus pillar3_bank_pd_lgd.csv
@@ -94,6 +102,14 @@ mat        = sovereign_maturity_ladder(sov_raw, period=202506)
 mat        = mat[mat["LEI_Code"].isin(_IRB_LEIS)].copy()
 acct_split = sovereign_by_accounting_class(sov_raw, period=202506)
 acct_split = acct_split[acct_split["LEI_Code"].isin(_IRB_LEIS)].copy()
+cap10      = cap_raw[cap_raw["LEI_Code"].isin(_IRB_LEIS)].copy()
+
+_LEI2NAME = bank_dir.set_index("lei")["bank_name"].to_dict()
+
+
+def _short(name: str, n: int = 24) -> str:
+    """Kürzt lange Banknamen für Achsen-Labels."""
+    return name if len(name) <= n else name[: n - 1] + "…"
 
 
 # =====================================================================
@@ -110,6 +126,67 @@ tab_yc, tab_sov = st.tabs([
 # =====================================================================
 with tab_yc:
     render_yield_curve_tab(config)
+
+    st.divider()
+
+    # === Historische Zins-Episoden · Plausibilisierung der Δr-Range ==
+    eyebrow("Historische Zins-Episoden · wie realistisch ist die Δr-Schock-Range?")
+
+    st.markdown(
+        '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+        'border-left:4px solid #034B6F;padding:0.85rem 1.1rem;'
+        'border-radius:6px;margin:0.4rem 0 1rem 0;color:#051C2C;'
+        'font-size:0.88rem;line-height:1.65;">'
+        '<strong>Ökonomische Einordnung.</strong> Ein Stress-Szenario ist '
+        'nur dann aussagekräftig, wenn die unterstellte Schock-Größe '
+        'historisch plausibel ist. Die Sidebar erlaubt Δr_10y von '
+        '<strong>−3 bis +5 pp</strong> — die Tabelle zeigt, dass die '
+        'großen Zins-Episoden der letzten Jahrzehnte genau in diese '
+        'Größenordnung fallen. Ein <strong>+2 pp</strong>-Schock ist damit '
+        'kein Tail-Fantasiewert, sondern wurde 2022 real beobachtet; '
+        '<strong>+3 pp</strong> entspricht etwa der kumulierten '
+        'EZB-Zinswende 2021–2023.'
+        '<br><br>'
+        '<table style="font-size:0.86rem;border-collapse:collapse;width:100%;">'
+        '<thead><tr style="background:#F4F4F4;">'
+        '<th style="text-align:left;padding:0.4rem 0.6rem;">Episode</th>'
+        '<th style="text-align:left;padding:0.4rem 0.6rem;">Markt</th>'
+        '<th style="text-align:left;padding:0.4rem 0.6rem;">Bewegung (ca.)</th>'
+        '<th style="text-align:left;padding:0.4rem 0.6rem;">Zeitraum</th>'
+        '</tr></thead><tbody>'
+        '<tr><td style="padding:0.4rem 0.6rem;">EZB-Zinswende 2021–2023</td>'
+        '<td style="padding:0.4rem 0.6rem;">10y Bund</td>'
+        '<td style="padding:0.4rem 0.6rem;font-weight:600;">≈ −0,2 % → +3,0 % '
+        '(≈ +320 bp)</td>'
+        '<td style="padding:0.4rem 0.6rem;">Dez 2021 – Okt 2023</td></tr>'
+        '<tr><td style="padding:0.4rem 0.6rem;">„Bond-Massaker" 1994</td>'
+        '<td style="padding:0.4rem 0.6rem;">10y US-Treasury</td>'
+        '<td style="padding:0.4rem 0.6rem;font-weight:600;">≈ +240 bp</td>'
+        '<td style="padding:0.4rem 0.6rem;">Jan – Nov 1994</td></tr>'
+        '<tr><td style="padding:0.4rem 0.6rem;">Taper Tantrum 2013</td>'
+        '<td style="padding:0.4rem 0.6rem;">10y US-Treasury</td>'
+        '<td style="padding:0.4rem 0.6rem;font-weight:600;">≈ +140 bp</td>'
+        '<td style="padding:0.4rem 0.6rem;">Mai – Sep 2013</td></tr>'
+        '<tr><td style="padding:0.4rem 0.6rem;">UK-Gilt-Krise (Mini-Budget)</td>'
+        '<td style="padding:0.4rem 0.6rem;">30y UK-Gilt</td>'
+        '<td style="padding:0.4rem 0.6rem;font-weight:600;">≈ +130 bp</td>'
+        '<td style="padding:0.4rem 0.6rem;">3 Handelstage, Sep 2022</td></tr>'
+        '</tbody></table>'
+        '<div style="margin-top:0.7rem;font-size:0.82rem;color:#6E6E6E;">'
+        '<strong>Quellen:</strong> Deutsche Bundesbank (Tagesrenditen '
+        'börsennotierter Bundeswertpapiere, Zeitreihen-Datenbank) · '
+        'Federal Reserve H.15 (Treasury Constant Maturities) · '
+        'Bank of England (Gilt-Renditen, Financial Stability Report '
+        'Okt 2022). Werte gerundet auf ±10 bp.<br>'
+        '<strong>Methodische Anmerkung.</strong> Unser Modell unterstellt '
+        'einen <em>Parallel-Shift</em> der Kurve am 10y-Punkt; reale '
+        'Episoden waren teils Steepener/Flattener. Der Parallel-Shift '
+        'mit Modified Duration ist die Standard-Erstordnungs-Näherung '
+        'für Zinsrisiko (Tuckman/Serrat 2012, Kap. 4) — '
+        'laufzeitdifferenzierte Twists wären eine V2-Erweiterung.'
+        '</div></div>',
+        unsafe_allow_html=True,
+    )
 
 
 # =====================================================================
@@ -321,6 +398,123 @@ with tab_sov:
 
     st.divider()
 
+    # === Doom-Loop quantifiziert · Home-Bias × Kapital-Exponierung ===
+    eyebrow("Doom-Loop quantifiziert · Home-Bias × Sovereign-Exposure relativ zum CET1-Kapital")
+
+    st.markdown(
+        '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+        'border-left:4px solid #A52F4D;padding:0.85rem 1.1rem;'
+        'border-radius:6px;margin:0.4rem 0 1rem 0;color:#051C2C;'
+        'font-size:0.88rem;line-height:1.65;">'
+        '<strong>Ökonomische Interpretation.</strong> Die Heatmap oben zeigt, '
+        '<em>wo</em> die Bestände liegen — diese Grafik beantwortet, '
+        '<em>wie gefährlich</em> sie sind. Der Doom-Loop ist umso bindender, '
+        'je stärker zwei Dimensionen zusammenkommen: (x) der '
+        '<strong>Home-Bias</strong> — wie viel des Sovereign-Buchs im '
+        'eigenen Heimatland steckt — und (y) der '
+        '<strong>Kapital-Hebel</strong> — wie groß das Sovereign-Buch '
+        'relativ zum CET1-Verlustpuffer ist. Eine Bank rechts oben hält '
+        'viel heimisches Staatsrisiko und hat wenig Kapital dagegen: '
+        'genau die Konstellation, die in der Eurokrise 2011/12 die '
+        'Banken-Staaten-Spirale getrieben hat.<br><br>'
+        '<strong>Mathematische Definition.</strong> '
+        'Home-Bias<sub>i</sub> = E<sub>domestic,i</sub> / E<sub>total,i</sub> · '
+        'Kapital-Hebel<sub>i</sub> = E<sub>total,i</sub> / CET1<sub>i</sub>. '
+        'CET1-Kapital aus EBA <code>tr_oth.csv</code> (Item 2520102), '
+        'Sovereign-Exposure aus <code>tr_sov.csv</code> (Item 2520810), '
+        'beide Stichtag Juni 2025.<br>'
+        '<span style="font-size:0.82rem;color:#6E6E6E;">'
+        '<strong>Quellen:</strong> Brunnermeier et al. (2016): „The '
+        'Sovereign-Bank Diabolic Loop", <em>American Economic Review '
+        'P&amp;P</em> 106(5) · Acharya, Drechsler &amp; Schnabl (2014): '
+        '„A Pyrrhic Victory? Bank Bailouts and Sovereign Credit Risk", '
+        '<em>Journal of Finance</em> 69(6) · ESRB (2015): „Report on the '
+        'regulatory treatment of sovereign exposures".'
+        '</span></div>',
+        unsafe_allow_html=True,
+    )
+
+    code_to_iso = cty_dim.set_index("code")["iso"].to_dict()
+    kpis = sovereign_kpis_per_bank(conc, bank_dir)
+    dl = (kpis.merge(dom[["lei", "domestic_share"]], on="lei", how="left")
+              .merge(cap10[["LEI_Code", "cet1_eur"]],
+                     left_on="lei", right_on="LEI_Code", how="left"))
+    dl = dl[dl["cet1_eur"] > 0].copy()
+    dl["sov_over_cet1"] = dl["total_eur"] / dl["cet1_eur"]
+    dl["top_iso"] = dl["top_country_code"].map(code_to_iso)
+
+    dl_l, dl_r = st.columns([3, 2], gap="medium")
+
+    with dl_l:
+        fig_dl = go.Figure(go.Scatter(
+            x=dl["domestic_share"] * 100,
+            y=dl["sov_over_cet1"] * 100,
+            mode="markers+text",
+            text=[_short(n, 16) for n in dl["bank_name"]],
+            textposition="top center",
+            textfont=dict(size=9, color=COLORS["navy"]),
+            marker=dict(
+                size=dl["total_eur"] / 1e9,
+                sizemode="area",
+                sizeref=2.0 * float(dl["total_eur"].max() / 1e9) / (38 ** 2),
+                sizemin=8,
+                color=COLORS["crimson"], opacity=0.75,
+                line=dict(width=1, color=COLORS["white"]),
+            ),
+            customdata=np.stack([dl["total_eur"] / 1e9,
+                                 dl["cet1_eur"] / 1e9], axis=-1),
+            hovertemplate=("<b>%{text}</b><br>Home-Bias: %{x:.0f}%<br>"
+                           "Sov/CET1: %{y:.0f}%<br>"
+                           "Σ Sovereign: %{customdata[0]:.0f} bn €<br>"
+                           "CET1: %{customdata[1]:.0f} bn €<extra></extra>"),
+        ))
+        fig_dl.add_vline(x=float(dl["domestic_share"].median() * 100),
+                         line_dash="dot", line_color=COLORS["stone"],
+                         annotation_text="Median", annotation_font_size=9)
+        fig_dl.add_hline(y=float(dl["sov_over_cet1"].median() * 100),
+                         line_dash="dot", line_color=COLORS["stone"])
+        fig_dl.update_layout(
+            title="Doom-Loop-Map · Blasengröße = Σ Sovereign-Buch",
+            xaxis_title="Home-Bias [% des Sovereign-Buchs im Heimatland]",
+            yaxis_title="Sovereign-Exposure [% des CET1-Kapitals]",
+            height=460, showlegend=False,
+        )
+        st.plotly_chart(fig_dl, use_container_width=True)
+
+    with dl_r:
+        st.markdown("**Konzentrations-KPIs pro Bank**")
+        st.caption(
+            "**Sov/CET1** = Kapital-Hebel · **Top-1** = größtes "
+            "Schuldnerland (Anteil) · **HHI** = Herfindahl-Index über die "
+            "Länderverteilung (>2500 = hoch konzentriert, DOJ/FTC-"
+            "Konvention) · **n** = Anzahl Schuldnerländer."
+        )
+        kpi_disp = pd.DataFrame({
+            "Bank":        [_short(n, 22) for n in dl["bank_name"]],
+            "Σ Sov bn":    (dl["total_eur"] / 1e9).round(0).astype(int),
+            "Sov/CET1":    (dl["sov_over_cet1"] * 100).round(0).astype(int).astype(str) + "%",
+            "Home-Bias":   (dl["domestic_share"] * 100).round(0).astype(int).astype(str) + "%",
+            "Top-1":       dl["top_iso"].fillna("—") + " " + (dl["top_share"] * 100).round(0).astype(int).astype(str) + "%",
+            "HHI":         (dl["hhi"] * 10000).round(0).astype(int),
+            "n":           dl["n_countries"],
+        }).sort_values("Σ Sov bn", ascending=False)
+        st.dataframe(kpi_disp, use_container_width=True, hide_index=True,
+                     height=420)
+
+    _max_lev = dl.loc[dl["sov_over_cet1"].idxmax()]
+    insight(
+        f"<strong>Lesart.</strong> Der größte Kapital-Hebel liegt bei "
+        f"<strong>{_max_lev['bank_name']}</strong> mit einem Sovereign-Buch "
+        f"von {_max_lev['sov_over_cet1']*100:.0f}% des CET1-Kapitals "
+        f"(Home-Bias {_max_lev['domestic_share']*100:.0f}%). Je weiter "
+        f"rechts oben eine Bank steht, desto direkter überträgt sich ein "
+        f"Spread-/Zinsschock ihres Heimatlandes auf ihre Kapitalquote — "
+        f"der Mechanismus, den Brunnermeier et al. (2016) als "
+        f"<em>diabolic loop</em> formalisieren."
+    )
+
+    st.divider()
+
     # === NEW · Accounting-class FV breakdown + CET1 impact ===
     eyebrow("IFRS-9-Klassifizierung · welcher Bond schlägt überhaupt auf CET1 durch?")
 
@@ -455,6 +649,105 @@ with tab_sov:
 
     st.divider()
 
+    # === Erkannt vs. verborgen · latente AC-Verluste (SVB-Lektion) ===
+    eyebrow("Erkannt vs. verborgen · latente AC-Verluste (die SVB-Lektion)")
+
+    _svb_shock = delta_r_pp if abs(delta_r_pp) > 1e-3 else 2.0
+    _svb_label = (f"Live-Schock Δr = {delta_r_pp:+.1f} pp"
+                  if abs(delta_r_pp) > 1e-3
+                  else "Beispiel-Schock Δr = +2.0 pp (kein Live-Schock aktiv)")
+
+    st.markdown(
+        '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+        'border-left:4px solid #C9A227;padding:0.85rem 1.1rem;'
+        'border-radius:6px;margin:0.4rem 0 1rem 0;color:#051C2C;'
+        'font-size:0.88rem;line-height:1.65;">'
+        '<strong>Ökonomische Interpretation — warum „latent" nicht '
+        '„harmlos" heißt.</strong> Die IFRS-9-Tabelle oben zeigt: '
+        'AC-Bestände (Amortised Cost) erzeugen unter einem Zinsschock '
+        '<em>keinen</em> CET1-Effekt — der Marktwertverlust existiert '
+        'ökonomisch trotzdem, er ist nur bilanziell unsichtbar. Der '
+        'Kollaps der Silicon Valley Bank (März 2023) hat gezeigt, wie '
+        'dieser latente Verlust real wird: Muss eine Bank wegen '
+        'Liquiditätsabflüssen AC-Bestände <em>vorzeitig verkaufen</em>, '
+        'wird der gesamte aufgelaufene Marktwertverlust schlagartig '
+        'GuV-wirksam. Jiang et al. (2023) beziffern die unrealisierten '
+        'Verluste des US-Bankensystems nach der Zinswende auf rund '
+        '2 Billionen USD — der Auslöser des Runs auf SVB.<br><br>'
+        '<strong>Mathematik.</strong> Identische MtM-Formel für alle '
+        'Klassen: ΔFV = −D·Δy·E pro Laufzeit-Bucket. Aufteilung: '
+        '<em>erkannt</em> = ΔFV der HfT/FVTPL/FVOCI-Bestände '
+        '(CET1-wirksam) · <em>latent</em> = ΔFV der AC-Bestände '
+        '(nicht CET1-wirksam, aber ökonomisch real).<br>'
+        '<span style="font-size:0.82rem;color:#6E6E6E;">'
+        '<strong>Quellen:</strong> Jiang, Matvos, Piskorski &amp; Seru '
+        '(2023): „Monetary Tightening and U.S. Bank Fragility in 2023: '
+        'Mark-to-Market Losses and Uninsured Depositor Runs?", NBER '
+        'Working Paper 31048 · FDIC (2023): „FDIC\'s Supervision of '
+        'Silicon Valley Bank" · Duration-MtM: Tuckman/Serrat (2012), '
+        'Kap. 4.</span></div>',
+        unsafe_allow_html=True,
+    )
+
+    _imp_svb = sovereign_cet1_impact(acct_split, delta_r_pp=_svb_shock)
+    _rec = (_imp_svb[_imp_svb["channel"].isin(["P&L", "OCI"])]
+            .groupby("LEI_Code")["cet1_impact_eur"].sum())
+    _lat = (_imp_svb[_imp_svb["channel"] == "none"]
+            .groupby("LEI_Code")["delta_fv_eur"].sum())
+    svb = pd.DataFrame({"erkannt_eur": _rec, "latent_eur": _lat}).fillna(0.0)
+    svb["total_eur"] = svb["erkannt_eur"] + svb["latent_eur"]
+    svb = svb.sort_values("total_eur", ascending=False)
+    svb["name"] = [_short(_LEI2NAME.get(l, l[:8]), 22) for l in svb.index]
+
+    sv_l, sv_r = st.columns([3, 2], gap="medium")
+
+    with sv_l:
+        fig_svb = go.Figure()
+        fig_svb.add_trace(go.Bar(
+            y=svb["name"], x=svb["erkannt_eur"] / 1e9, orientation="h",
+            name="Erkannt · HfT/FVTPL/FVOCI (CET1-wirksam)",
+            marker_color=COLORS["crimson"], marker_line_width=0,
+        ))
+        fig_svb.add_trace(go.Bar(
+            y=svb["name"], x=svb["latent_eur"] / 1e9, orientation="h",
+            name="Latent · AC (bilanziell unsichtbar)",
+            marker_color=COLORS["amber"], marker_line_width=0,
+        ))
+        fig_svb.update_layout(
+            title=f"MtM-Wirkung pro Bank · {_svb_label}",
+            barmode="relative", height=440,
+            xaxis_title="ΔFair Value [Mrd. €] · negativ = Verlust",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                        xanchor="left", x=0),
+        )
+        st.plotly_chart(fig_svb, use_container_width=True)
+
+    with sv_r:
+        sys_rec = float(svb["erkannt_eur"].sum())
+        sys_lat = float(svb["latent_eur"].sum())
+        sys_tot = sys_rec + sys_lat
+        lat_share = sys_lat / sys_tot if abs(sys_tot) > 1 else 0.0
+        st.metric("Σ MtM-Wirkung (alle 10 Banken)",
+                  f"€{sys_tot/1e9:+.1f} bn", _svb_label,
+                  delta_color="off")
+        st.metric("davon CET1-wirksam erkannt",
+                  f"€{sys_rec/1e9:+.1f} bn",
+                  "HfT + FVTPL + FVOCI", delta_color="off")
+        st.metric("davon latent (AC, verborgen)",
+                  f"€{sys_lat/1e9:+.1f} bn",
+                  f"{lat_share*100:.0f}% der Gesamt-MtM-Wirkung",
+                  delta_color="off")
+        st.caption(
+            "AC schützt die CET1-Quote **buchhalterisch**, nicht "
+            "**ökonomisch**: Solange die Bank halten kann, läuft der "
+            "Verlust per Pull-to-Par aus. Gerät sie unter "
+            "Liquiditätsdruck und muss verkaufen, materialisiert sich "
+            "der latente Verlust sofort — der SVB-Mechanismus. Für die "
+            "CET1-Bridge (Tab 4) zählt konsistent nur der erkannte Teil."
+        )
+
+    st.divider()
+
     # === Worked Example · konkret durchgerechnet =====================
     eyebrow("Worked Example · ein +200 bp Zinsschock konkret durchgerechnet")
 
@@ -526,6 +819,193 @@ with tab_sov:
             'unsichtbar.'
             '</div>',
             unsafe_allow_html=True,
+        )
+
+    st.divider()
+
+    # === Zinsrisiko-Profil · gewichtete Duration + BPV ===============
+    eyebrow("Zinsrisiko-Profil · gewichtete Duration & Basis-Punkt-Wert (BPV)")
+
+    st.markdown(
+        '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+        'border-left:4px solid #2251FF;padding:0.85rem 1.1rem;'
+        'border-radius:6px;margin:0.4rem 0 1rem 0;color:#051C2C;'
+        'font-size:0.88rem;line-height:1.65;">'
+        '<strong>Ökonomische Interpretation.</strong> Zwei Banken mit '
+        'gleich großem Sovereign-Buch können völlig unterschiedlich '
+        'zinssensitiv sein — entscheidend ist, <em>wo auf der Kurve</em> '
+        'sie investiert sind. Die Kennzahl dafür ist die '
+        '<strong>exposure-gewichtete Modified Duration</strong> D̄ und der '
+        'daraus abgeleitete <strong>Basis-Punkt-Wert (BPV</strong>, auch '
+        'DV01): der €-Verlust des Portfolios bei +1 Basispunkt '
+        'Zinsanstieg. Der Balken zerlegt den BPV zusätzlich nach '
+        'Laufzeit-Buckets — so sieht man, ob das Zinsrisiko einer Bank '
+        'aus dem langen Ende (&gt;10Y) oder aus der Breite des Buchs kommt.'
+        '<br><br>'
+        '<strong>Mathematik.</strong> '
+        'D̄<sub>i</sub> = Σ<sub>b</sub> E<sub>b</sub>·D<sub>b</sub> / '
+        'Σ<sub>b</sub> E<sub>b</sub> &nbsp;·&nbsp; '
+        'BPV<sub>i</sub> = Σ<sub>b</sub> E<sub>b</sub>·D<sub>b</sub>·10⁻⁴. '
+        'Bucket-Durationen per Mittelpunkt-Approximation: &lt;3M 0.125 · '
+        '3M–1Y 0.625 · 1–2Y 1.5 · 2–3Y 2.5 · 3–5Y 4.0 · 5–10Y 7.5 · '
+        '&gt;10Y 15.0 Jahre (dokumentiert in MODEL_ASSUMPTIONS §7).<br>'
+        '<span style="font-size:0.82rem;color:#6E6E6E;">'
+        '<strong>Quellen:</strong> Tuckman &amp; Serrat (2012): „Fixed '
+        'Income Securities", Kap. 4 (DV01/Duration) · Fabozzi (2007): '
+        '„Fixed Income Analysis", Kap. Duration &amp; Convexity.'
+        '</span></div>',
+        unsafe_allow_html=True,
+    )
+
+    risk = mat.copy()
+    risk["bpv_eur"] = risk["duration_years"] * risk["exposure_eur"] * 1e-4
+    bank_risk = (risk.groupby("LEI_Code")
+                     .agg(exp_eur=("exposure_eur", "sum"),
+                          bpv_eur=("bpv_eur", "sum")))
+    bank_risk["dur_w"] = bank_risk["bpv_eur"] * 1e4 / bank_risk["exp_eur"]
+    bank_risk = bank_risk.sort_values("bpv_eur")
+    bank_risk["name"] = [_short(_LEI2NAME.get(l, l[:8]), 22)
+                         for l in bank_risk.index]
+
+    bucket_order = (mat[["Maturity", "label"]].drop_duplicates()
+                    .sort_values("Maturity")["label"].tolist())
+    _BUCKET_COLORS = ["#BFD7EA", "#8FB8DC", "#5E9ACD", "#2D7CBE",
+                      "#0F5C97", "#0A3D64", "#A52F4D"]
+
+    bp_l, bp_r = st.columns([3, 2], gap="medium")
+
+    with bp_l:
+        fig_bpv = go.Figure()
+        for b_label, b_color in zip(bucket_order, _BUCKET_COLORS):
+            sub_b = (risk[risk["label"] == b_label]
+                     .set_index("LEI_Code")["bpv_eur"]
+                     .reindex(bank_risk.index).fillna(0.0))
+            fig_bpv.add_trace(go.Bar(
+                y=bank_risk["name"], x=sub_b / 1e6, orientation="h",
+                name=b_label, marker_color=b_color, marker_line_width=0,
+            ))
+        fig_bpv.update_layout(
+            title="BPV pro Bank, zerlegt nach Laufzeit-Bucket [Mio. € pro +1 bp]",
+            barmode="stack", height=440,
+            xaxis_title="BPV [Mio. € / bp]",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02,
+                        xanchor="left", x=0, font=dict(size=9)),
+        )
+        st.plotly_chart(fig_bpv, use_container_width=True)
+
+    with bp_r:
+        st.markdown("**Duration & BPV pro Bank**")
+        st.caption(
+            "**D̄** = exposure-gewichtete Modified Duration in Jahren · "
+            "**BPV** = €-Verlust bei +1 bp. Hohes D̄ bei kleinem Buch "
+            "kann denselben BPV erzeugen wie niedriges D̄ bei großem Buch."
+        )
+        bpv_disp = pd.DataFrame({
+            "Bank":          bank_risk["name"],
+            "Σ Sov bn":      (bank_risk["exp_eur"] / 1e9).round(0).astype(int),
+            "D̄ (Jahre)":     bank_risk["dur_w"].round(2),
+            "BPV (Mio €/bp)": (bank_risk["bpv_eur"] / 1e6).round(1),
+        }).iloc[::-1]
+        st.dataframe(bpv_disp, use_container_width=True, hide_index=True,
+                     height=420)
+
+    st.divider()
+
+    # === Sensitivität · CET1-wirksamer Verlust über die Δr-Range =====
+    eyebrow("Sensitivität · CET1-wirksamer Sovereign-Verlust über die gesamte Δr-Range")
+
+    st.markdown(
+        '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+        'border-left:4px solid #034B6F;padding:0.85rem 1.1rem;'
+        'border-radius:6px;margin:0.4rem 0 1rem 0;color:#051C2C;'
+        'font-size:0.88rem;line-height:1.65;">'
+        '<strong>Ökonomische Interpretation.</strong> Statt eines '
+        'einzelnen Szenarios zeigt diese Sektion die volle '
+        '<strong>Verlustfunktion</strong> jeder Bank über die gesamte '
+        'Slider-Range (−3 bis +5 pp). Die Steigung jeder Linie ist das '
+        'bankspezifische Zinsrisiko des CET1-wirksamen Teilbuchs '
+        '(HfT/FVTPL/FVOCI) — sie kombiniert Buchgröße, Duration und '
+        'IFRS-9-Mix in einer Zahl. Rechts dieselbe Wirkung normiert auf '
+        'das CET1-Kapital: Wie viele Prozentpunkte ihres Verlustpuffers '
+        'kostet der Schock jede Bank allein über den Sovereign-Kanal?'
+        '<br><br>'
+        '<strong>Mathematik.</strong> Verlust<sub>i</sub>(Δr) = '
+        'Σ<sub>b∈CET1-wirksam</sub> D<sub>b</sub>·E<sub>b</sub> · (Δr/100) '
+        '— linear in Δr (Erstordnungs-Näherung). Der '
+        'Konvexitätsterm ½·C·(Δy)² wird vernachlässigt; bei steigenden '
+        'Zinsen <em>überschätzt</em> die lineare Näherung den Verlust '
+        'leicht — die Schätzung ist also konservativ.<br>'
+        '<span style="font-size:0.82rem;color:#6E6E6E;">'
+        '<strong>Quellen:</strong> Tuckman &amp; Serrat (2012), Kap. 4 · '
+        'Fabozzi (2007), Kap. Duration &amp; Convexity (Konvexitäts-'
+        'Korrektur zweiter Ordnung).</span></div>',
+        unsafe_allow_html=True,
+    )
+
+    eff = acct_split[acct_split["channel"].isin(["P&L", "OCI"])].copy()
+    eff["dxe"] = eff["duration_years"] * eff["exposure_eur"]
+    slope_per_pp = eff.groupby("LEI_Code")["dxe"].sum() / 100.0
+
+    sn_l, sn_r = st.columns([3, 2], gap="medium")
+
+    with sn_l:
+        r_grid = np.linspace(-3.0, 5.0, 33)
+        fig_sw = go.Figure()
+        _LINE_COLORS = [COLORS["navy"], COLORS["mid_blue"],
+                        COLORS["bright_blue"], COLORS["crimson"],
+                        COLORS["amber"], "#00A9A5", "#6E6E6E",
+                        "#8FB8DC", "#A52F4D", "#0A3D64"]
+        _ranked = slope_per_pp.sort_values(ascending=False)
+        for i, (lei, slope) in enumerate(_ranked.items()):
+            fig_sw.add_trace(go.Scatter(
+                x=r_grid, y=-slope * r_grid / 1e9, mode="lines",
+                name=_short(_LEI2NAME.get(lei, lei[:8]), 18),
+                line=dict(width=2,
+                          color=_LINE_COLORS[i % len(_LINE_COLORS)]),
+            ))
+        if abs(delta_r_pp) > 1e-3:
+            fig_sw.add_vline(x=delta_r_pp, line_dash="dash",
+                             line_color=COLORS["crimson"],
+                             annotation_text=f"Live: {delta_r_pp:+.1f} pp",
+                             annotation_font_size=10)
+        fig_sw.update_layout(
+            title="CET1-wirksamer Sovereign-MtM pro Bank [Mrd. €] über Δr",
+            xaxis_title="Δr_10y [Prozentpunkte]",
+            yaxis_title="CET1-wirksamer ΔFV [Mrd. €]",
+            height=460,
+            legend=dict(font=dict(size=9)),
+        )
+        st.plotly_chart(fig_sw, use_container_width=True)
+
+    with sn_r:
+        _pct_shock = delta_r_pp if abs(delta_r_pp) > 1e-3 else 2.0
+        pct = pd.DataFrame({"slope": slope_per_pp})
+        pct = pct.merge(cap10[["LEI_Code", "cet1_eur"]],
+                        left_index=True, right_on="LEI_Code")
+        pct = pct[pct["cet1_eur"] > 0].copy()
+        pct["loss_pct_cet1"] = (pct["slope"] * _pct_shock
+                                / pct["cet1_eur"] * 100)
+        pct["name"] = [_short(_LEI2NAME.get(l, l[:8]), 20)
+                       for l in pct["LEI_Code"]]
+        pct = pct.sort_values("loss_pct_cet1")
+        fig_pct = go.Figure(go.Bar(
+            y=pct["name"], x=pct["loss_pct_cet1"], orientation="h",
+            marker_color=COLORS["crimson"], marker_line_width=0,
+            text=[f"{v:.1f}%" for v in pct["loss_pct_cet1"]],
+            textposition="outside",
+            textfont=dict(size=9, color=COLORS["navy"]),
+        ))
+        fig_pct.update_layout(
+            title=(f"Sovereign-Verlust in % des CET1-Kapitals "
+                   f"(Δr = {_pct_shock:+.1f} pp)"),
+            xaxis_title="CET1-wirksamer Verlust [% des CET1]",
+            height=460,
+        )
+        st.plotly_chart(fig_pct, use_container_width=True)
+        st.caption(
+            "Isolierter Sovereign-Kanal — die volle 2-Kanal-Bridge "
+            "(Kreditbuch + Sovereign, inkl. ΔRWA-Nenner-Effekt) zeigt "
+            "Tab 4 · Eigenkapital."
         )
 
     st.divider()
@@ -637,6 +1117,8 @@ with tab_sov:
 
 footer(
     f"Zwei Sub-Tabs · Yield-Curve (Bundesbank-Svensson-Input) · Sovereigns "
-    f"(Doom-Loop + IFRS-9-Split, ΔMtM-Kanal der CET1-Bridge) · "
-    f"Daten: EBA Transparency 2025 (Stichtag Juni 2025) · 10 IRB-Banken"
+    f"(Doom-Loop-Map · IFRS-9-Split · latente AC-Verluste · Duration/BPV · "
+    f"Δr-Sensitivität — der ΔMtM-Kanal der CET1-Bridge) · "
+    f"Daten: EBA Transparency 2025 (tr_sov.csv + CET1 aus tr_oth.csv, "
+    f"Stichtag Juni 2025) · 10 IRB-Banken"
 )
