@@ -23,9 +23,7 @@ setup()
 from eba_loader import (load_eba_universe,                       # type: ignore
                          parse_credit_risk_csv, loan_book_class_breakdown,
                          parse_capital_overview,
-                         cet1_ratio_bridge, load_bank_directory,
-                         parse_sovereign_csv, sovereign_maturity_ladder,
-                         rate_shock_pnl)
+                         load_bank_directory)
 from macro_factor import (                                       # type: ignore
     anchor_from_eba, factor_stats,
 )

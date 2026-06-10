@@ -183,8 +183,9 @@ Ein steigender 10y-Zins lässt den Marktwert der Anleihen sinken
 (klassischer Bond-MtM-Verlust). Je mehr eine Bank hält und je länger
 die Restlaufzeit, desto stärker schlägt das auf die CET1-Quote durch
 — das ist der **zweite** der zwei Stress-Kanäle unseres Modells
-(Kreditbuch + Sovereign; der Trading-Book-Kanal ist in V1 nicht
-abgebildet — siehe Marktbuch-Trading-Book-Sub-Tab).
+(Kreditbuch + Sovereign; ein Trading-Book-Kanal ist in V1 bewusst
+nicht abgebildet — kleine Handelsbücher, keine belastbare
+FRTB-Kalibrierung aus EBA-Aggregaten).
 
 **Was lassen wir bewusst weg?**
 - Derivative-Engagements auf Staatsanleihen (z.B. Sovereign-CDS)
@@ -266,8 +267,13 @@ mit:
 
 **Warum ist das für unser Modell wichtig?**
 Dies ist der konkrete EUR-Verlust, der direkt auf die CET1-Quote
-durchschlägt — aber **nicht für alle Bonds gleich** (siehe IFRS-9-
-Klassen-Erklärung weiter unten in diesem Sub-Tab).
+durchschlägt — aber **nicht für alle Bonds gleich**: CET1-wirksam
+ist nur der zum Marktwert geführte Teil (HfT + FVTPL + FVOCI), der
+AC-Bestand bleibt zu Buchwert. Diese Aufteilung ist **keine Annahme**,
+sondern wird bank-individuell aus der EBA Transparency gelesen
+(`tr_sov.csv`, Items 2520812–2520815) — dieselbe Datenbasis speist
+die CET1-Bridge in Tab 1 und Tab 4 (siehe IFRS-9-Klassen-Erklärung
+weiter unten in diesem Sub-Tab).
 
 **Was wir bewusst nicht abbilden:**
 - **Slope-/Curvature-Schocks** (kurze vs. lange Zinsen unterschiedlich)

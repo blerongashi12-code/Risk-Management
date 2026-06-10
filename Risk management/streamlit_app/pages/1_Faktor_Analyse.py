@@ -35,8 +35,8 @@ setup()
 
 from eba_loader import (load_eba_universe,                          # type: ignore
                          parse_capital_overview,
-                         parse_sovereign_csv, sovereign_maturity_ladder,
-                         rate_shock_pnl,
+                         parse_sovereign_csv, sovereign_by_accounting_class,
+                         sovereign_cet1_pnl_lookup,
                          cet1_ratio_bridge, load_bank_directory)
 from macro_factor import (anchor_from_eba,                          # type: ignore
                            factor_returns, factor_stats)
@@ -1115,13 +1115,15 @@ st.caption(
 def _load_channel_data():
     cap = parse_capital_overview(EBA_RAW_DIR / "tr_oth.csv", period=202506)
     sov = parse_sovereign_csv(EBA_RAW_DIR / "tr_sov.csv", period=202506)
-    sov_mat = sovereign_maturity_ladder(sov, period=202506)
+    # Bank-individuell gemeldeter IFRS-9-Split (Items 2520812-2520815)
+    # statt Brutto-Maturity-Ladder: nur HfT/FVTPL/FVOCI sind CET1-wirksam.
+    sov_acct = sovereign_by_accounting_class(sov, period=202506)
     bd  = load_bank_directory(EBA_RAW_DIR / "TR_Metadata.xlsx")
-    return cap, sov_mat, bd
+    return cap, sov_acct, bd
 
 
 if _is_stressed:
-    cap_over, sov_mat, bd = _load_channel_data()
+    cap_over, sov_acct, bd = _load_channel_data()
 
     # Per-Bank-Capital-Bridge aus den vorgestressten Segmenten
     # (analog zu Stage 4 — direkt via irb_capital_requirement)
@@ -1173,11 +1175,10 @@ if _is_stressed:
         name_to_lei[bank_name] = lei
         loan_bridges_lei[lei] = _bank_bridge(portfolio)
 
-    sov_pnl_df = (rate_shock_pnl(sov_mat, delta_r_pp=delta_r_pp)
-                  if abs(delta_r_pp) > 1e-5 else
-                  pd.DataFrame(columns=["LEI_Code", "delta_pnl_eur"]))
-    sov_lookup = dict(zip(sov_pnl_df.get("LEI_Code", []),
-                          sov_pnl_df.get("delta_pnl_eur", [])))
+    # CET1-wirksamer Sovereign-MtM (nur HfT/FVTPL/FVOCI, echter
+    # EBA-Split) — identische Datenbasis wie Tab 3 und Tab 4.
+    sov_lookup = (sovereign_cet1_pnl_lookup(sov_acct, delta_r_pp=delta_r_pp)
+                  if abs(delta_r_pp) > 1e-5 else {})
 
     # Zwei-Kanal-CET1-Bridge (Loan-Book + Sovereign) — Trading-Book-Kanal
     # in V1 entfernt (siehe cet1_ratio_bridge-Docstring).
@@ -1269,7 +1270,9 @@ if _is_stressed:
 **CET1-Quote unter Stress** — 2 Kanäle:
 
 1. **Loan-Book**:  ΔEL ↓ CET1-Kapital direkt, ΔRWA ↓ Quote über Nenner
-2. **Sovereign**:  ΔFV (Modified-Duration · Δy) fließt über OCI (FVOCI) → CET1
+2. **Sovereign**:  ΔFV (Modified-Duration · Δy) — CET1-wirksam ist nur der
+   bank-individuell gemeldete HfT/FVTPL/FVOCI-Anteil (EBA-IFRS-9-Split,
+   Items 2520812–2520815); AC bleibt zu Buchwert (latenter Verlust)
 
 *(Trading-Book-Kanal in V1 entfernt — Markt-Risiko nur deskriptiv im
 Marktbuch-Tab.)*
@@ -1384,21 +1387,27 @@ Marktbuch-Tab.)*
         with st.expander("ⓘ Sovereign ΔFV", expanded=False):
             st.markdown(
                 "**Definition.** Mark-to-Market-Verlust auf Sovereign-"
-                "Anleihen durch Zinsanstieg. Wirkt für FVOCI- und "
-                "FVTPL-Bestände direkt durch OCI / P&L auf CET1.\n\n"
-                "**Berechnung pro Bank.**"
+                "Anleihen durch Zinsanstieg. CET1-wirksam ist nur der "
+                "zum Marktwert geführte Teil: HfT + FVTPL (via GuV) und "
+                "FVOCI (via OCI-Reserve). AC-Bestände bleiben zu "
+                "Buchwert — latenter, nicht CET1-wirksamer Verlust.\n\n"
+                "**Berechnung pro Bank** (nur CET1-wirksame Klassen):"
             )
             st.latex(
-                r"\Delta \text{FV} = - \sum_{m \in \text{buckets}}"
-                r" D_m \cdot \Delta y \cdot E_{b,m}"
+                r"\Delta \text{FV} = - \sum_{m,\,c \in \{\text{HfT,"
+                r"FVTPL,FVOCI}\}} D_m \cdot \Delta y \cdot E_{b,m,c}"
             )
             st.markdown(
                 "mit D_m = Modified-Duration des Maturity-Buckets, "
-                "Δy = aktueller Δr_10y in Dezimal.\n\n"
+                "Δy = aktueller Δr_10y in Dezimal, c = IFRS-9-Klasse.\n\n"
+                "**Datenquelle des Klassen-Splits.** Bank-individuell "
+                "gemeldet in der EBA Transparency 2025 (`tr_sov.csv`, "
+                "Items 2520812–2520815) — keine Annahme.\n\n"
                 f"**Aktueller Beitrag.** {ch_sov_fv:+.2f} pp = "
-                f"{delta_sov_fv/1e9:+.1f} Mrd. EUR ΔFV (über alle "
-                "Buckets).\n\n"
-                "**Wirkung.** Reduziert CET1 wenn Zinsen steigen."
+                f"{delta_sov_fv/1e9:+.1f} Mrd. EUR CET1-wirksamer ΔFV.\n\n"
+                "**Wirkung.** Reduziert CET1 wenn Zinsen steigen. "
+                "Quelle: Tuckman/Serrat (2012), Kap. 4; IFRS 9 "
+                "Klassifizierung."
             )
     with info_cols[4]:
         with st.expander("ⓘ CET1 stress", expanded=False):

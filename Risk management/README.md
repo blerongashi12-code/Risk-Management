@@ -43,7 +43,7 @@ EU-IRB-Banken aus.
 | ΔBrent | logarithmischer Return | −1,0 ≤ Δ ≤ +1,5 | Δlog(Brent) |
 | Δr_10y | Prozentpunkte (pp) | −3,0 ≤ Δ ≤ +5,0 | Δr |
 
-### 1.2 · Drei Stress-Kanäle, ein Ziel
+### 1.2 · Zwei Stress-Kanäle, ein Ziel
 
 ```
         ΔBrent     Δr_10y
@@ -56,30 +56,34 @@ EU-IRB-Banken aus.
    │  Mortgage, QRRE, Other Retail, Bank,     │
    │  Sovereign)                              │
    └─────────────────────────────────────────┘
-       │              │              │
-       ▼              ▼              ▼
-  ┌─────────┐    ┌─────────┐    ┌─────────┐
-  │ Kanal 1 │    │ Kanal 2 │    │ Kanal 3 │
-  │ Kredit­ │    │ Sovereign│    │ Trading │
-  │ buch    │    │ Book    │    │ Book    │
-  │         │    │         │    │         │
-  │ ΔPD +   │    │ ΔFV via │    │ FRTB-   │
-  │ ΔLGD →  │    │ Modi-   │    │ Multi-  │
-  │ ΔEL +   │    │ fied    │    │ plier   │
-  │ ΔRWA    │    │ Dura-   │    │ + P&L-  │
-  │ via     │    │ tion ·  │    │ Hair-   │
-  │ Basel-  │    │ IFRS-9- │    │ cut     │
-  │ IRB     │    │ Filter  │    │         │
-  └─────────┘    └─────────┘    └─────────┘
-       │              │              │
-       └──────────────┼──────────────┘
-                      ▼
-            ┌──────────────────┐
-            │   CET1-Quote     │
-            │ (Pillar 1 / CCB  │
-            │  / SREP-Schwellen)│
-            └──────────────────┘
+            │                  │
+            ▼                  ▼
+       ┌─────────┐        ┌──────────┐
+       │ Kanal 1 │        │ Kanal 2  │
+       │ Kredit­ │        │ Sovereign│
+       │ buch    │        │ Book     │
+       │         │        │          │
+       │ ΔPD +   │        │ ΔFV via  │
+       │ ΔLGD →  │        │ Modified │
+       │ ΔEL +   │        │ Duration │
+       │ ΔRWA    │        │ · IFRS-9-│
+       │ via     │        │ Split    │
+       │ Basel-  │        │ (gemeldet│
+       │ IRB     │        │ je Bank) │
+       └─────────┘        └──────────┘
+            │                  │
+            └────────┬─────────┘
+                     ▼
+           ┌──────────────────┐
+           │   CET1-Quote     │
+           │ (Pillar 1 / CCB  │
+           │  / SREP-Schwellen)│
+           └──────────────────┘
 ```
+
+*(Ein dritter Trading-Book-Kanal wurde in V2.1 entfernt — kleine
+Handelsbücher, keine belastbare FRTB-Kalibrierung aus EBA-Aggregaten.
+Markt-Risiko erscheint nicht mehr in der CET1-Bridge.)*
 
 ### 1.3 · 5-Tab-Cockpit (Streamlit-App)
 
@@ -88,8 +92,8 @@ EU-IRB-Banken aus.
 | **0 · Intro (Landing-Page)** | 5-Minuten-Tour, Faktor-Begründung, β-Matrix, Stress-Kanäle mit Mini-Beispielen |
 | **1 · Faktor-Analyse & Transmission** | 5-Jahres-Korrelations-Analyse + 5-stufige Stress-Bridge |
 | **2 · Kreditbuch** | Loan-Book-Kanal: PD/LGD-Matrix pro Bank, Worked Example, Capital-Bridge, Bank-Drilldown |
-| **3 · Marktbuch** | 4 Sub-Tabs: Yield-Curve · Sovereigns (IFRS-9) · Banking-Book-Bonds · Trading-Book |
-| **4 · Eigenkapital** | 3-Kanal-CET1-Waterfall, Pillar-1/CCB/SREP-Threshold-Analyse, Bank-Drilldown |
+| **3 · Marktbuch** | 2 Sub-Tabs: Yield-Curve (Input + historische Episoden) · Sovereigns (IFRS-9-Split, Doom-Loop-Map, latente AC-Verluste, Duration/BPV, Δr-Sensitivität) |
+| **4 · Eigenkapital** | 2-Kanal-CET1-Waterfall, Pillar-1/CCB/SREP-Threshold-Analyse, Bank-Drilldown |
 | **5 · Validierung** | Walk-Forward-Backtest + Annahmen + Methodologie-Disclosure |
 
 ---
@@ -218,44 +222,41 @@ Aggregat pro Bank:
 
 Quelle: Tuckman/Serrat (2012), "Fixed Income Securities", 3rd ed., Wiley, §4.2.
 
-**IFRS-9-Filter:**
+**IFRS-9-Filter (gemeldete Daten, keine Annahme):**
 ```
-CET1-Effekt = ΔFV · f_IFRS9
-   mit  f_IFRS9 = w_HfT + w_FVTPL + w_FVOCI  (Standardannahme 0,60)
-```
-
-Der Anteil **w_AC** des AC-Buchs (Annahme 0,40) bleibt buchhalterisch unsichtbar,
-ist aber ökonomisch real (latenter Verlust, vgl. SVB-Krise 2023).
-
-### 3.4 · FRTB-Style Market-RWA + Trading-P&L (Trading-Book)
-
-Schock-Magnitude (additive Aggregation der zwei Faktoren):
-```
-|Schock| = |ΔBrent_log| + |Δr_10y_pp|
+CET1-Effekt_bank = − Σ_{m, c ∈ {HfT, FVTPL, FVOCI}} D_m · Δy · E_{b,m,c}
 ```
 
-Markt-RWA unter Stress:
-```
-RWA_market,stress = RWA_market,base · (1 + k · |Schock|)        mit k = 0,15
-```
+Der Klassen-Split E_{b,m,c} wird **bank-individuell** aus der EBA
+Transparency 2025 gelesen (`tr_sov.csv`, Items 2520812 HfT / 2520813
+FVTPL / 2520814 FVOCI / 2520815 AC — granular pro Land × Laufzeit).
+Duration-gewichtet sind über die 10 Banken ≈ 51 % des Brutto-MtM
+CET1-wirksam (Juni 2025); die frühere Standardannahme f_IFRS9 = 0,60
+ist durch die echten Daten ersetzt. Der AC-Anteil bleibt buchhalterisch
+unsichtbar, ist aber ökonomisch real (latenter Verlust, vgl. SVB-Krise
+2023; Jiang et al. 2023, NBER WP 31048). Implementierung:
+`eba_loader.sovereign_cet1_pnl_lookup()` — identische Datenbasis in
+Tab 1, Tab 3 und Tab 4.
 
-Trading-P&L-Haircut:
-```
-ΔP&L_trading = − h · |Schock| · P&L_trading,base                mit h = 0,20
-```
+### 3.4 · Trading-Book (entfernt in V2.1)
 
-Kalibrierung von **k** und **h**: EBA Stress Test 2025 Methodology Note, §3.4
-(Net-Trading-Income-Reduktion 40–60 % im Adverse-Szenario) und §7
-(Markt-RWA-Anstieg 30–40 %). Bei typischem |Schock| ≈ 2 ergibt das k ≈ 0,15 und
-h ≈ 0,20.
+Der frühere dritte Kanal (FRTB-Style Market-RWA-Multiplier k = 0,15 +
+Trading-P&L-Haircut h = 0,20) wurde **entfernt**: Die Handelsbücher der
+10 überwiegend Retail-/Corporate-lastigen Banken sind klein, und eine
+belastbare FRTB-Sensitivität ließe sich aus den EBA-Bank-Aggregaten
+(keine Issuer-/Tranche-Granularität) nicht sauber kalibrieren. Ein
+Kanal ohne belastbare Kalibrierung suggeriert nur Schein-Vollständigkeit.
 
 ### 3.5 · CET1-Quoten-Aggregation
 
 ```
-                CET1_base − ΔEL_loan − ΔFV_sovereign − ΔP&L_trading
+                CET1_base − ΔEL_loan + ΔFV_sovereign,CET1-wirksam
 CET1_stress = ──────────────────────────────────────────────────────
-                RWA_base + ΔRWA_credit + ΔRWA_market
+                RWA_base + ΔRWA_credit
 ```
+
+(ΔFV ist signiert: bei Zinsanstieg negativ. Market- und
+Operational-RWA bleiben konstant.)
 
 Vergleich gegen die drei Aufsichts-Schwellen:
 
@@ -527,9 +528,9 @@ Die geänderten Werte wirken sofort und global auf alle Charts.
 | A-05 | Asset-Korrelation ρ | Basel-Funktion gemäß CRR Art. 153 (Corporate/Bank/Sovereign), feste Werte für Mortgage (0,15) und QRRE (0,04) | BCBS d424, Art. 153–154 |
 | A-06 | Konfidenz-Niveau IRB-Formel | 99,9 % | BCBS d424, Art. 153 (Pillar-1-Standard) |
 | A-07 | Modified Duration Sovereign | gewichteter Bucket-Mittelpunkt: 0,1 / 0,6 / 1,5 / 2,5 / 4,0 / 7,5 / 15,0 Jahre | Tuckman/Serrat (2012) §4.2; EBA-Bucket-Definition Items 2520810ff. |
-| A-08 | IFRS-9-Mix Sovereign | 60 % HfT/FVTPL/FVOCI, 40 % AC | EBA "Implementation of IFRS 9 by EU Banks" Reports (2018, 2021, 2023) + ECB SSM Supervisory Banking Statistics — typischer Mittelwert für große EU-IRB-Banken |
-| A-09 | Trading-Book-RWA-Multiplier k | 0,15 pro Einheit \|Schock\| | EBA Stress Test 2025 Methodology Note §7 — Markt-RWA-Anstieg 30–40 % im Adverse-Szenario bei \|Schock\| ≈ 2 |
-| A-10 | Trading-P&L-Haircut h | 0,20 pro Einheit \|Schock\| (entspricht 50 %-Reduktion bei \|Schock\| = 2,5) | EBA Stress Test 2025 §3.4 und 2023 §3.2 — Net-Trading-Income-Reduktion 40–60 % im Adverse-Szenario |
+| A-08 | IFRS-9-Mix Sovereign | **keine Annahme — bank-individuell gemeldete Daten**: Split pro Bank × Land × Laufzeit aus EBA Transparency 2025, `tr_sov.csv` Items 2520812 (HfT) / 2520813 (FVTPL) / 2520814 (FVOCI) / 2520815 (AC). CET1-wirksam nur HfT+FVTPL+FVOCI; duration-gewichtet ≈ 51 % im 10-Banken-Mittel (Juni 2025). Frühere Stylized-Fact-Annahme 60/40 ersetzt | EBA Transparency Exercise 2025 (Sovereign-Template); IFRS 9 (IASB 2014); Plausibilitäts-Querprüfung: EBA "Implementation of IFRS 9 by EU Banks" Reports (50–65 % Marktwert-Anteil seit 2020) |
+| A-09 | ~~Trading-Book-RWA-Multiplier k~~ | **obsolet** — Trading-Book-Kanal in V1 entfernt (kleine Handelsbücher, keine belastbare FRTB-Kalibrierung aus EBA-Aggregaten); Markt-Risiko nicht mehr Teil der CET1-Bridge | — |
+| A-10 | ~~Trading-P&L-Haircut h~~ | **obsolet** — siehe A-09 | — |
 | A-11 | Faktor-Unabhängigkeit Brent ⊥ Δr_10y | empirisch ρ = +0,07 über 5 Jahre, R² = 0,005 | eigene Schätzung auf ICE-Brent + Bundesbank-Svensson, im Cockpit Tab 1 reproduzierbar |
 | A-12 | PD-Floor / PD-Cap | 3 bp / 50 % | Basel-Sovereign-Floor (BCBS d424 Art. 160 (1)) bzw. numerisches Sanity-Limit |
 | A-13 | LGD-Floor / LGD-Cap | 5 % / 100 % | Sanity-Konvention + CRR-Definition |
@@ -575,8 +576,8 @@ Risk management/
 │   └── pages/
 │       ├── 1_Faktor_Analyse.py        ← Korrelations-Analyse + 5-Stufen-Bridge
 │       ├── 2_Kreditbuch.py            ← Loan-Book mit Worked Example
-│       ├── 3_Marktbuch.py             ← 4 Sub-Tabs (Yield · Sov · BB · TB)
-│       ├── 4_Eigenkapital.py          ← 3-Kanal-CET1
+│       ├── 3_Marktbuch.py             ← 2 Sub-Tabs (Yield-Curve · Sovereigns)
+│       ├── 4_Eigenkapital.py          ← 2-Kanal-CET1
 │       └── 5_Validierung.py           ← Walk-Forward-Backtest
 │
 └── data/
@@ -787,10 +788,9 @@ Vollständige Liste in `MODEL_ASSUMPTIONS.md`. Highlights:
   öffentlich zugänglich).
 - **Sovereign-Buch.** Parallel-Shift-Annahme (kein Slope/Curvature-Stress); kein
   Credit-Spread-Risiko; kein Hedging.
-- **Banking-Book Bonds.** In den EBA-Daten mit Loans aggregiert — keine isolierte
-  Bond-Position rekonstruierbar.
-- **Trading-Book.** Nur Aggregat, keine Issuer-Granularität, keine
-  Asset-Class-Split (Aktien / Bonds / FX / Rohstoffe).
+- **Trading-Book.** Als CET1-Kanal entfernt (V2.1): EBA publiziert nur
+  Bank-Aggregate ohne Issuer-Granularität oder Asset-Class-Split — keine
+  belastbare FRTB-Kalibrierung möglich.
 - **Walk-Forward-Backtest.** Zeigt die Vorgänger-Methodik (Single-Factor-M) als
   historische Diagnose, nicht das aktive 2-Faktor-Modell — eine Re-Implementierung
   des Backtests im 2-Faktor-Setup steht noch aus.

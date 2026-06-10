@@ -1011,6 +1011,33 @@ def sovereign_cet1_impact(
     return agg
 
 
+def sovereign_cet1_pnl_lookup(
+    sov_acct_df: pd.DataFrame, delta_r_pp: float,
+) -> dict[str, float]:
+    """Pro Bank: CET1-wirksamer Sovereign-MtM unter Δr-Schock (EUR, signiert).
+
+    Single Source für den Sovereign-Kanal der CET1-Bridge. Nutzt den
+    bank-individuell GEMELDETEN IFRS-9-Split aus der EBA Transparency
+    (tr_sov.csv, Items 2520812 HfT / 2520813 FVTPL / 2520814 FVOCI /
+    2520815 AC) — KEINE Stylized-Fact-Annahme (frühere 60/40-Aufteilung
+    ersetzt, ebenso die V1-Vereinfachung "gesamte Ladder FVOCI-ähnlich").
+
+    Ökonomik: Nur zum Marktwert geführte Bestände (HfT/FVTPL via GuV,
+    FVOCI via OCI-Rücklage) schlagen auf die CET1-Quote durch; AC bleibt
+    zu fortgeführten Anschaffungskosten (latenter, nicht CET1-wirksamer
+    Verlust — vgl. SVB 2023, Jiang et al. 2023 NBER WP 31048).
+    Mathematik: ΔFV = −D_bucket · Δy · Exposure pro Laufzeit-Bucket
+    (Tuckman/Serrat 2012, Kap. 4), summiert über die CET1-wirksamen
+    Klassen je Bank.
+
+    Returns: dict {LEI_Code: Σ cet1_impact_eur} (negativ = Verlust).
+    """
+    imp = sovereign_cet1_impact(sov_acct_df, delta_r_pp=delta_r_pp)
+    if imp.empty:
+        return {}
+    return imp.groupby("LEI_Code")["cet1_impact_eur"].sum().to_dict()
+
+
 def sovereign_kpis_per_bank(
     conc_df: pd.DataFrame, bank_dir: pd.DataFrame,
 ) -> pd.DataFrame:
@@ -1680,6 +1707,32 @@ def _test_curated_leis_in_bank_dir():
     )
 
 
+def _test_sovereign_effective_lt_gross():
+    """CET1-wirksamer Sovereign-MtM (echter IFRS-9-Split) muss betraglich
+    unter dem Brutto-MtM der vollen Ladder liegen (AC-Anteil > 0) und
+    alle 10 kuratierten Banken abdecken."""
+    from config import EBA_RAW_DIR as _RAW
+    if not (_RAW / "tr_sov.csv").exists():
+        return  # Daten nicht vorhanden — Skip (wie Real-loader-Smoke)
+    from eba_pd_loader import get_top10_leis
+    leis = set(get_top10_leis())
+    sov = parse_sovereign_csv(_RAW / "tr_sov.csv", period=202506)
+    acct = sovereign_by_accounting_class(sov, period=202506)
+    acct = acct[acct["LEI_Code"].isin(leis)]
+    mat = sovereign_maturity_ladder(sov, period=202506)
+    mat = mat[mat["LEI_Code"].isin(leis)]
+    eff = sovereign_cet1_pnl_lookup(acct, delta_r_pp=2.0)
+    gross = dict(zip(*[rate_shock_pnl(mat, delta_r_pp=2.0)[c]
+                       for c in ("LEI_Code", "delta_pnl_eur")]))
+    assert set(eff.keys()) == leis, \
+        f"Effective lookup deckt {len(eff)}/10 Banken ab"
+    tot_eff, tot_gross = sum(eff.values()), sum(gross.values())
+    assert abs(tot_eff) < abs(tot_gross), \
+        f"effective {tot_eff:.3e} nicht < gross {tot_gross:.3e}"
+    assert 0.30 < abs(tot_eff / tot_gross) < 0.90, \
+        f"effective/gross-Ratio {tot_eff/tot_gross:.2f} unplausibel"
+
+
 if __name__ == "__main__":
     import sys
     if sys.platform == "win32":
@@ -1696,6 +1749,7 @@ if __name__ == "__main__":
         ("Real loader smoke (if files present)", _test_real_loader_if_files_present),
         ("Filter keeps all 10 curated banks", _test_filter_keeps_all_10_curated_banks),
         ("Curated LEIs match EBA directory",  _test_curated_leis_in_bank_dir),
+        ("Sovereign effective < gross MtM",   _test_sovereign_effective_lt_gross),
     ]
     for label, fn in tests:
         try:

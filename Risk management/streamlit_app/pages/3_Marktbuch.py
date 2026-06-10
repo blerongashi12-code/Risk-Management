@@ -576,10 +576,17 @@ with tab_sov:
         'EBA-Items der <code>tr_sov.csv</code>: <code>2520812</code> (HfT), '
         '<code>2520813</code> (FVTPL), <code>2520814</code> (FVOCI), '
         '<code>2520815</code> (AC). Jede IRB-Bank meldet pro Land × Bucket '
-        'die Aufteilung — wir aggregieren über alle Länder und Buckets, '
-        'damit man auf einen Blick sieht, wie viel des Sovereign-Buchs '
-        'CET1-relevant ist (HfT + FVTPL + FVOCI) versus zu Buchwert '
-        'gehalten wird (AC).'
+        'die Aufteilung — <strong>gemeldete Daten, keine Annahme</strong>. '
+        'Wir aggregieren über alle Länder und Buckets, damit man auf '
+        'einen Blick sieht, wie viel des Sovereign-Buchs CET1-relevant '
+        'ist (HfT + FVTPL + FVOCI) versus zu Buchwert gehalten wird (AC). '
+        '<em>Begriffspräzision:</em> Die EBA meldet den Bilanzwert '
+        '(Gross Carrying Amount) — für HfT/FVTPL/FVOCI ist das per '
+        'IFRS 9 zugleich der Fair Value; für AC der fortgeführte '
+        'Anschaffungswert. <strong>Konsistenz:</strong> Exakt dieser '
+        'bank-individuelle Split speist auch den Sovereign-Kanal der '
+        'CET1-Bridge (Tab 1 Waterfall + Tab 4 Eigenkapital) — alle Tabs '
+        'rechnen auf derselben Datenbasis.'
         '</div>',
         unsafe_allow_html=True,
     )

@@ -40,7 +40,7 @@ from config import (KAPPA_DOWNTURN_LGD, EBA_RAW_DIR)                # type: igno
 from eba_loader import (                                            # type: ignore
     load_eba_universe, load_bank_directory,
     parse_capital_overview, parse_sovereign_csv,
-    sovereign_maturity_ladder, rate_shock_pnl,
+    sovereign_by_accounting_class, sovereign_cet1_pnl_lookup,
     cet1_ratio_bridge,
 )
 from macro_factor import (anchor_from_eba,                          # type: ignore
@@ -90,10 +90,15 @@ def _load_universe(top_n: int):
     return filter_universe_to_top10(u)
 
 
-@st.cache_data(ttl=24*3600, show_spinner="Loading sovereign maturity ladder …")
-def _load_sov_pnl():
+@st.cache_data(ttl=24*3600, show_spinner="Loading sovereign IFRS-9 split …")
+def _load_sov_acct():
+    # Bank-individuell GEMELDETER IFRS-9-Split (EBA tr_sov Items
+    # 2520812-2520815) — Datenbasis des Sovereign-Kanals. Nur die zum
+    # Marktwert gefuehrten Klassen (HfT/FVTPL/FVOCI) wirken auf CET1;
+    # AC bleibt zu Buchwert. Ersetzt die fruehere V1-Vereinfachung
+    # "gesamte Maturity-Ladder FVOCI-aehnlich" (100%-Durchleitung).
     sov_raw = parse_sovereign_csv(EBA_RAW_DIR / "tr_sov.csv", period=202506)
-    return sovereign_maturity_ladder(sov_raw, period=202506)
+    return sovereign_by_accounting_class(sov_raw, period=202506)
 
 
 @st.cache_data(ttl=24*3600, show_spinner=False)
@@ -116,7 +121,7 @@ with st.sidebar:
 top_n = 10  # konstant: das Universe ist auf die kuratierten 10 Banken fixiert
 cap_df, bank_dir = _load_capital(top_n)
 universe = _load_universe(top_n)
-sov_mat = _load_sov_pnl()
+sov_acct = _load_sov_acct()
 fac_stats = _load_factor_cov()
 
 # === 2-Faktor-Stress: Bridge direkt mit dem 2-Faktor-Modell rechnen ====
@@ -173,12 +178,12 @@ if _is_stressed:
     apply_stress_to_universe(universe, _d_brent, _d_r_10y_pp,
                              override_betas=_sens_overrides)
 
-# Channel 2 — sovereign rate-shock P&L per bank
-sov_pnl_df = (rate_shock_pnl(sov_mat, delta_r_pp=delta_r_pp)
-              if abs(delta_r_pp) > 1e-3 else
-              pd.DataFrame(columns=["LEI_Code", "delta_pnl_eur"]))
-sov_pnl_lookup: dict[str, float] = dict(
-    zip(sov_pnl_df.get("LEI_Code", []), sov_pnl_df.get("delta_pnl_eur", []))
+# Channel 2 — CET1-wirksamer Sovereign-MtM pro Bank: nur die zum
+# Marktwert gefuehrten IFRS-9-Klassen (HfT/FVTPL/FVOCI) aus dem
+# bank-individuell gemeldeten EBA-Split; AC bleibt zu Buchwert.
+sov_pnl_lookup: dict[str, float] = (
+    sovereign_cet1_pnl_lookup(sov_acct, delta_r_pp=delta_r_pp)
+    if abs(delta_r_pp) > 1e-3 else {}
 )
 
 # Restrict capital_df to universe banks only
@@ -630,9 +635,10 @@ def _two_factor_sensitivity(
 # Sovereign sensitivity per pp (recomputed at unit shock)
 _sov_pnl_per_pp = 0.0
 try:
-    _unit_sov = rate_shock_pnl(sov_mat, delta_r_pp=1.0)
-    _unit_sov = _unit_sov[_unit_sov["LEI_Code"].isin(universe_leis)]
-    _sov_pnl_per_pp = float(_unit_sov["delta_pnl_eur"].sum())
+    _unit_sov = sovereign_cet1_pnl_lookup(sov_acct, delta_r_pp=1.0)
+    _sov_pnl_per_pp = float(sum(
+        v for k, v in _unit_sov.items() if k in set(universe_leis)
+    ))
 except Exception:
     pass
 
@@ -764,11 +770,22 @@ $$\text{CET1}^{\text{stress}} = \text{CET1}^{\text{base}}
 - $\Delta\text{EL}_{\text{loan}}$ — Vasicek-Capital-Bridge ΔEL pro Bank
   (PD-Channel + LGD-Channel via downturn-LGD), reduziert CET1 als
   zusätzliche Provisions-Aufwendung. Quelle: BCBS 2017 / CRR Art. 153.
-- $\Delta\text{MtM}_{\text{sov}}$ — signiert; bei Rate-Up negativ über alle
-  Maturity-Buckets, fließt für FVOCI-Bestände durch OCI direkt zur CET1.
+- $\Delta\text{MtM}_{\text{sov}}$ — signiert; bei Rate-Up negativ.
   $\Delta\text{MtM} = -D_{\text{mod}} \cdot \Delta y \cdot \text{Exposure}$
-  (Modified Duration; Tuckman/Serrat 2012). V1 modelliert die gesamte
-  Sovereign-Maturity-Ladder als FVOCI-ähnlich (konservativ).
+  pro Laufzeit-Bucket (Modified Duration; Tuckman/Serrat 2012, Kap. 4).
+  **CET1-wirksam ist nur der bank-individuell gemeldete, zum Marktwert
+  geführte Teil** des Sovereign-Buchs: HfT + FVTPL (via GuV) und FVOCI
+  (via OCI-Reserve) — der AC-Bestand bleibt zu fortgeführten
+  Anschaffungskosten und erzeugt keinen CET1-Effekt (latenter Verlust,
+  vgl. SVB 2023). Der IFRS-9-Split ist **keine Annahme**, sondern wird
+  pro Bank × Land × Laufzeit aus der EBA Transparency gelesen
+  (`tr_sov.csv`, Items 2520812 HfT / 2520813 FVTPL / 2520814 FVOCI /
+  2520815 AC). Über die 10 Banken sind duration-gewichtet ≈ 51 % des
+  Brutto-MtM CET1-wirksam (Juni 2025) — bank-individuell stark
+  unterschiedlich, siehe Marktbuch → „Erkannt vs. verborgen".
+  Damit rechnen Tab 3 (Marktbuch) und diese Bridge auf identischer
+  Datenbasis; die frühere V1-Vereinfachung („gesamte Ladder
+  FVOCI-ähnlich", 100 % Durchleitung) ist ersetzt.
 
 **Denominator (Total RWA):**
 

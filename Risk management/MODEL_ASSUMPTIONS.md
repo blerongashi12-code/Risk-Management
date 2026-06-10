@@ -10,7 +10,7 @@
 
 Das Cockpit quantifiziert die Wirkung makroökonomischer Schocks auf die
 regulatorische Eigenkapitalquote (CET1) der 10 größten EU-IRB-Banken
-über drei separate Risiko-Channels.
+über zwei separate Risiko-Channels.
 
 ### Zwei separate Macro-Faktoren
 
@@ -27,13 +27,14 @@ regulatorische Eigenkapitalquote (CET1) der 10 größten EU-IRB-Banken
 - Quelle: `backend/factor_correlation.py` über Brent (ICE) +
   Bundesbank-Svensson
 
-### Drei Stress-Channels
+### Zwei Stress-Channels
 
 | # | Channel | Mechanik |
 |---|---------|----------|
 | 1 | **Loan Book** | Sektor-differenzierte PD/LGD-Transmission via β-Sensitivitäten |
-| 2 | **Sovereign Book** | Modified-Duration-MtM auf Δr_10y |
-| 3 | **Trading Book** | FRTB-style Multiplier auf Market-RWA + P&L |
+| 2 | **Sovereign Book** | Modified-Duration-MtM auf Δr_10y, CET1-wirksam nur der bank-individuell gemeldete HfT/FVTPL/FVOCI-Anteil (EBA-IFRS-9-Split) |
+
+*(Der frühere dritte Trading-Book-Channel wurde entfernt — siehe A-07.)*
 
 ---
 
@@ -228,35 +229,48 @@ einem Vasicek-Single-Factor-M-Mapping.
 **Warum ökonomisch:** Bond-Preis ist invers zum Zins. Längere Laufzeit
 = höhere Duration = stärkere Preisreaktion auf Zinsschock.
 
-**IFRS-9-Filter:** Nur HfT, FVTPL und FVOCI sind CET1-wirksam
-(via P&L bzw OCI). AC und HtM tragen keinen direkten CET1-Effekt
-(latenter Verlust verborgen).
+**IFRS-9-Filter (Daten, keine Annahme):** Nur HfT, FVTPL und FVOCI
+sind CET1-wirksam (via P&L bzw. OCI). AC trägt keinen direkten
+CET1-Effekt (latenter Verlust verborgen — vgl. SVB 2023, Jiang et
+al. 2023 NBER WP 31048). Der Klassen-Split ist **bank-individuell
+gemeldet** (Items 2520812 HfT / 2520813 FVTPL / 2520814 FVOCI /
+2520815 AC, granular pro Land × Laufzeit) — keine Stylized-Fact-
+Annahme. Duration-gewichtet sind über die 10 Banken ≈ 51 % des
+Brutto-MtM CET1-wirksam (Juni 2025).
+
+**Implementierung (Stand 2026-06-10):** Die CET1-Bridge konsumiert
+exakt diesen gefilterten MtM via `sovereign_cet1_pnl_lookup()`
+(eba_loader). Die frühere V1-Vereinfachung — gesamte Maturity-Ladder
+als FVOCI-ähnlich, d. h. 100 % Durchleitung — sowie die noch ältere
+60/40-Pauschale sind ersetzt; Tab 1, Tab 3 und Tab 4 rechnen auf
+identischer Datenbasis. Regressionstest:
+`_test_sovereign_effective_lt_gross` (effective < gross, Ratio
+plausibel 30–90 %).
 
 **Limitation:** Parallel-Shift-Annahme (kein Slope/Curvature-Stress
 auf Sovereign-MtM); keine Credit-Spread-Risiken; kein Hedging
 (Swaps/Futures nicht in EBA-Public-Disclosure).
 
 **Quelle:** EBA Transparency Exercise 2025, `tr_sov.csv` + Items
-2520810/812/813/814/815.
+2520810/812/813/814/815; IFRS 9 (IASB 2014); Tuckman/Serrat (2012),
+Kap. 4.
 
 ---
 
-### A-07 · Trading-Book-Channel [approximation]
+### A-07 · Trading-Book-Channel [ENTFERNT, Stand 2026-06-10]
 
-**Was:** Market-RWA-Multiplier und Trading-Book-P&L-Haircut unter Stress.
+**Was:** Der frühere dritte CET1-Kanal (Market-RWA-Multiplier +
+Trading-Book-P&L-Haircut) wurde **vollständig entfernt** — er lief
+zuletzt mit hartkodiertem m_factor = 0.0 und damit wirkungslos.
 
-**Formel (vereinfacht):**
-```
-RWA_market_stress = RWA_market_base · (1 + k_brent·|ΔBrent| + k_rate·|Δr_10y|)
-```
-
-mit k_brent ≈ k_rate ≈ 0.12 (FRTB-style Sensitivität).
-
-**Quelle:** Item 2520210 (Market-RWA) und 2520311 (TB-P&L) der EBA
-Transparency 2025.
-
-**Limitation:** Bank-Aggregat-Werte, keine Issuer- oder Tranche-
-Granularität (ABS/MBS in V1 nicht stress-elastisch modelliert).
+**Begründung:** Die Handelsbücher der 10 überwiegend Retail-/
+Corporate-lastigen Banken sind klein, und eine belastbare
+FRTB-Sensitivität ließe sich aus den EBA-Bank-Aggregaten (Items
+2520210/2520311, keine Issuer-/Tranche-Granularität) nicht sauber
+kalibrieren. Ein Kanal, der konstruktionsbedingt 0 beiträgt,
+suggeriert nur Schein-Vollständigkeit. Die CET1-Bridge ist seitdem
+ein konsistentes **2-Kanal-Modell** (Kreditbuch + Sovereign);
+`cet1_ratio_bridge(tb_stress_df=...)` ignoriert den Legacy-Parameter.
 
 ---
 
