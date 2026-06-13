@@ -213,6 +213,27 @@ unvermeidbar, da die Messung von Default-Sensitivitäten einen Default-Zyklus
 mit hinreichend Ausfällen braucht. Baselines (PD/LGD) = 31.12.2024,
 Schock-Größe = EBA-2025-Szenario. β sind via Sidebar-Override veränderbar.
 
+**Was Annahme ist (explizit):** Die Aufsicht gibt nur die *Logik* vor
+(§2.4.2 ¶121: sektorale Sensitivitäten, konsistent mit Richtung und
+Größenordnung der Szenario-Schocks) — **keine fertige β-Tabelle**. Wir haben
+also **nichts abgeschrieben**: die Quellen liefern Vorzeichen, relative
+Struktur und Größenordnung; die konkreten Zahlen sind eine **lineare,
+überschreibbare Experten-Kalibrierung**. *Plausibilitäts-Check (keine
+invertierte Quell-Tabelle):* β_rate × EBA-Adverse-Zinsschock (+1,9 pp) →
+Large-Corp +0,38 pp / KMU +0,76 pp / Mortgage +0,57 pp PD — dieselbe
+Größenordnung wie die in ECB WP 2897 gemessene Reaktion.
+
+**Ausblick — portfolio-spezifische β (bewusst nicht im Modell):** Eine
+einzelne Bank würde die β auf ihrem *eigenen* Portfolio schätzen (EBA §2.4.2
+¶120 „banks should use models"): (1) eigenes Datenpanel quartalsweiser
+Default-/Transition-Raten je Klasse über ≥1 Konjunkturzyklus; (2) Spezifikation
+logit(PD) ~ β_oil·ΔBrent + β_rate·Δr₁₀ᵧ + Kontrollen (BIP, Arbeitslosigkeit,
+Hauspreis) + Lags, gemeinsam über Klassen (SUR, wie ECB BEAST WP 2469);
+(3) Schätzung + EBA-Mindeststandards (ökonometrische Solidität,
+Responsiveness, ¶120) + Out-of-sample-Backtest; (4) Plausibilisierung gegen
+ECB-Benchmark-Parameter (¶122/125) + Caps/Floors. Erfordert bank-interne
+Ausfalldaten, die öffentlich nicht vorliegen — daher die Default-β + Override.
+
 ---
 
 ### A-05 · IRB-Capital-Formel [published]

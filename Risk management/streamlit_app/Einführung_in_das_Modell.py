@@ -504,10 +504,38 @@ st.markdown(
     "Diese Tabelle zeigt die Default-β-Werte je Exposure-Klasse. "
     "**β_oil** misst, um wie viele Prozentpunkte die PD steigt, wenn "
     "Brent um +100 % (log = +0.70) springt; **β_rate** entsprechend "
-    "für +100 bp Δr_10y. Die Werte sind aus der Literatur abgeleitet, "
-    "nicht aus dem Modell geschätzt — das ist methodisch wichtig: "
-    "die β sind <em>aufsichtsrechtlich plausibilisiert</em>, nicht "
-    "data-gefittet."
+    "für +100 bp Δr_10y."
+)
+
+st.markdown(
+    '<div style="background:#F4F4F4;border-left:4px solid #034B6F;'
+    'padding:0.95rem 1.1rem;border-radius:6px;margin:0.4rem 0 0.8rem 0;'
+    'color:#051C2C;font-size:0.9rem;line-height:1.6;">'
+    '<strong>Wie wir die β bestimmen — und was hier Annahme ist '
+    '(methodisch wichtig):</strong><br><br>'
+    '<strong>1 · Die Kalibrierungs-Logik ist aufsichtsrechtlich vorgegeben.</strong> '
+    'Die EBA-Methodik <strong>§2.4.2 ¶121</strong> schreibt vor, projizierte '
+    'Risikoparameter als <em>sektorale Sensitivitäten</em> zu modellieren, die '
+    '<em>konsistent mit Richtung UND Größenordnung</em> der Szenario-Schocks '
+    'sind. Die EBA veröffentlicht aber <strong>keine fertige β-Tabelle</strong> — '
+    'wir haben also <strong>nichts abgeschrieben</strong>; vorgegeben ist nur, '
+    '<em>wie</em> man modelliert, nicht die konkrete Zahl.<br><br>'
+    '<strong>2 · Was die Quellen liefern</strong> (Vorzeichen, relative '
+    'Struktur, Größenordnung je Segment): ECB WP 2897 (2024, Corporate/KMU; '
+    'KMU ≈ 2×), ECB WP 3112 (2025, Mortgage ↔ Zins), ECB FSR 2024 '
+    '(Retail-Haushalte), EBA-2025-Szenario §4.1.6 (Zins-Höhe +1,9 pp) und '
+    'EBA-2025-Results Fig. 22 (offizielles Verlust-Ranking als '
+    'Quer-Verankerung).<br><br>'
+    '<strong>3 · Unsere Annahme (explizit).</strong> Wir unterstellen eine '
+    '<em>lineare</em> Sensitivität und setzen die β als <em>defensible, '
+    'überschreibbare Defaults</em> so, dass sie unter dem EBA-Adverse-Szenario '
+    'PD/LGD-Bewegungen in der von den Quellen belegten Größenordnung erzeugen '
+    '(Größenordnungs-Check direkt unter der Tabelle). β-Publikationen 2024/25; '
+    'ihre ökonometrischen Schätzfenster sind historisch (2014–19, da '
+    'Sensitivitäts-Messung einen Default-Zyklus braucht); die PD/LGD-Baselines '
+    'sind 31.12.2024.'
+    '</div>',
+    unsafe_allow_html=True,
 )
 
 import pandas as pd
@@ -544,6 +572,24 @@ _beta_table = pd.DataFrame(
 )
 st.dataframe(_beta_table, hide_index=True, use_container_width=True,
              height=290)
+
+st.markdown(
+    '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+    'border-top:2px solid #034B6F;border-radius:4px;'
+    'padding:0.8rem 1.0rem;margin:0.2rem 0 0.6rem 0;color:#051C2C;'
+    'font-size:0.86rem;line-height:1.55;">'
+    '<strong>Plausibilitäts-Check</strong> (Größenordnungs-Validierung, '
+    '<em>keine</em> invertierte Quell-Tabelle): wendet man die β auf den '
+    'EBA-Adverse-Zinsschock (+1,9 pp Euroraum) an, ergibt sich für '
+    'Large-Corporate 0,20 × 1,9 = <strong>+0,38 pp PD</strong>, für KMU '
+    '0,40 × 1,9 = <strong>+0,76 pp</strong>, für Mortgage 0,30 × 1,9 = '
+    '<strong>+0,57 pp</strong>. Das liegt in derselben Größenordnung wie die '
+    'in ECB WP 2897 gemessene Reaktion (Large-Corp einige Zehntel-pp unter '
+    'kombiniertem Stress, KMU ≈ 2–3×) — die β sind damit szenario-konsistent '
+    'im Sinne von §2.4.2 ¶121.'
+    '</div>',
+    unsafe_allow_html=True,
+)
 
 with st.expander("β-Werte überschreiben (Sensitivitäts-Analyse, advanced)",
                  expanded=False):
@@ -622,6 +668,40 @@ with st.expander("β-Werte überschreiben (Sensitivitäts-Analyse, advanced)",
         st.caption(
             "Keine Overrides aktiv — alle Tabs nutzen die kalibrierten "
             "Default-Werte.")
+
+# --- Ausblick · portfolio-spezifische β-Schätzung (bewusst nicht im Modell) -
+st.markdown(
+    '<div style="background:#FBF7EF;border:1px solid #E4D8C2;'
+    'border-left:4px solid #B8860B;border-radius:6px;'
+    'padding:0.95rem 1.1rem;margin:0.7rem 0 0.4rem 0;color:#051C2C;'
+    'font-size:0.88rem;line-height:1.6;">'
+    '<strong>Ausblick · Wie eine Bank portfolio-spezifische β schätzen '
+    'würde</strong><br><br>'
+    'Ein berechtigter Kritikpunkt: β müssten eigentlich '
+    '<em>portfolio-spezifisch</em> sein. Unsere β sind sektorweite '
+    'Default-Werte aus Aufsicht/Literatur — eine einzelne Bank würde sie auf '
+    'ihrem <em>eigenen</em> Portfolio schätzen (Regionen-Mix, Sicherheiten, '
+    'Kundenqualität unterscheiden sich). Genau das verlangt EBA §2.4.2 ¶120 '
+    '(„banks should use models"). Dieses Mess-Konzept ist <strong>bewusst '
+    'nicht ins Modell eingebaut</strong> — es braucht bank-interne '
+    'Ausfalldaten, die öffentlich nicht vorliegen; deshalb die Default-β plus '
+    'die Override-Funktion oben für den Sensitivitäts-Test. So würde eine Bank '
+    'vorgehen:<br><br>'
+    '<strong>① Datenpanel</strong> — eigene quartalsweise Default-/'
+    'Transition-Raten je Exposure-Klasse über mindestens einen '
+    'Konjunkturzyklus.<br>'
+    '<strong>② Spezifikation</strong> — logit(PD)<sub>Klasse</sub> = '
+    'β_oil · ΔBrent + β_rate · Δr₁₀ᵧ + Kontrollen (BIP, Arbeitslosigkeit, '
+    'Hauspreis) + Lags; Klassen gemeinsam geschätzt (SUR, wie ECB BEAST '
+    'WP 2469).<br>'
+    '<strong>③ Schätzung &amp; Standards</strong> — β aus den Regressions-'
+    'Koeffizienten; EBA-Mindeststandards (ökonometrische Solidität + '
+    'Responsiveness, ¶120); Out-of-sample-Backtest.<br>'
+    '<strong>④ Plausibilisierung</strong> — gegen ECB-Benchmark-Parameter '
+    '(¶122/125), Caps/Floors und Cross-Section-Vergleich der Banken.'
+    '</div>',
+    unsafe_allow_html=True,
+)
 
 # --- Schritt 4 · Banken und Datenbasis -----------------------------
 _onb_step("4", "Banken & Datenbasis",
