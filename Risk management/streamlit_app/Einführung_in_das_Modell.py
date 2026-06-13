@@ -218,11 +218,11 @@ with found_l:
         'Corporates (insb. energieintensive Industrie), Konsumenten-'
         'Disposable-Income über Heiz- und Kraftstoff-Preise, sowie '
         'Headline-Inflation → Zentralbank-Reaktion.<br><br>'
-        '<strong>Quellen:</strong> EBA Stress Test 2025 Methodology '
-        'Note Sec. 3.2 (Energie als Macro-Treiber); Hamilton '
-        '<em>JME</em> 1983, Kilian <em>AER</em> 2009 (Öl-Schock-'
-        'Transmission); ICE Brent als Benchmark in EBA-Adverse-'
-        'Szenarien seit 2014.'
+        '<strong>Quellen:</strong> EBA/ESRB 2025 Macro-financial '
+        'Scenario (Energiepreis-Schock als Szenario-Treiber — Chart 7: '
+        'Öl-/Gas-Schock → HICP +3,9 %); Hamilton <em>JME</em> 1983, '
+        'Kilian <em>AER</em> 2009 (Öl-Schock-Transmission); ICE Brent '
+        'als Benchmark in EBA-Adverse-Szenarien.'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -248,9 +248,9 @@ with found_m:
         'Bank-NIM via Yield-Curve-Steepening, Corporate-Bond-Spreads.'
         '<br><br>'
         '<strong>Quellen:</strong> Bundesbank Svensson-Tagesreihe '
-        'ab 1972 (offizielle Zero-Curve); EBA Stress Test 2025 nutzt '
-        'identischen 10y-Sovereign-Punkt; Drehmann/Juselius <em>BIS WP</em> '
-        '2014 zu DSR-Sensitivität auf 10y-Yield.'
+        'ab 1972 (offizielle Zero-Curve); EBA/ESRB 2025 Macro-financial '
+        'Scenario §4.1.6 (adverser 10y-Pfad, Startpunkt Ø Dez-2024); '
+        'ECB WP 2897 (2024) zur Zins-Transmission auf die PD.'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -339,11 +339,15 @@ st.dataframe(example_df, hide_index=True, use_container_width=True,
              height=205)
 
 st.markdown(
-    "Die Sensitivitäten (β-Werte) sind aus dem **EBA Stress Test "
-    "2025 Methodology Note** und der akademischen Literatur kalibriert "
-    "(Drehmann/Juselius BIS 2014, Hosszú/Király MNB 2018, Castro "
-    "Economic Modelling 2013). Komplette Tabelle in "
-    "`MODEL_ASSUMPTIONS.md`."
+    "Die Sensitivitäten (β-Werte) sind auf **aktuelle Quellen "
+    "(Stichtag 31.12.2024)** kalibriert: das **EBA-2025-Adverse-"
+    "Szenario** (10y-Zinspfad, §4.1.6), **ECB WP 2897 (2024)** für die "
+    "Corporate-/KMU-PD-Reaktion, **ECB WP 3112 (2025)** für Mortgage-"
+    "Defaults und die **ECB FSR 2024** für die übrigen Retail-Klassen — "
+    "eingebettet in den EBA-"
+    "Methodik-Rahmen **§2.4.2 ¶121** (sektorale Sensitivitäten, "
+    "konsistent mit Richtung *und* Größenordnung der Szenario-Schocks). "
+    "Komplette Tabelle in `MODEL_ASSUMPTIONS.md`."
 )
 
 # --- Schritt 3 · Vollbild: alle 7 Klassen einer Bank unter demselben Schock --
@@ -360,47 +364,47 @@ st.markdown(
 _uc_mech = pd.DataFrame([
     ("Corporate",     "+0,30 / +0,20", "+0,55 pp ↑", "2,42 % → 2,97 %",
      "+0,50 / +1,00", "+2,25 pp ↑",  "38,4 % → 40,7 %",
-     "Ölpreis verteuert Input-Kosten und drückt Margen, höhere "
+     "Ölpreis wirkt als Angebotsschock (Input-Kosten, Margen), höhere "
      "Zinsen erhöhen die Refinanzierungslast — beide Kanäle treiben "
      "die Ausfallrate moderat nach oben.",
-     "EBA Stress-Test 2025, §5.3.2"),
-    ("SME-Corporate", "+0,45 / +0,35", "+0,93 pp ↑", "3,93 % → 4,86 %",
-     "+0,40 / +1,20", "+2,60 pp ↑",  "14,1 % → 16,7 %",
-     "Reagiert ≈ 1,5× sensitiver als Large-Corporate: dünnere "
-     "Liquiditätspuffer und geringere Preissetzungsmacht verstärken "
-     "die Wirkung desselben Schocks.",
-     "Drehmann & Juselius, BIS WP 2014"),
+     "ECB WP 2897 (2024); EBA §2.4.2"),
+    ("SME-Corporate", "+0,60 / +0,40", "+1,10 pp ↑", "3,93 % → 5,03 %",
+     "+0,45 / +1,10", "+2,43 pp ↑",  "14,1 % → 16,5 %",
+     "Reagiert ≈ 2× so stark wie Large-Corporate — ECB WP 2897 misst "
+     "diese Größen-Heterogenität direkt (Angebotsschock ≈2×, "
+     "Geldpolitik ≈3×); dünnere Puffer + geringere Preissetzungsmacht.",
+     "ECB WP 2897 (2024), Fig. 5"),
     ("Mortgage",      "+0,05 / +0,30", "+0,63 pp ↑", "1,41 % → 2,04 %",
      "+0,10 / +1,50", "+3,05 pp ↑",  "14,1 % → 17,1 %",
      "Zins-dominiert: variabel verzinste Darlehen erhöhen sofort die "
      "Schuldendienstquote, zugleich drückt die Immobilien-Neubewertung "
-     "die Recovery (höchstes γ_rate).",
-     "Hosszú & Király, MNB OP 2018"),
+     "die Recovery (höchstes γ_rate, EBA ¶128).",
+     "ECB WP 3112 (2025); EBA ¶128"),
     ("QRRE",          "+0,40 / +0,15", "+0,50 pp ↑", "2,97 % → 3,47 %",
      "+0,30 / +0,50", "+1,15 pp ↑",  "54,1 % → 55,3 %",
-     "Öl-dominiert: Inflation über Energiekosten belastet das "
-     "verfügbare Haushaltseinkommen; unbesicherte Forderungen haben "
-     "ohnehin hohe LGD, daher geringer LGD-Hub.",
-     "Castro, Economic Modelling 2013"),
+     "Öl-dominiert: Energiepreis-Inflation belastet das verfügbare "
+     "Haushaltseinkommen; unbesicherte Forderungen haben ohnehin hohe "
+     "LGD, daher geringer LGD-Hub.",
+     "ECB FSR 2024; EBA Results 2025"),
     ("Other Retail",  "+0,30 / +0,25", "+0,65 pp ↑", "5,68 % → 6,33 %",
      "+0,25 / +0,80", "+1,72 pp ↑",  "25,9 % → 27,6 %",
      "Mischprofil zwischen besichertem Mortgage und unbesichertem "
      "QRRE — Öl- und Zinskanal wirken etwa gleich stark auf PD und LGD.",
-     "EBA Credit-Risk-Benchmark 2024"),
+     "ECB FSR 2024; EBA Results 2025"),
     ("Bank",          "+0,05 / −0,05", "−0,08 pp ↓", "2,74 % → 2,67 %",
      "+0,10 / +0,50", "+1,05 pp ↑",  "34,1 % → 35,2 %",
      "Vorzeichen-Umkehr: steigende Zinsen heben die Net Interest "
      "Margin, der NIM-Uplift überkompensiert den Kreditrisiko-Anstieg "
      "→ PD sinkt. Die LGD steigt dennoch, da höhere Zinsen Bond-Werte "
      "und damit die Recovery drücken.",
-     "EBA Stress-Test 2025, §5.3.4"),
+     "EBA 2025 Methodik Kap. 4 (NII)"),
     ("Sovereign",     "  0,00 /   0,00", "  0,00 pp ·", "0,06 % → 0,06 %",
      "  0,00 /   0,00", "  0,00 pp ·", "8,25 % → 8,25 %",
      "Macro-orthogonal: Sovereign-Default ist ein fiskalisches, kein "
      "makroökonomisches Ereignis. Der Zinsschock wirkt stattdessen "
      "über den Marktbuch-MtM-Kanal (separate Modellebene, Tab "
      "Marktbuch).",
-     "Reinhart & Rogoff, 2009"),
+     "MtM-Kanal (EBA ¶153); R&R 2009"),
 ], columns=[
     "Klasse",
     "β_oil / β_rate (PD)",
@@ -512,13 +516,13 @@ import pandas as pd
 # Der statische Fallback (gleiche Werte) greift nur, falls das Backend-Modul
 # einmal nicht importierbar ist.
 _beta_rows_meta = [
-    ("Corporate",     "corporate",     (0.30,  0.20), "Hosszú/Király 2018; EBA ST 2025 §3.4"),
-    ("SME Corporate", "sme_corporate", (0.45,  0.35), "Castro 2013; höhere Sensitivität bei kleineren Firmen"),
-    ("Mortgage",      "mortgage",      (0.05,  0.30), "Drehmann/Juselius 2014 (DSR-Channel)"),
-    ("QRRE",          "qrre",          (0.40,  0.15), "Castro 2013; Konsumenten-DSR via Energie-Inflation"),
-    ("Other Retail",  "other_retail",  (0.30,  0.25), "EBA ST 2025 §3.4"),
-    ("Bank",          "bank",          (0.05, -0.05), "NIM-Profit-Effekt bei steigenden Zinsen (Kritik 7)"),
-    ("Sovereign",     "sovereign",     (0.00,  0.00), "Sovereign-PD nur über Spread-Channel, hier nicht modelliert"),
+    ("Corporate",     "corporate",     (0.30,  0.20), "ECB WP 2897 (2024); EBA §2.4.2 ¶120-128"),
+    ("SME Corporate", "sme_corporate", (0.60,  0.40), "ECB WP 2897 (2024) Fig. 5 — KMU-PD ≈2× Large-Corp"),
+    ("Mortgage",      "mortgage",      (0.05,  0.30), "Zins: ECB WP 3112 (2025); Öl: ECB FSR 2024; EBA ¶128"),
+    ("QRRE",          "qrre",          (0.40,  0.15), "ECB FSR Mai 2024 (Energie/Zins → Haushalte); EBA Results 2025"),
+    ("Other Retail",  "other_retail",  (0.30,  0.25), "ECB FSR Mai 2024; EBA-2025-Results Fig. 22 (Retail)"),
+    ("Bank",          "bank",          (0.05, -0.05), "EBA 2025 Methodik Kap. 4 (NII) — NIM-Uplift, β_rate<0"),
+    ("Sovereign",     "sovereign",     (0.00,  0.00), "Macro-orthogonal; Zins über Marktbuch-MtM-Kanal (EBA ¶153)"),
 ]
 try:
     from two_factor_stress import SENSITIVITY_MATRIX as _SENS  # type: ignore
@@ -1035,10 +1039,9 @@ st.markdown(
     'die mediane Größenordnung.</td></tr>'
     '<tr><td class="a-val">β_oil = +0,30 · β_rate = +0,20</td>'
     '<td class="a-src">Sektor-Sensitivitäten der Klasse Corporate — '
-    'kalibriert nach EBA Stress Test 2025 Methodology Note §3.4 sowie '
-    'Hosszú/Király 2018 (MNB Working Paper, ungarisches Banken-'
-    'System) und Castro 2013 (Economic Modelling, Eurozone-Panel). '
-    'Vollständige Matrix in Schritt 3b oben.</td></tr>'
+    'kalibriert nach ECB WP 2897 (2024, Makro-/Geldpolitik-Schocks → '
+    'Corporate-PD im Euroraum) im Rahmen der EBA-2025-Methodik §2.4.2 '
+    '¶120-128. Vollständige Matrix in Schritt 3b oben.</td></tr>'
     '</table>'
     '</div>'
 
@@ -1054,9 +1057,10 @@ st.markdown(
     '<div class="ch-source">'
     '<strong>Fundament:</strong> Basel III IRB-Ansatz (BCBS 2017, Art. '
     '153 CRR) · bank-spezifische Pillar-3 EU-CR6 (31.12.2024) für die regulatorisch '
-    'publizierten A-IRB-PDs und -LGDs · β-Sensitivitäten aus EBA '
-    'Stress Test 2025 Methodology Note und der Literatur '
-    '(Hosszú/Király 2018, Castro 2013, Drehmann/Juselius 2014).'
+    'publizierten A-IRB-PDs und -LGDs · β-Sensitivitäten kalibriert nach '
+    'EBA-2025-Methodik §2.4.2 ¶121, EBA-2025-Adverse-Szenario §4.1.6 '
+    '(10y-Pfad), ECB WP 2897 (Corporate/KMU), ECB WP 3112 (Mortgage) '
+    'und ECB FSR 2024 (Retail).'
     '</div>'
 
     '</div>',

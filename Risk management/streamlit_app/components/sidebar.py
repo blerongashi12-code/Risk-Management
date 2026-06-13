@@ -137,7 +137,7 @@ def render_sidebar() -> dict:
             '• Brent: ICE (yfinance), täglich<br>'
             '• 10y-Zins: Bundesbank Svensson, täglich<br>'
             '• Banken-Universe: 10 IRB-Banken<br>'
-            '• Stress-Sensitivitäten: EBA + Literatur'
+            '• Stress-Sensitivitäten: EBA §2.4.2 + ECB WP 2897/3112 + FSR 2024'
             '</div>',
             unsafe_allow_html=True,
         )

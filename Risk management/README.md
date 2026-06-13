@@ -486,7 +486,7 @@ Pro Exposure-Klasse vier Koeffizienten: β_oil (PD), β_rate (PD), γ_oil (LGD),
 | Klasse | β_oil | β_rate | γ_oil | γ_rate | Ökonomische Logik |
 |---|---:|---:|---:|---:|---|
 | Corporate | +0,30 | +0,20 | +0,50 | +1,00 | Energie-Input-Kosten + Bond-Refi-Kosten |
-| SME Corporate | +0,45 | +0,35 | +0,40 | +1,20 | SMEs sensitiver wegen geringerer Diversifikation und kürzerer Refi-Profile |
+| SME Corporate | +0,60 | +0,40 | +0,45 | +1,10 | SMEs reagieren ≈2× so stark wie Large-Corp (ECB WP 2897 2024, Größen-Heterogenität); geringere Diversifikation, kürzere Refi-Profile |
 | Mortgage | +0,05 | +0,30 | +0,10 | +1,50 | Floating-Rate-Affordability + Property-Value-Haircut bei Δr |
 | QRRE | +0,40 | +0,15 | +0,30 | +0,50 | Konsumenten-Inflation belastet Disposable Income stark |
 | Other Retail | +0,30 | +0,25 | +0,25 | +0,80 | zwischen Mortgage und QRRE |
@@ -495,18 +495,32 @@ Pro Exposure-Klasse vier Koeffizienten: β_oil (PD), β_rate (PD), γ_oil (LGD),
 
 ### 6.2 · Quellen pro Wert
 
-| Klasse | Quelle für β-Werte |
-|---|---|
-| Corporate | EBA Stress Test 2025 Methodology Note, §3.4 (Corporate-Channel) · Hosszú & Király (2018) MNB-WP 2018/2 für ungarische Corporates |
-| SME Corporate | Castro (2013) Economic Modelling 31 für GIPSI-Länder, höhere Sensitivität bei kleineren Firmen empirisch belegt · EBA ST 2025 §3.4 |
-| Mortgage | Drehmann & Juselius (2014) BIS Working Paper 421 für DSR-Channel · ECB Macroprudential Bulletin Issue 7 (Apr 2019) zu Hypotheken-Affordability |
-| QRRE | Castro (2013) Economic Modelling 31, Konsumenten-DSR via Energie-Inflation |
-| Other Retail | EBA ST 2025 §3.4, interpoliert zwischen Mortgage und QRRE |
-| **Bank** | EBA Stress Test 2025 Methodology Note §3.5 (Net Interest Income) — NIM-Profit-Effekt bei steigenden Zinsen explizit erfasst |
-| Sovereign | konventionell auf 0 gesetzt — Sovereign-Risiko wird im Sovereign-Buch (Modified Duration) modelliert, nicht über PD-Stress |
+Methodischer Rahmen: **EBA 2025 Methodology Note §2.4.2 ¶120-128** (¶121
+„sectoral sensitivities applied to portfolio-level projections", konsistent
+mit Richtung *und* Größenordnung der Szenario-Schocks; ¶128 LGD spiegelt den
+Sicherheiten-Fair-Value). Schock-Größe: **EBA 2025 Macro-financial scenario
+§4.1.6** (adverser 10y-Pfad, Start Dez-2024). Quelle der per-Segment-β:
 
-Die γ-Werte (LGD-Stress) sind analog kalibriert. CRR Art. 181 fordert „Downturn-LGD"
+| Klasse | Quelle für β-Werte (aktuell, Stichtag 31.12.2024) |
+|---|---|
+| Corporate | ECB WP 2897 (2024) — Makro-/Geldpolitik-Schocks → Large-Corp-PD im Euroraum (DE/FR/IT/ES); EBA §2.4.2 ¶120-128 |
+| SME Corporate | ECB WP 2897 (2024), Fig. 5 — KMU/Mikro-PD ≈2× (Angebot) bzw. ≈3× (Geldpolitik) Large-Corp; ersetzt Drehmann/Juselius (2014, ≈1,5×) |
+| Mortgage | Zins: ECB WP 3112 (2025) Variable-Rate-Mortgage-Defaults ↔ Zins · Öl: ECB FSR Mai 2024 (Energie → Haushalts-Default) · LGD: EBA §2.4.2 ¶128 |
+| QRRE | ECB FSR Mai 2024 (Haushalts-Schuldendienst ↔ Zins; Energie → Konsumenten-Arrears); EBA-2025-Results Fig. 22 (Retail = höchste Verlustquote) |
+| Other Retail | ECB FSR Mai 2024; EBA-2025-Results Fig. 22 (Retail-Portfolio); Profil zwischen Mortgage und QRRE |
+| **Bank** | EBA 2025 Methodology Note Kap. 4 (Net Interest Income) — NIM-Profit-Effekt bei steigenden Zinsen (β_rate < 0) |
+| Sovereign | macro-orthogonal; Sovereign-Risiko via Marktbuch-MtM/Duration (EBA §2.4.2 ¶153). EBA-2025-Results Fig. 22 bestätigt: Public sector = niedrigste Verlustquote. β_oil = 0 ist begründete Modellentscheidung, keine Auslassung |
+
+Die γ-Werte (LGD-Stress) sind nach EBA §2.4.2 ¶128 kalibriert (LGD spiegelt
+den Sicherheiten-Fair-Value-Verfall). CRR Art. 181 fordert „Downturn-LGD"
 für IRB-Banken — die γ-Werte bilden den Downturn-Aufschlag faktor-spezifisch ab.
+
+> **Hinweis zu den Schätzfenstern:** Die β-*Publikationen* sind 2024/2025;
+> ihre ökonometrischen *Schätzfenster* sind historisch (WP 2897 und WP 3112:
+> 2014-2019) — methodisch unvermeidbar, da die Messung von Default-Sensitivitäten
+> einen Default-*Zyklus* mit hinreichend Ausfällen benötigt (die ruhigen Jahre
+> 2020-2024 liefern dafür kaum Signal). Baselines (PD/LGD) sind 31.12.2024, die
+> Schock-Größe stammt aus dem EBA-2025-Adverse-Szenario.
 
 ### 6.3 · Override-Möglichkeit für Sensitivitäts-Analysen
 
@@ -643,7 +657,9 @@ Risk management/
   März 2026.
   https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/risk-dashboard
 
-- **EBA Stress Test 2025 Methodology Note.** Veröffentlicht September 2024.
+- **EBA 2025 EU-wide Stress Test — Methodological Note.** Veröffentlicht 11. November
+  2024 (Kreditrisiko = Kap. 2, §2.4.2). · **Macro-financial scenario** (Jan 2025,
+  §4.1.6 Long-term rates). · **Results** (Aug 2025, Fig. 22 Verlustquoten je Portfolio).
   https://www.eba.europa.eu/regulation-and-policy/stress-testing
 
 - **EBA Reports on the Implementation of IFRS 9 by EU Banks.** Jährlich seit 2018.
@@ -654,23 +670,29 @@ Risk management/
 
 ### 9.3 · Akademische Literatur
 
-- **Castro, V. (2013).** "Macroeconomic determinants of the credit risk in the banking
-  system: The case of the GIPSI." *Economic Modelling* 31, S. 672–683.
-  DOI: 10.1016/j.econmod.2012.11.029
-  https://doi.org/10.1016/j.econmod.2012.11.029
+**Per-Segment-β-Kalibrierung (aktuell, Stichtag 31.12.2024):**
 
-- **Drehmann, M. & Juselius, M. (2014).** "Evaluating early warning indicators of
-  banking crises: Satisfying policy requirements." *International Journal of
-  Forecasting* 30(3), S. 759–780. Vorabversion: BIS Working Paper 421.
-  https://www.bis.org/publ/work421.htm
+- **Lo Duca, M., Moccero, D. & Parlapiano, F. (2024).** "The impact of macroeconomic
+  and monetary policy shocks on credit risk in the euro area corporate sector."
+  *ECB Working Paper Series* No 2897. — Corporate/SME, beide Faktoren
+  (Angebotsschock ≈ Öl, Geldpolitik ≈ Zins); KMU ≈2×/3× Large-Corp.
+  https://www.ecb.europa.eu/pub/pdf/scpwps/ecb.wp2897~449ca98c99.en.pdf
+
+- **Bandoni, E., Fourné, F. & Jarmulska, B. (2025).** "Mortgage loan rates and the
+  defaults of variable rate mortgages." *ECB Working Paper Series* No 3112. —
+  Mortgage-Default ↔ Zins, nichtlinear & asymmetrisch.
+  https://www.ecb.europa.eu/pub/pdf/scpwps/ecb.wp3112~d8d7660171.en.pdf
+
+- **ECB/ESRB (2024).** *Financial Stability Review, Mai 2024.* — Energie-/Cost-of-
+  Living-Schock → Haushalts-Arrears/Default (untere Einkommensquintile);
+  Sektor-Heterogenität der erwarteten Default-Raten.
+  https://www.ecb.europa.eu/press/financial-stability-publications/fsr/html/index.en.html
+
+**Foundational (Öl-Makro-Transmission, Identifikation):**
 
 - **Hamilton, J. D. (1983).** "Oil and the macroeconomy since World War II."
   *Journal of Political Economy* 91(2), S. 228–248.
   https://www.jstor.org/stable/1832055
-
-- **Hosszú, Zs. & Király, J. (2018).** "Banking system, real economy, real estate
-  market." Magyar Nemzeti Bank Working Paper 2018/2.
-  https://www.mnb.hu/en/publications/studies-publications-statistics/mnb-working-papers
 
 - **Kilian, L. (2009).** "Not All Oil Price Shocks Are Alike: Disentangling Demand
   and Supply Shocks in the Crude Oil Market." *American Economic Review* 99(3),

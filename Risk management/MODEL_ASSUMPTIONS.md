@@ -152,12 +152,17 @@ zwei separate Sensitivitäten parametrisiert:
 | Klasse | β_oil (PD) | β_rate (PD) | γ_oil (LGD) | γ_rate (LGD) |
 |---|---|---|---|---|
 | Corporate | +0.30 | +0.20 | +0.50 | +1.00 |
-| SME Corporate | +0.45 | +0.35 | +0.40 | +1.20 |
+| SME Corporate | +0.60 | +0.40 | +0.45 | +1.10 |
 | Mortgage | +0.05 | +0.30 | +0.10 | +1.50 |
 | QRRE | +0.40 | +0.15 | +0.30 | +0.50 |
 | Other Retail | +0.30 | +0.25 | +0.25 | +0.80 |
 | **Bank** | +0.05 | **−0.05** | +0.10 | +0.50 |
 | Sovereign | 0 | 0 | 0 | 0 |
+
+*SME-β auf ≈2× Corporate angehoben (Recalibration Juni 2026) — ECB
+WP 2897 (2024) misst die KMU-Größen-Heterogenität direkt (≈2× bei
+Angebots-, ≈3× bei Geldpolitik-Schock); ersetzt den älteren ≈1,5×-Wert
+aus Drehmann/Juselius (2014).*
 
 **Sektor-Differenzierung adressiert Professor-Kritik Punkt 7** ("Zinsen
 hoch ≠ allgemein schlecht"): Bank-Klasse hat β_rate < 0 — steigende
@@ -170,20 +175,43 @@ Literatur dokumentiert:
 - Floating-Rate-Hypotheken reagieren stark auf Zinsen (β_rate für Mortgage)
 - Banken profitieren von steigender Zinskurve über NIM (β_rate negativ)
 
-**Quellen:**
-- EBA Stress Test 2025 Methodology Note (Sept 2024), Sec. 5.3.2 (Sektor-
-  PD-Elastizitäten) + Sec. 6.1-6.2 (LGD-Stress)
-- Drehmann & Juselius (2014). *Evaluating early warning indicators of
-  banking crises*. BIS WP 421 (SME-PD-Elastizität)
-- Hosszú & Király (2018). MNB Working Papers 2018/2 (Mortgage Rate-
-  Sensitivität)
-- Castro (2013). *Macroeconomic determinants of credit risk in the
-  banking system*. Economic Modelling 31 (Oil-Price-Transmission)
-- Reinhart & Rogoff (2009). *This Time Is Different* (Sovereign-Defaults)
+**Quellen (Recalibration Juni 2026 — aktuell, Stichtag 31.12.2024):**
+Methodischer Rahmen: EBA *2025 EU-wide Stress Test — Methodological Note*
+(11 Nov 2024), Kap. 2 Credit risk, **§2.4.2 ¶120-128** (¶121: „sectoral
+sensitivities applied to portfolio-level projections", konsistent mit
+Richtung *und* Größenordnung der Szenario-Schocks; ¶128: LGD spiegelt den
+Sicherheiten-Fair-Value-Verfall). Schock-Größe: EBA/ESRB *2025 Macro-
+financial scenario* (Jan 2025), **§4.1.6** adverser 10y-Pfad. Per-Segment-β:
+- **Corporate / SME** ← ECB WP 2897 (Lo Duca/Moccero/Parlapiano 2024):
+  Makro- & Geldpolitik-Schocks → Corporate-PD (DE/FR/IT/ES); KMU/Mikro
+  ≈2× (Angebot) bzw. ≈3× (Geldpolitik) Large-Corp. Deckt beide Faktoren ab
+  (Supply-Schock ≈ Öl, Monetary ≈ Zins).
+- **Mortgage** ← ECB WP 3112 (Bandoni/Fourné/Jarmulska 2025): Variable-
+  Rate-Mortgage-Defaults ↔ Zins (nichtlinear/asymmetrisch); Öl-Kanal via
+  ECB FSR Mai 2024 (Energie → Haushalts-Default).
+- **QRRE / Other Retail** ← ECB FSR Mai 2024 (Haushalts-Schuldendienst ↔
+  Zins; Energie → Konsumenten-Arrears, untere Einkommensquintile);
+  EBA-2025-Results Fig. 22 (Retail = höchste projizierte Verlustquote).
+- **Bank** ← EBA-2025-Methodik Kap. 4 (NII): NIM-Uplift bei +Δr → β_rate<0.
+- **Sovereign** ← macro-orthogonal; Zins wirkt über den separaten Marktbuch-
+  MtM-Kanal (EBA §2.4.2 ¶153). Empirisch aktuell bestätigt durch EBA-2025-
+  Results Fig. 22 (Public sector = niedrigste Verlustquote). Reinhart &
+  Rogoff (2009) für die fiskalische Natur von Sovereign-Defaults.
+- **All-Segment-Querverankerung:** EBA *2025 EU-wide Stress Test — Results*
+  (Aug 2025), Fig. 22, bestätigt die relative Sensitivitäts-Rangfolge.
 
-**Limitation:** β-Koeffizienten sind aus Literatur kalibriert. Eine
-banken- und periodenspezifische Re-Schätzung wäre ideal, aber durch
-Datenverfügbarkeit (Pillar-3 vs AnaCredit) eingeschränkt.
+**Wichtig zur Faktor-Struktur:** Der Zins-Kanal ist direkt auf aktuelle,
+segment-spezifische Quellen kalibrierbar. Der Öl-Kanal wirkt im EBA/ECB-
+Framework *nicht* direkt, sondern als adverser Angebotsschock (so in
+WP 2897 identifiziert) — das EBA-2025-Szenario ist selbst öl-/gas-getrieben
+(Energiepreis → HICP +3,9 % → Zinsen ↑ → BIP ↓). Bank-Öl bleibt indirekt
+(kein direkter per-Segment-Anker), daher klein gehalten.
+
+**Limitation:** Die β-PUBLIKATIONEN sind 2024/2025; ihre ökonometrischen
+Schätzfenster sind historisch (WP 2897 und WP 3112: 2014-2019) — methodisch
+unvermeidbar, da die Messung von Default-Sensitivitäten einen Default-Zyklus
+mit hinreichend Ausfällen braucht. Baselines (PD/LGD) = 31.12.2024,
+Schock-Größe = EBA-2025-Szenario. β sind via Sidebar-Override veränderbar.
 
 ---
 
@@ -379,16 +407,23 @@ Punkt-Prognose.
 
 - BCBS (2017). *Basel III: Finalising post-crisis reforms*. Basel
   Committee on Banking Supervision.
-- Castro, V. (2013). *Macroeconomic determinants of the credit risk in
-  the banking system: The case of the GIPSI*. Economic Modelling 31.
-- Drehmann, M. & Juselius, M. (2014). *Evaluating early warning
-  indicators of banking crises*. BIS Working Paper 421.
+- Bandoni, E., Fourné, F. & Jarmulska, B. (2025). *Mortgage loan rates
+  and the defaults of variable rate mortgages*. ECB Working Paper 3112.
+- EBA (2024). *2025 EU-wide Stress Test — Methodological Note* (11 Nov
+  2024); Kap. 2 Credit risk, §2.4.2.
+- EBA/ESRB (2025). *2025 EU-wide Stress Test — Macro-financial scenario*
+  (Jan 2025); §4.1.6 Long-term rates.
+- EBA (2025). *2025 EU-wide Stress Test — Results* (Aug 2025); Fig. 22
+  Projected credit risk losses by portfolio.
+- EBA (2025). *Report on the 2024 Credit Risk Benchmarking Exercise*
+  (März 2025).
 - EBA (2025). *EU-wide Transparency Exercise 2025 — Public Disclosure*.
-- EBA (2026). *Risk Dashboard Credit Risk Parameters Annex Q4 2025*.
-- EBA (2024). *EU-wide Stress Test 2025 — Methodology Note*.
 - EBA GL 14 (ICAAP / Stress-Testing).
-- Hosszú, Zs. & Király, J. (2018). *Default risk in Hungarian household
-  credit portfolios*. MNB Working Papers 2018/2.
+- ECB/ESRB (2024). *Financial Stability Review, Mai 2024* (Energie-/
+  Cost-of-Living-Schock → Haushalts-Default; Sektor-Heterogenität).
+- Lo Duca, M., Moccero, D. & Parlapiano, F. (2024). *The impact of
+  macroeconomic and monetary policy shocks on credit risk in the euro
+  area corporate sector*. ECB Working Paper 2897.
 - Reinhart, C. & Rogoff, K. (2009). *This Time Is Different: Eight
   Centuries of Financial Folly*. Princeton UP.
 - SR 11-7 — Federal Reserve / OCC Supervisory Guidance on Model Risk

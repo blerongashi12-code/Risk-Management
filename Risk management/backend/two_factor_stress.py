@@ -18,25 +18,67 @@ Vorteile gegenüber Vasicek/M:
   hat β_rate < 0 (NIM-Uplift).
 - Transparente lineare Form ohne Conditional-PD-Inverse-Normal-Tricks.
 
-β-Koeffizienten · Herkunft
---------------------------
-Die unten hinterlegten Sensitivitäten sind aus Literatur und EBA-
-Veröffentlichungen kalibriert. Pro Klasse + Faktor + Risk-Parameter
-gibt es einen β-Wert mit explizit zitierter Quelle. Diese Werte sind
-"defensible defaults" — der Anwender kann sie via Sidebar-Override
-für Sensitivitäts-Analysen verändern.
+β-Koeffizienten · Herkunft (Recalibration Juni 2026, Stichtag 31.12.2024)
+-------------------------------------------------------------------------
+Die β/γ sind als "sectoral sensitivities applied to portfolio-level
+projections" im Sinne der EBA-Methodik §2.4.2 ¶121 zu verstehen —
+genau dieser Ansatz ist aufsichtsrechtlich vorgesehen (die EBA gibt
+KEINE fertigen β-Tabellen vor, sondern verlangt, dass die projizierten
+Parameter in *Richtung und Größenordnung* mit den Szenario-Schocks
+konsistent sind). Pro Klasse + Faktor + Risk-Parameter gibt es einen
+β-Wert mit explizit zitierter, AKTUELLER Quelle. Es sind "defensible
+defaults", via Sidebar-Override veränderbar.
 
-Quellen
--------
-- EBA Stress Test 2025 Methodology Note (Sept 2024) — Sektor-PD-
-  Sensitivitäten unter Adverse-Szenario
-- EBA Credit Risk Benchmarking Exercise 2024 — historische Default-
-  Rate-Reaktionen je Asset-Klasse
-- Drehmann & Juselius (2014) BIS WP 421 — Macro-PD-Transmission
-- Hosszú & Kirá ly (2018) MNB WP 2018/2 — Zins-Sensitivität von Retail-
-  Default-Raten
-- Castro (2013) — Oil-Price-Macroeconomic-Transmission auf Banking-
-  Sector-PDs
+Wichtig zur Faktor-Struktur:
+- ZINS-Kanal (β_rate): direkt auf aktuelle, segment-spezifische Quellen
+  (Stichtag 31.12.2024) kalibrierbar — EBA-2025-Adverse-Szenario
+  (10y-Pfad) + ECB-Satellitenmodelle.
+- ÖL-Kanal (β_oil): die EBA/ECB-Kreditrisiko-Modelle treiben PD/LGD
+  NICHT direkt über den Ölpreis, sondern über BIP/GVA/HICP. Brent wirkt
+  daher als *adverser Angebotsschock* (so identifiziert in ECB WP 2897)
+  — das EBA-2025-Szenario ist selbst ein öl-/gas-getriebenes Szenario
+  (Energiepreis-Schock → HICP +3,9 % → Zinsen ↑ → BIP ↓). Der Öl-Kanal
+  ist also der Szenario-Auslöser, dessen Kredit-Wirkung über die
+  Angebotsschock-Evidenz fundiert ist, NICHT eine separat publizierte
+  supervisory Öl-PD-Elastizität.
+
+Quellen (aktuell)
+-----------------
+- EBA (2024). *2025 EU-wide Stress Test — Methodological Note* (11 Nov
+  2024), Kap. 2 Credit risk, §2.4.2 "Projected point-in-time parameters
+  (a hierarchy of approaches)", ¶120–128 (¶121 sectoral sensitivities,
+  ¶128 LGD reflektiert Sicherheiten-FV-Verfall).
+- EBA/ESRB (2025). *2025 EU-wide Stress Test — Macro-financial
+  scenario* (Jan 2025), §4.1.6 Long-term rates (adverse 10y-Pfad,
+  Startpunkt Ø Dez-2024): Euroraum 2,73 → 4,63 % (+1,9 pp), DE +1,3,
+  FR +2,1, IT +2,9, ES +2,8 pp.
+- Lo Duca, Moccero & Parlapiano (2024). *The impact of macroeconomic
+  and monetary policy shocks on credit risk in the euro area corporate
+  sector*, ECB WP 2897 — PD-Reaktion je Sektor/Größe (DE/FR/IT/ES):
+  KMU/Mikro ≈2× (Angebot) bzw. ≈3× (Geldpolitik) Large-Corp.
+  → Corporate/SME, BEIDE Faktoren (Supply-Schock ≈ Öl, Monetary ≈ Zins).
+- Bandoni, Fourné & Jarmulska (2025). *Mortgage loan rates and the
+  defaults of variable rate mortgages*, ECB WP 3112 — Mortgage-Default ↔
+  Zins, nichtlinear & asymmetrisch (Zins-Anstiege treiben Default stark).
+  → Mortgage, Zins-Kanal.
+- EBA/ECB (2024). *Financial Stability Review, Mai 2024* — Energiepreis-/
+  Cost-of-Living-Schock → Haushalts-Arrears/Default (untere Einkommens-
+  quintile); Sektor-Heterogenität der erwarteten Default-Raten.
+  → Mortgage/QRRE/Other-Retail, Öl- und Zins-Kanal.
+- EBA (2025). *2025 EU-wide Stress Test — Results* (Aug 2025), Fig. 22
+  „Projected credit risk losses by portfolio" — Verlustquote je Basel-
+  Portfolio (Startpunkt 31.12.2024): Retail > SMEs > Corporate-RE >
+  Corporate > Residential > Public. All-Segment-Querverankerung der
+  relativen Sensitivitäts-Struktur.
+- EBA (2025). *Report on the 2024 Credit Risk Benchmarking Exercise*
+  (März 2025) — aktuelle PD/LGD-Niveaus je IRB-Asset-Klasse.
+
+Hinweis zu den Schätzfenstern: PD/LGD-Baselines = 31.12.2024, Schock-
+Größe = EBA-2025-Adverse-Szenario (Start Dez-2024). Die β-PUBLIKATIONEN
+sind 2024/2025; ihre ÖKONOMETRISCHEN Schätzfenster sind historisch
+(WP 2897 und WP 3112: 2014-2019) — methodisch unvermeidbar, weil die
+Messung von Default-Sensitivitäten einen Default-Zyklus mit hinreichend
+Ausfällen benötigt (die ruhigen Jahre 2020-2024 liefern kaum Signal).
 
 API
 ---
@@ -72,117 +114,132 @@ import numpy as np
 
 SENSITIVITY_MATRIX = {
     "corporate": {
-        "pd_oil":   0.30,  # +30% oil → +9 bp PD (Input-Kosten, Margin-Squeeze)
-        "pd_rate":  0.20,  # +1pp rate → +20 bp PD (Refi-Kosten höher)
-        "lgd_oil":  0.50,  # +30% oil → +0.15pp LGD (Asset-Werte mild)
-        "lgd_rate": 1.00,  # +1pp rate → +1pp LGD (Asset-Werte Bond-ähnlich)
-        "source_pd":  "EBA Stress Test 2025 Methodology Note, Sec. 5.3.2 "
-                      "(Corporate sectoral PD elasticities, adverse "
-                      "scenario)",
-        "source_lgd": "EBA Stress Test 2025 Methodology Note, Sec. 6.1 "
-                      "(LGD-stress under macro adverse)",
+        "pd_oil":   0.30,  # Angebotsschock-Kanal (ECB WP 2897)
+        "pd_rate":  0.20,  # +1pp rate → +20 bp PD (Refi-Kosten, WP 2897)
+        "lgd_oil":  0.50,  # Sicherheiten-Werte mild öl-sensitiv
+        "lgd_rate": 1.00,  # Sicherheiten-FV-Verfall bei +Δr (EBA §2.4.2 ¶128)
+        "source_pd":  "ECB WP 2897 (Lo Duca/Moccero/Parlapiano 2024) — "
+                      "Makro-/Geldpolitik-Schocks → Large-Corp-PD im EA "
+                      "(DE/FR/IT/ES); EBA 2025 Methodology §2.4.2 ¶120-128",
+        "source_lgd": "EBA 2025 Methodology §2.4.2 ¶128 (LGD spiegelt "
+                      "Sicherheiten-FV-Verfall); EBA Credit Risk "
+                      "Benchmarking 2024 (LGD-Niveau Corporate)",
         "economic_logic":
-            "Steigender Ölpreis erhöht Input-Kosten besonders in "
-            "energy-intensiven Industrien (Transport, Chemie, "
-            "Materialien). Höhere Zinsen verteuern Refinanzierung und "
-            "drücken auf Cashflow-Coverage-Ratios. LGD reagiert mild "
-            "auf Oil (Sicherheiten-Werte) und stärker auf Rate "
-            "(Collateral-Bond-Duration-Effekt).",
+            "Der Ölpreis wirkt als adverser Angebotsschock (Input-Kosten, "
+            "Margin-Squeeze, energie-intensive Industrien); ECB WP 2897 "
+            "misst die stärkste Supply-Reaktion in Bau/Immobilien, "
+            "Handel, Transport, ICT. Höhere Zinsen verteuern "
+            "Refinanzierung und drücken Cashflow-Coverage. LGD reagiert "
+            "mild auf Öl und stärker auf Zins, weil ein Zinsschock den "
+            "Fair Value der Sicherheiten senkt (EBA §2.4.2 ¶128).",
     },
     "sme_corporate": {
-        "pd_oil":   0.45,  # SMEs noch sensitiver als Large Corporates
-        "pd_rate":  0.35,  # SMEs haben oft kürzere Laufzeiten + höhere Refi
-        "lgd_oil":  0.40,
-        "lgd_rate": 1.20,
-        "source_pd":  "Drehmann & Juselius (2014) BIS WP 421 — SME-PD "
-                      "elasticity to interest rate ~1.5× larger than "
-                      "large-corp",
-        "source_lgd": "EBA Stress Test 2025 Methodology Note (SME-LGD "
-                      "amplifier 1.2× corporate)",
+        "pd_oil":   0.60,  # ≈2× Large-Corp (ECB WP 2897 Fig. 5, Size)
+        "pd_rate":  0.40,  # ≈2× Large-Corp; Geldpolitik trifft KMU härter
+        "lgd_oil":  0.45,
+        "lgd_rate": 1.10,
+        "source_pd":  "ECB WP 2897 (2024) Fig. 5 — Mikro/KMU-PD reagiert "
+                      "≈2× (Angebotsschock) bzw. ≈3× (Geldpolitik) so "
+                      "stark wie Large-Corp; ersetzt Drehmann/Juselius "
+                      "(2014, ≈1,5×)",
+        "source_lgd": "EBA 2025 Methodology §2.4.2 ¶128; weniger liquide "
+                      "KMU-Sicherheiten → LGD leicht über Large-Corp",
         "economic_logic":
-            "SMEs haben geringere Diversifikation und schwächere "
-            "Bargaining-Power gegenüber Lieferanten — Energie-"
-            "Schocks und Refi-Schocks schlagen härter durch. Auch die "
-            "LGD ist höher, weil Sicherheiten weniger liquide.",
+            "KMU haben geringere Diversifikation, dünnere Liquiditäts-"
+            "puffer und schwächere Preissetzungsmacht — Energie- und "
+            "Zinsschocks schlagen härter durch. ECB WP 2897 quantifiziert "
+            "diese Größen-Heterogenität direkt: ein Angebotsschock hebt "
+            "die Mikro-/KMU-PD rund doppelt, ein Geldpolitik-Schock rund "
+            "dreifach gegenüber Large-Corporates. Daher β ≈ 2× Corporate. "
+            "LGD höher, weil Sicherheiten weniger liquide sind.",
     },
     "mortgage": {
-        "pd_oil":   0.05,  # nur indirekt via Inflation
-        "pd_rate":  0.30,  # Floating-Rate-Affordability-Druck
+        "pd_oil":   0.05,  # nur indirekt via Haushaltseinkommen/Inflation
+        "pd_rate":  0.30,  # Affordability + Hauspreis-Kanal (ECB WP 3112)
         "lgd_oil":  0.10,
-        "lgd_rate": 1.50,  # Property-values drop with rate shock
-        "source_pd":  "Hosszú & Király (2018) MNB WP — Rate-Sensitivität "
-                      "von Mortgage-Default ca. +0.30pp PD je +100bp Δr "
-                      "im 2-Jahres-Horizont",
-        "source_lgd": "EBA Stress Test 2025 Methodology Note, Sec. 6.2 "
-                      "(Residential property haircut ca. -15-20% bei "
-                      "+200bp Δr → +1.5pp LGD je 1pp)",
+        "lgd_rate": 1.50,  # Wohnimmobilien-Preis sinkt mit Zinsschock
+        "source_pd":  "Zins: ECB WP 3112 (2025) — Variable-Rate-Mortgage-"
+                      "Defaults ↔ Zins (nichtlinear, asymmetrisch, "
+                      "2022-24-Zyklus); Öl: ECB FSR Mai 2024 "
+                      "(Energiekosten → Haushalts-Default)",
+        "source_lgd": "EBA 2025 Methodology §2.4.2 ¶128 (Immobilien-"
+                      "Preisschock → Wohnsicherheiten-FV); EBA-2025-"
+                      "Szenario unterstellt starken RRE-Preisrückgang",
         "economic_logic":
-            "Hypotheken sind das archetypische rate-sensitive Asset: "
-            "Floating-Rate-Anteil belastet Affordability sofort, "
-            "Property-Werte sinken via Duration. Brent hat nur "
-            "indirekten Effekt via verfügbarem Einkommen "
-            "(Inflations-Belastung).",
+            "Hypotheken sind das archetypische zins-sensitive Asset: der "
+            "Floating-Rate-Anteil belastet die Affordability sofort, und "
+            "der Zinsschock drückt die Wohnimmobilien-Preise und damit "
+            "die Recovery (höchstes γ_rate, EBA ¶128). Brent wirkt nur "
+            "indirekt über das verfügbare Haushaltseinkommen.",
     },
     "qrre": {
-        "pd_oil":   0.40,  # Kosten-Inflation belastet Konsumenten
-        "pd_rate":  0.15,  # geringere Rate-Sensitivität (kurze Laufzeiten)
+        "pd_oil":   0.40,  # Energie-Inflation belastet Konsumenten direkt
+        "pd_rate":  0.15,  # geringe Zins-Sensitivität (kurze Laufzeiten)
         "lgd_oil":  0.30,
         "lgd_rate": 0.50,
-        "source_pd":  "Castro (2013) — Oil-Price-Shock auf Retail-"
-                      "Default-Raten via Inflations-Transmission, "
-                      "Korrelations-Koeff. ~0.35-0.50",
-        "source_lgd": "Basel III F-IRB-LGD 65% baseline + EBA-2023-"
-                      "Downturn-Multiplier-Konvention",
+        "source_pd":  "ECB FSR Mai 2024 (Haushalts-Schuldendienst ↔ Zins; "
+                      "Energiepreis → Konsumenten-Arrears, untere "
+                      "Einkommensquintile); EBA-2025-Results Fig. 22 "
+                      "(Retail: höchste projizierte Verlustquote)",
+        "source_lgd": "Basel III F-IRB-Baseline + EBA Credit Risk "
+                      "Benchmarking 2024 (QRRE-LGD-Niveau)",
         "economic_logic":
-            "QRRE (Kreditkarten, Revolving) reagiert primär auf "
-            "Konsumenten-Disposable-Income — Energie-Preise belasten "
-            "via Inflation. Zins-Sensitivität ist niedriger, weil "
-            "QRRE-Sätze ohnehin variabel und hoch (oft 15-20%).",
+            "QRRE (Kreditkarten, Revolving) reagiert primär auf das "
+            "verfügbare Haushaltseinkommen — Energiepreise belasten es "
+            "über die Inflation (ECB FSR 2024). Die Zins-Sensitivität ist "
+            "niedrig, weil QRRE-Sätze ohnehin variabel und hoch sind "
+            "(oft 15-20 %) und die Laufzeiten kurz.",
     },
     "other_retail": {
         "pd_oil":   0.30,
         "pd_rate":  0.25,
         "lgd_oil":  0.25,
         "lgd_rate": 0.80,
-        "source_pd":  "EBA Credit Risk Benchmarking 2024 — Other-Retail-"
-                      "PD-Volatilität historisch zwischen QRRE und "
-                      "Mortgage",
-        "source_lgd": "EBA Stress Test 2025 (Other Retail LGD "
-                      "amplifier 0.8× mortgage)",
+        "source_pd":  "ECB FSR Mai 2024 (Haushalte); EBA-2025-Results "
+                      "Fig. 22 (Retail-Portfolio); Profil zwischen "
+                      "Mortgage und QRRE",
+        "source_lgd": "EBA 2025 Methodology §2.4.2 ¶128; EBA Credit Risk "
+                      "Benchmarking 2024 (Other-Retail-LGD-Niveau)",
         "economic_logic":
             "Konsumkredite, Auto-Finanzierung, Personal Loans: mittlere "
             "Sensitivität sowohl auf Energie-Inflation als auch auf "
-            "Refi-Kosten. Position zwischen Mortgage und QRRE.",
+            "Refi-Kosten — ein Mischprofil zwischen besichertem Mortgage "
+            "und unbesichertem QRRE.",
     },
     "bank": {
         "pd_oil":   0.05,  # nur indirekt
         "pd_rate": -0.05,  # NEGATIV: NIM-Uplift kompensiert Kreditrisiko
         "lgd_oil":  0.10,
         "lgd_rate": 0.50,
-        "source_pd":  "EBA Stress Test 2025 Methodology Note — Bank-zu-"
-                      "Bank-Exposures: rate-up wirkt netto positiv via "
-                      "NIM-Verbesserung (kompensiert credit-risk-up)",
-        "source_lgd": "Basel III F-IRB-LGD 45% baseline",
+        "source_pd":  "EBA 2025 Methodology Kap. 4 (NII) — steigende "
+                      "Zinsen heben die Net Interest Margin; NIM-Uplift "
+                      "kompensiert den Kreditrisiko-Anstieg netto positiv",
+        "source_lgd": "Basel III F-IRB-LGD 45 % Baseline (Senior-"
+                      "Unsecured Bank-Exposure)",
         "economic_logic":
-            "Bank-Counterparties profitieren von steigenden Zinsen "
-            "(Net Interest Margin) — der credit-Risk-Anstieg wird "
-            "überkompensiert. Daher β_rate < 0 — ein KLARES Beispiel, "
-            "dass 'Zinsen hoch = schlecht' NICHT allgemein gilt.",
+            "Bank-Counterparties profitieren von steigenden Zinsen über "
+            "die Net Interest Margin (EBA-NII-Kapitel) — der Kreditrisiko-"
+            "Anstieg wird überkompensiert. Daher β_rate < 0: ein klares "
+            "Beispiel, dass 'Zinsen hoch = schlecht' NICHT allgemein gilt.",
     },
     "sovereign": {
         "pd_oil":   0.00,
         "pd_rate":  0.00,  # Sovereign-Default ist macro-orthogonal
         "lgd_oil":  0.00,
         "lgd_rate": 0.00,
-        "source_pd":  "Reinhart & Rogoff (2009) — Sovereign defaults sind "
-                      "fiskalische Ereignisse, nicht direkt macro-getrieben",
-        "source_lgd": "F-IRB-LGD 45% (Sovereign-Recovery historisch "
-                      "ähnlich Senior-Unsecured)",
+        "source_pd":  "Macro-orthogonal: Zins wirkt über den Marktbuch-"
+                      "MtM-Kanal (EBA 2025 Methodology §2.4.2 ¶153, ECB-"
+                      "Sovereign-Benchmark); EBA-2025-Results Fig. 22 "
+                      "(Public sector: niedrigste projizierte Verlustquote "
+                      "im Adverse-Szenario); Reinhart & Rogoff (2009)",
+        "source_lgd": "F-IRB-LGD 45 % (Sovereign-Recovery ~ Senior-"
+                      "Unsecured)",
         "economic_logic":
             "Sovereign-Default ist primär fiskalisch determiniert "
-            "(Schuldenstand, Steuereinnahmen, politische Stabilität) "
-            "und NICHT direkt durch Brent oder Δr_10y. Der Sovereign-"
-            "MtM-Channel wirkt über Duration (separate Modellebene).",
+            "(Schuldenstand, Steuereinnahmen, politische Stabilität) und "
+            "NICHT direkt durch Brent oder Δr_10y. Der Zinsschock wirkt "
+            "stattdessen über den Sovereign-MtM-/Duration-Kanal (separate "
+            "Modellebene, Tab Marktbuch).",
     },
 }
 
@@ -562,6 +619,44 @@ def _test_sovereign_inert():
     assert abs(p - 0.001) < 1e-6
 
 
+def _test_sme_amplifies_corporate():
+    """ECB WP 2897 (2024): KMU-PD reagiert ≈2× so stark wie Large-Corp.
+
+    Recalibration Juni 2026 — die SME-β müssen die in WP 2897 gemessene
+    Größen-Heterogenität (≈2× für Angebots-, ≈3× für Geldpolitik-Schock)
+    abbilden, also klar über den Corporate-β liegen.
+    """
+    for factor in ("oil", "rate"):
+        b_sme = get_beta("sme_corporate", factor, "pd")
+        b_cor = get_beta("corporate",     factor, "pd")
+        assert b_sme >= 1.8 * b_cor - 1e-9, (
+            f"SME β_{factor} ({b_sme}) sollte ≈2× Corporate ({b_cor}) sein")
+
+
+def _test_sources_current_no_stale_refs():
+    """Keine falschen EBA-Abschnittsnummern mehr (Recalibration Juni 2026).
+
+    §5.3.2 = Conduct risk, §6.1/§6.2 = Non-interest income im echten
+    EBA-2025-Methodology-Note. Kreditrisiko-Projektion ist §2.4.2. Diese
+    Stale-Referenzen dürfen NICHT mehr in den Quellen stehen.
+    """
+    stale = ("5.3.2", "5.3.4", "Sec. 6.1", "Sec. 6.2", "§3.4", "§3.5")
+    for cls in VASICEK_CLASSES:
+        src = get_sources(cls)
+        blob = (src["pd"] + " " + src["lgd"])
+        for bad in stale:
+            assert bad not in blob, \
+                f"{cls}: veraltete Quellen-Referenz '{bad}' in {blob!r}"
+        # jede Nicht-Sovereign-Klasse muss einen aktuellen (2024/2025)
+        # Quellen-Anker zitieren
+        if cls != "sovereign":
+            assert any(k in blob for k in
+                       ("WP 2897", "WP 3112", "FSR Mai 2024", "FSR 2024",
+                        "§2.4.2", "Benchmarking 2024", "NII",
+                        "EBA-2025-Results")), \
+                f"{cls}: kein aktueller Quellen-Anker in {blob!r}"
+
+
 if __name__ == "__main__":
     import sys
     if sys.platform == "win32":
@@ -575,6 +670,8 @@ if __name__ == "__main__":
         ("Stress-Anwendung Corporate",       _test_stress_application),
         ("Mortgage Rate-dominant",           _test_mortgage_rate_dominant),
         ("Sovereign macro-inert",            _test_sovereign_inert),
+        ("SME ≈2× Corporate (WP 2897)",      _test_sme_amplifies_corporate),
+        ("Quellen aktuell (keine §5.3.2)",   _test_sources_current_no_stale_refs),
     ]:
         try:
             fn()

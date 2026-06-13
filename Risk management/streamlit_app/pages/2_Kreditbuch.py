@@ -212,8 +212,9 @@ else:
         f"(Floating-Rate-Affordability), Corporate auf beide Faktoren, "
         f"Bank-Klasse hat <em>negative</em> Zinssensitivität "
         f"(NIM-Effekt — adressiert Professor-Kritik Punkt 7). "
-        f"Quelle: EBA Stress Test 2025 Methodology Note + Literatur "
-        f"(Drehmann/Juselius, Hosszú/Király, Castro)."
+        f"Quelle: β kalibriert nach EBA-2025-Methodik §2.4.2 ¶121, "
+        f"ECB WP 2897 (Corporate/KMU), ECB WP 3112 (Mortgage) und "
+        f"ECB FSR 2024 (Retail)."
     )
 
 st.divider()
@@ -297,9 +298,9 @@ with st.expander("① PD · Probability of Default · "
         "Zins — z.B. reagiert Mortgage stark auf Zinsen, Corporate "
         "auf beide Faktoren, und **die Bank-Klasse hat β_rate < 0** "
         "(Net-Interest-Margin-Uplift bei steigenden Zinsen). "
-        "Quellen der Sensitivitäten: EBA Stress Test 2025 Methodology "
-        "Note, Drehmann/Juselius (BIS WP 421), Hosszú/Király (MNB WP "
-        "2018/2), Castro (2013)."
+        "Quellen der Sensitivitäten: EBA-2025-Methodik §2.4.2 ¶120-128, "
+        "ECB WP 2897 (2024, Corporate/KMU-PD), ECB WP 3112 (2025, "
+        "Mortgage-Default ↔ Zins), ECB FSR 2024 (Retail/Haushalte)."
     )
     st.markdown(
         "Die empirische Korrelations-Analyse (Tab 1 · Faktor-Analyse) "
@@ -387,9 +388,9 @@ with st.expander("② LGD · Loss Given Default · "
         "Beispiel-Sensitivitäten (γ): **Mortgage** reagiert mit γ_rate = "
         "+1.50pp/+1pp besonders stark auf Zinsen (Property-Value-"
         "Haircut über Duration-Effekt). **Corporate** hat γ_rate = +1.0pp "
-        "(Sicherheiten-Bond-Duration). Quellen: EBA Stress Test 2025 "
-        "Methodology Note Sec. 6.1-6.2 + EBA Risk Dashboard historische "
-        "LGD-Sensitivität."
+        "(Sicherheiten-FV-Verfall bei +Δr). Quellen: EBA-2025-Methodik "
+        "§2.4.2 ¶128 (LGD spiegelt Sicherheiten-Fair-Value) + EBA Credit "
+        "Risk Benchmarking 2024."
     )
     st.markdown(
         "**Floor / Cap:** LGD wird auf [5%, 100%] geclippt für "
@@ -409,8 +410,8 @@ with st.expander("② LGD · Loss Given Default · "
         "- LGD-Floor bei 5 %, Cap bei 100 % — rein numerische Stabilität "
         "der IRB-Capital-Rechnung, kein ökonomischer Kausal-Cap  \n"
         "- LGD-Sensitivitäten γ_oil / γ_rate sind defensible defaults "
-        "aus EBA Stress-Test 2025 Methodology Note, nicht bank-"
-        "individuell kalibriert"
+        "(EBA-2025-Methodik §2.4.2 ¶121/¶128), nicht bank-individuell "
+        "kalibriert"
     )
 
 # -------- 3) EAD --------

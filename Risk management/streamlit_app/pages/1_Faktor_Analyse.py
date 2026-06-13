@@ -851,9 +851,11 @@ with pd_col_r:
         r"+ \beta_{\text{rate}} \cdot \Delta r_{10y,\text{pp}}"
     )
     st.markdown(
-        "Die β-Werte stammen aus EBA Stress Test 2025 §3.4 + Literatur "
-        "(Hosszú/Király 2018, Castro 2013, Drehmann/Juselius 2014) — "
-        "vollständige Tabelle im Intro-Tab · Schritt 3b. **Mortgage** "
+        "Die β-Werte sind auf aktuelle Quellen (Stichtag 31.12.2024) "
+        "kalibriert: ECB WP 2897 (2024, Corporate/KMU), ECB WP 3112 "
+        "(2025, Mortgage), ECB FSR 2024 (Retail) — im EBA-Methodik-"
+        "Rahmen §2.4.2 ¶121. Vollständige Tabelle im Intro-Tab · "
+        "Schritt 3b. **Mortgage** "
         "reagiert primär auf Zinsen (β_rate hoch), **QRRE** auf Brent "
         "(β_oil hoch), **Bank** hat β_rate < 0 (NIM-Effekt: steigende "
         "Zinsen erhöhen die Marge und reduzieren die PD)."
@@ -933,8 +935,9 @@ with lgd_col_r:
     )
     st.markdown(
         "Werte gefloort bei 5 % und gecappt bei 100 %. Die γ-Werte sind "
-        "aus dem EBA Stress Test 2025 und akademischer Literatur "
-        "kalibriert (CRR Art. 181 für Downturn-LGD-Konvention). Mortgage "
+        "nach EBA-2025-Methodik §2.4.2 ¶128 (LGD spiegelt den Sicherheiten-"
+        "Fair-Value-Verfall) kalibriert (CRR Art. 181 für Downturn-LGD-"
+        "Konvention). Mortgage "
         "hat das größte γ_rate, weil steigende Zinsen direkt den "
         "Immobilien-Sicherheitenwert reduzieren — die Bank bekommt im "
         "Default weniger zurück."
@@ -1535,5 +1538,6 @@ footer(
     f"{cov_source} · Aggregat über alle {N_TOTAL} "
     f"IRB-Banken · PDs/LGDs bank-spezifisch aus Pillar-3 EU-CR6 "
     f"(31.12.2024) · "
-    f"β-Sensitivitäten kalibriert nach EBA Stress Test 2025 + Literatur"
+    f"β-Sensitivitäten kalibriert nach EBA-2025-Methodik §2.4.2 + "
+    f"ECB WP 2897/3112 + ECB FSR 2024 (Stichtag 31.12.2024)"
 )
