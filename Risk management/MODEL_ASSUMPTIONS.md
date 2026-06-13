@@ -223,16 +223,25 @@ invertierte Quell-Tabelle):* β_rate × EBA-Adverse-Zinsschock (+1,9 pp) →
 Large-Corp +0,38 pp / KMU +0,76 pp / Mortgage +0,57 pp PD — dieselbe
 Größenordnung wie die in ECB WP 2897 gemessene Reaktion.
 
-**Ausblick — portfolio-spezifische β (bewusst nicht im Modell):** Eine
-einzelne Bank würde die β auf ihrem *eigenen* Portfolio schätzen (EBA §2.4.2
-¶120 „banks should use models"): (1) eigenes Datenpanel quartalsweiser
-Default-/Transition-Raten je Klasse über ≥1 Konjunkturzyklus; (2) Spezifikation
-logit(PD) ~ β_oil·ΔBrent + β_rate·Δr₁₀ᵧ + Kontrollen (BIP, Arbeitslosigkeit,
-Hauspreis) + Lags, gemeinsam über Klassen (SUR, wie ECB BEAST WP 2469);
-(3) Schätzung + EBA-Mindeststandards (ökonometrische Solidität,
-Responsiveness, ¶120) + Out-of-sample-Backtest; (4) Plausibilisierung gegen
-ECB-Benchmark-Parameter (¶122/125) + Caps/Floors. Erfordert bank-interne
-Ausfalldaten, die öffentlich nicht vorliegen — daher die Default-β + Override.
+**Ausblick — portfolio-spezifische β (bewusst nicht im Modell).** Zwei Stufen:
+
+*Stufe 1 — machbar mit öffentlichen Daten (Peer-Group-Ansatz):* aus den
+publizierten Merkmalen der 10 Banken ließe sich je Bank ein *eigenes*
+effektives β ableiten — (a) Länder-Mix → bank-spezifischer Zinsschock
+(IT/ES +2,8–2,9 pp vs. DE/NL +1,3 pp aus §4.1.6, mit Länder-Exposure
+skaliert); (b) Portfolio-Mix → exposure-gewichtetes Blend-β; (c) Peer-Gruppen
+nach Geschäftsmodell, quergeprüft gegen die bank-individuellen EBA-2025-
+Results-Verlustquoten.
+
+*Stufe 2 — Ideal-Weg (bank-intern, EBA §2.4.2 ¶120 „banks should use
+models"):* eigenes Satellitenmodell — (1) Datenpanel eigener Default-/
+Transition-Raten je Klasse über ≥1 Konjunkturzyklus; (2) logit(PD) ~
+β_oil·ΔBrent + β_rate·Δr₁₀ᵧ + Kontrollen (BIP, Arbeitslosigkeit, Hauspreis)
++ Lags, gemeinsam über Klassen (SUR, wie ECB BEAST WP 2469); (3) EBA-
+Mindeststandards (Solidität, Responsiveness, ¶120) + Out-of-sample-Backtest;
+(4) Plausibilisierung gegen ECB-Benchmark-Parameter (¶122/125). Erfordert
+bank-interne Ausfalldaten, die öffentlich nicht vorliegen — daher die
+sektorweiten Default-β + Override.
 
 ---
 

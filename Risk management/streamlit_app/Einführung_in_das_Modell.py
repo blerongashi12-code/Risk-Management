@@ -508,34 +508,13 @@ st.markdown(
 )
 
 st.markdown(
-    '<div style="background:#F4F4F4;border-left:4px solid #034B6F;'
-    'padding:0.95rem 1.1rem;border-radius:6px;margin:0.4rem 0 0.8rem 0;'
-    'color:#051C2C;font-size:0.9rem;line-height:1.6;">'
-    '<strong>Wie wir die β bestimmen — und was hier Annahme ist '
-    '(methodisch wichtig):</strong><br><br>'
-    '<strong>1 · Die Kalibrierungs-Logik ist aufsichtsrechtlich vorgegeben.</strong> '
-    'Die EBA-Methodik <strong>§2.4.2 ¶121</strong> schreibt vor, projizierte '
-    'Risikoparameter als <em>sektorale Sensitivitäten</em> zu modellieren, die '
-    '<em>konsistent mit Richtung UND Größenordnung</em> der Szenario-Schocks '
-    'sind. Die EBA veröffentlicht aber <strong>keine fertige β-Tabelle</strong> — '
-    'wir haben also <strong>nichts abgeschrieben</strong>; vorgegeben ist nur, '
-    '<em>wie</em> man modelliert, nicht die konkrete Zahl.<br><br>'
-    '<strong>2 · Was die Quellen liefern</strong> (Vorzeichen, relative '
-    'Struktur, Größenordnung je Segment): ECB WP 2897 (2024, Corporate/KMU; '
-    'KMU ≈ 2×), ECB WP 3112 (2025, Mortgage ↔ Zins), ECB FSR 2024 '
-    '(Retail-Haushalte), EBA-2025-Szenario §4.1.6 (Zins-Höhe +1,9 pp) und '
-    'EBA-2025-Results Fig. 22 (offizielles Verlust-Ranking als '
-    'Quer-Verankerung).<br><br>'
-    '<strong>3 · Unsere Annahme (explizit).</strong> Wir unterstellen eine '
-    '<em>lineare</em> Sensitivität und setzen die β als <em>defensible, '
-    'überschreibbare Defaults</em> so, dass sie unter dem EBA-Adverse-Szenario '
-    'PD/LGD-Bewegungen in der von den Quellen belegten Größenordnung erzeugen '
-    '(Größenordnungs-Check direkt unter der Tabelle). β-Publikationen 2024/25; '
-    'ihre ökonometrischen Schätzfenster sind historisch (2014–19, da '
-    'Sensitivitäts-Messung einen Default-Zyklus braucht); die PD/LGD-Baselines '
-    'sind 31.12.2024.'
-    '</div>',
-    unsafe_allow_html=True,
+    "Dies ist die **zentralste Annahme des gesamten Modells** — deshalb "
+    "legen wir sie offen. Die EBA gibt vor, **wie** man kalibriert "
+    "(§2.4.2 ¶121: sektorale Sensitivitäten, konsistent mit Richtung und "
+    "Größenordnung der Szenario-Schocks), **aber keine fertige Tabelle** — "
+    "die konkreten Zahlen sind unsere *lineare, plausibilisierte und "
+    "überschreibbare* Annahme, **nicht abgeschrieben**. Warum welcher Wert "
+    "für welches Segment plausibel ist, steht **direkt unter der Tabelle**."
 )
 
 import pandas as pd
@@ -572,6 +551,37 @@ _beta_table = pd.DataFrame(
 )
 st.dataframe(_beta_table, hide_index=True, use_container_width=True,
              height=290)
+
+st.markdown(
+    '<div style="background:#F9FBFC;border:1px solid #D9E4EA;'
+    'border-radius:6px;padding:0.9rem 1.1rem;margin:0.3rem 0 0.7rem 0;'
+    'color:#051C2C;font-size:0.88rem;line-height:1.7;">'
+    '<strong>Warum welcher Wert je Segment</strong> '
+    '(β_oil / β_rate · ökonomischer Treiber · Beleg):<br>'
+    '• <strong>Corporate (0,30 / 0,20)</strong> — Öl verteuert Input-Kosten '
+    'und drückt Margen, Zins die Refinanzierung; <em>beide</em> Kanäle '
+    'wirken moderat positiv. <em>ECB WP 2897.</em><br>'
+    '• <strong>SME (0,60 / 0,40 = 2× Corporate)</strong> — dieselben Kanäle, '
+    'aber doppelt so empfindlich: dünnere Liquiditätspuffer, weniger '
+    'Preissetzungsmacht. <em>WP 2897 misst KMU ≈ 2× (Öl) bzw. ≈ 3× '
+    '(Zins).</em><br>'
+    '• <strong>Mortgage (0,05 / 0,30)</strong> — Öl fast irrelevant (nur '
+    'mittelbar übers Einkommen); <em>Zins dominiert</em>: Floating-Rate-'
+    'Belastung + fallende Hauspreise. <em>ECB WP 3112.</em><br>'
+    '• <strong>QRRE (0,40 / 0,15)</strong> — genau umgekehrt: <em>Öl '
+    'dominiert</em> (Energie-Inflation frisst das Konsumenten-Einkommen), '
+    'Zins kaum (kurze Laufzeiten, ohnehin hohe Sätze). <em>ECB FSR 2024.</em><br>'
+    '• <strong>Other Retail (0,30 / 0,25)</strong> — Mischprofil zwischen '
+    'Mortgage und QRRE. <em>FSR 2024 / EBA-Results.</em><br>'
+    '• <strong>Bank (0,05 / −0,05)</strong> — Zins-β <em>negativ</em>: '
+    'steigende Zinsen heben die Zinsmarge (NIM) stärker, als das Kreditrisiko '
+    'steigt → PD sinkt netto. <em>EBA-NII-Kapitel.</em><br>'
+    '• <strong>Sovereign (0 / 0)</strong> — makro-neutral: der Zins wirkt hier '
+    'nicht über die PD, sondern über den Kursverlust im Marktbuch (separater '
+    'Kanal). <em>EBA ¶153.</em>'
+    '</div>',
+    unsafe_allow_html=True,
+)
 
 st.markdown(
     '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
@@ -675,30 +685,37 @@ st.markdown(
     'border-left:4px solid #B8860B;border-radius:6px;'
     'padding:0.95rem 1.1rem;margin:0.7rem 0 0.4rem 0;color:#051C2C;'
     'font-size:0.88rem;line-height:1.6;">'
-    '<strong>Ausblick · Wie eine Bank portfolio-spezifische β schätzen '
-    'würde</strong><br><br>'
-    'Ein berechtigter Kritikpunkt: β müssten eigentlich '
-    '<em>portfolio-spezifisch</em> sein. Unsere β sind sektorweite '
-    'Default-Werte aus Aufsicht/Literatur — eine einzelne Bank würde sie auf '
-    'ihrem <em>eigenen</em> Portfolio schätzen (Regionen-Mix, Sicherheiten, '
-    'Kundenqualität unterscheiden sich). Genau das verlangt EBA §2.4.2 ¶120 '
-    '(„banks should use models"). Dieses Mess-Konzept ist <strong>bewusst '
-    'nicht ins Modell eingebaut</strong> — es braucht bank-interne '
-    'Ausfalldaten, die öffentlich nicht vorliegen; deshalb die Default-β plus '
-    'die Override-Funktion oben für den Sensitivitäts-Test. So würde eine Bank '
-    'vorgehen:<br><br>'
-    '<strong>① Datenpanel</strong> — eigene quartalsweise Default-/'
-    'Transition-Raten je Exposure-Klasse über mindestens einen '
-    'Konjunkturzyklus.<br>'
-    '<strong>② Spezifikation</strong> — logit(PD)<sub>Klasse</sub> = '
-    'β_oil · ΔBrent + β_rate · Δr₁₀ᵧ + Kontrollen (BIP, Arbeitslosigkeit, '
-    'Hauspreis) + Lags; Klassen gemeinsam geschätzt (SUR, wie ECB BEAST '
-    'WP 2469).<br>'
-    '<strong>③ Schätzung &amp; Standards</strong> — β aus den Regressions-'
-    'Koeffizienten; EBA-Mindeststandards (ökonometrische Solidität + '
-    'Responsiveness, ¶120); Out-of-sample-Backtest.<br>'
-    '<strong>④ Plausibilisierung</strong> — gegen ECB-Benchmark-Parameter '
-    '(¶122/125), Caps/Floors und Cross-Section-Vergleich der Banken.'
+    '<strong>Ausblick · Wie man die β portfolio-spezifisch machen '
+    'könnte</strong><br><br>'
+    'Berechtigte Kritik: β sollten eigentlich <em>portfolio-spezifisch</em> '
+    'sein, nicht sektorweit (Regionen-Mix, Sicherheiten, Kundenqualität '
+    'unterscheiden sich je Bank). Zwei Stufen, wie man dahin käme:<br><br>'
+    '<strong>Stufe 1 — machbar in DIESEM Modell (Peer-Group-Ansatz, nur '
+    'öffentliche Daten):</strong> Wir haben 10 Banken mit publizierten '
+    'Portfolio-Merkmalen — daraus ließe sich je Bank ein <em>eigenes</em> '
+    'effektives β ableiten, ganz ohne interne Ausfalldaten:<br>'
+    '• <strong>Länder-Mix → Zins-β:</strong> eine IT/ES-lastige Bank erlebt '
+    'einen größeren 10y-Schock (+2,8–2,9 pp) als eine DE/NL-lastige '
+    '(+1,3 pp) — die Länder-Pfade aus EBA-Szenario §4.1.6 liegen vor, das '
+    'β_rate ließe sich also mit dem Länder-Exposure der Bank skalieren.<br>'
+    '• <strong>Portfolio-Mix → Blend-β:</strong> das Segment-β mit den '
+    'echten Exposure-Gewichten der Bank verrechnen → ein bank-spezifisches '
+    'Aggregat-β (mortgage-lastig ≠ corporate-lastig).<br>'
+    '• <strong>Peer-Gruppen → Quer-Kalibrierung:</strong> Banken nach '
+    'Geschäftsmodell gruppieren (retail- vs. corporate-lastig vs. universal) '
+    'und die Gruppen-β gegen die <em>bank-individuellen</em> Verlustquoten '
+    'der EBA-2025-Results plausibilisieren.<br><br>'
+    '<strong>Stufe 2 — der Ideal-Weg (bank-intern, EBA §2.4.2 ¶120 „banks '
+    'should use models"):</strong> eigenes Satellitenmodell — '
+    '(1) Datenpanel eigener Default-/Transition-Raten je Klasse über ≥ 1 '
+    'Konjunkturzyklus; (2) logit(PD)<sub>Klasse</sub> = β_oil · ΔBrent + '
+    'β_rate · Δr₁₀ᵧ + Kontrollen (BIP, Arbeitslosigkeit, Hauspreis) + Lags, '
+    'gemeinsam geschätzt (SUR, wie ECB BEAST WP 2469); (3) EBA-Mindeststandards '
+    '(ökonometrische Solidität, Responsiveness) + Out-of-sample-Backtest; '
+    '(4) Plausibilisierung gegen ECB-Benchmark-Parameter (¶122/125). '
+    'Erfordert bank-interne Ausfalldaten — die öffentlich nicht vorliegen; '
+    'deshalb nutzt unser Modell die sektorweiten Default-β + die '
+    'Override-Funktion oben.'
     '</div>',
     unsafe_allow_html=True,
 )
