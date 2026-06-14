@@ -160,9 +160,11 @@ zwei separate Sensitivitäten parametrisiert:
 | Sovereign | 0 | 0 | 0 | 0 |
 
 *SME-β auf ≈2× Corporate angehoben (Recalibration Juni 2026) — ECB
-WP 2897 (2024) misst die KMU-Größen-Heterogenität direkt (≈2× bei
-Angebots-, ≈3× bei Geldpolitik-Schock); ersetzt den älteren ≈1,5×-Wert
-aus Drehmann/Juselius (2014).*
+WP 2897 (2024) zeigt, dass kleine und mittlere Unternehmen deutlich stärker
+auf Angebots- und Zinsschocks reagieren als große Unternehmen. ECB WP 3207
+(2026) stützt zusätzlich sektorale Unterschiede bei Unternehmens-Ausfällen
+im Stress-Test-Kontext.
+Die Werte ersetzen den älteren ≈1,5×-Wert aus Drehmann/Juselius (2014).*
 
 **Sektor-Differenzierung adressiert Professor-Kritik Punkt 7** ("Zinsen
 hoch ≠ allgemein schlecht"): Bank-Klasse hat β_rate < 0 — steigende
@@ -175,30 +177,29 @@ Literatur dokumentiert:
 - Floating-Rate-Hypotheken reagieren stark auf Zinsen (β_rate für Mortgage)
 - Banken profitieren von steigender Zinskurve über NIM (β_rate negativ)
 
-**Quellen (Recalibration Juni 2026 — aktuell, Stichtag 31.12.2024):**
+**Quellen (Recalibration Juni 2026 — Modell-Stichtag 31.12.2024):**
 Methodischer Rahmen: EBA *2025 EU-wide Stress Test — Methodological Note*
-(11 Nov 2024), Kap. 2 Credit risk, **§2.4.2 ¶120-128** (¶121: „sectoral
-sensitivities applied to portfolio-level projections", konsistent mit
-Richtung *und* Größenordnung der Szenario-Schocks; ¶128: LGD spiegelt den
-Sicherheiten-Fair-Value-Verfall). Schock-Größe: EBA/ESRB *2025 Macro-
-financial scenario* (Jan 2025), **§4.1.6** adverser 10y-Pfad. Per-Segment-β:
-- **Corporate / SME** ← ECB WP 2897 (Lo Duca/Moccero/Parlapiano 2024):
-  Makro- & Geldpolitik-Schocks → Corporate-PD (DE/FR/IT/ES); KMU/Mikro
-  ≈2× (Angebot) bzw. ≈3× (Geldpolitik) Large-Corp. Deckt beide Faktoren ab
-  (Supply-Schock ≈ Öl, Monetary ≈ Zins).
-- **Mortgage** ← ECB WP 3112 (Bandoni/Fourné/Jarmulska 2025): Variable-
-  Rate-Mortgage-Defaults ↔ Zins (nichtlinear/asymmetrisch); Öl-Kanal via
-  ECB FSR Mai 2024 (Energie → Haushalts-Default).
-- **QRRE / Other Retail** ← ECB FSR Mai 2024 (Haushalts-Schuldendienst ↔
-  Zins; Energie → Konsumenten-Arrears, untere Einkommensquintile);
-  EBA-2025-Results Fig. 22 (Retail = höchste projizierte Verlustquote).
-- **Bank** ← EBA-2025-Methodik Kap. 4 (NII): NIM-Uplift bei +Δr → β_rate<0.
-- **Sovereign** ← macro-orthogonal; Zins wirkt über den separaten Marktbuch-
-  MtM-Kanal (EBA §2.4.2 ¶153). Empirisch aktuell bestätigt durch EBA-2025-
-  Results Fig. 22 (Public sector = niedrigste Verlustquote). Reinhart &
-  Rogoff (2009) für die fiskalische Natur von Sovereign-Defaults.
-- **All-Segment-Querverankerung:** EBA *2025 EU-wide Stress Test — Results*
-  (Aug 2025), Fig. 22, bestätigt die relative Sensitivitäts-Rangfolge.
+(11 Nov 2024), Kap. 2 Credit risk, **§2.4.2 ¶122-123**. ¶122 verlangt
+grundsätzlich Modellprojektionen für gestresste TR/LGD/LR-Parameter; ¶123
+erlaubt sektorale Sensitivitäten auf Portfolio-Projektionen, wenn keine
+geeigneten sektoralen Satellite-Modelle verfügbar sind. **¶130** verlangt,
+dass LGD/LR-Projektionen sinkende Fair Values von Credit-Risk-Mitigants
+berücksichtigen. Schock-Größe: EBA/ESRB *2025 Macro-financial scenario*
+(Jan 2025), **§4.1.6** adverser 10y-Pfad. Per-Segment-β:
+
+| Segment | Was die Quelle modelliert | Warum genau dieser Wert | Plausibilitäts-Check |
+|---|---|---|---|
+| **Corporate** | ECB WP 2897 (2024): makroökonomische Schocks verändern die **Ausfallwahrscheinlichkeit** nichtfinanzieller Unternehmen. Das passt, weil diese Unternehmen die Kreditnehmer hinter unseren Corporate-Exposures sind. ECB WP 3207 (2026): sektorale Unternehmens-Ausfälle unterscheiden sich im Stress-Test stark. | Corporate ist der Anker. Der Ölkanal ist ein **Proxy**: Brent steht für den Energie-/Angebotsschock, nicht für eine veröffentlichte Öl-Beta. Höhere Energiepreise erhöhen Kosten, drücken Margen und schwächen Cashflows. Deshalb β_oil = +0.30. Der Zinskanal ist direkter: höhere Zinsen verteuern Refinanzierung, deshalb β_rate = +0.20. | +1,9 Prozentpunkte Zinsstress × 0,20 = **+0,38 Prozentpunkte** Ausfallwahrscheinlichkeit. Plausibel, weil EBA §2.4.2 ¶123 sektorale Sensitivitäten verlangt, die Richtung und Größenordnung des Szenarios treffen; WP 2897 zeigt für große Unternehmen eine moderate Reaktion. Genau deshalb ist +0,20 als moderater Corporate-Anker plausibel. |
+| **SME Corporate** | ECB WP 2897 (2024): kleine und mittlere Unternehmen reagieren deutlich stärker auf Angebots- und Zinsschocks als große Unternehmen. ECB WP 3207 (2026): Stress trifft Sektoren und Unternehmensgruppen unterschiedlich stark. | β_oil = +0.60 und β_rate = +0.40 sind exakt 2× Corporate. Das ist eine vorsichtige Kalibrierung am unteren Rand der in WP 2897 gezeigten stärkeren KMU-Reaktion. | +1,9 × 0,40 = **+0,76 Prozentpunkte**. Plausibel, weil WP 2897 kleine/mittlere Unternehmen empirisch deutlich sensitiver einordnet; 2× ist der vorsichtige untere Rand. Plausibel gemäß EBA ¶123, weil der Aufschlag die Segment-Rangfolge und die Szenario-Größenordnung transparent wahrt. |
+| **Mortgage** | ECB WP 3112 (2025): Zinsanstiege erhöhen die Ausfallwahrscheinlichkeit variabel verzinster Hypotheken deutlich stärker als Zinssenkungen sie senken. EBA ¶130 stützt den Sicherheiten-Kanal. | β_rate = +0.30 liegt über Corporate wegen Schuldendienst- und Hauspreis-Kanal, aber unter SME wegen Besicherung. β_oil = +0.05 nahe null, da Öl nur indirekt über Haushaltsbudgets wirkt. | +1,9 × 0,30 = **+0,57 Prozentpunkte**. Plausibel, weil WP 3112 Zinsanstiege bei variablen Hypotheken als starken, asymmetrischen Ausfalltreiber modelliert. Plausibel gemäß EBA ¶130, weil Sicherheitenwerte im Stress zusätzlich berücksichtigt werden müssen. |
+| **QRRE** | ECB Financial Stability Review Mai 2024: Haushalte werden durch Schuldendienst, Lebenshaltungskosten und Energiepreise belastet. EBA 2025 Results Fig. 22: Retail hat die höchste projizierte Verlustquote. | Qualifying Revolving Retail Exposures (revolvierende Konsumentenkredite, z. B. Kreditkarten) sind oft unbesichert und einkommensnah. Deshalb β_oil = +0.40. β_rate = +0.15 bleibt unter Mortgage, weil die Zinssätze ohnehin hoch und variabel sind. | +0,50 Brent-log-Schock × 0,40 = **+0,20 Prozentpunkte**. Methodisch plausibel gemäß EBA ¶123, weil die Sensitivität Richtung und Größenordnung des Stress-Szenarios treffen muss. EBA Results Fig. 22 dient hier nur als grober Verlustquotenvergleich nach Exposure-Klasse: Retail liegt dort im Stress hoch. |
+| **Other Retail** | Gleiche Quellenebene wie QRRE: Financial Stability Review 2024 für Haushalte, EBA Results 2025 Fig. 22 für Retail als verlustanfälliges Portfolio. | Mischprofil zwischen Kreditkarte/Konsumkredit und Hypothek: β_oil = +0.30, β_rate = +0.25. Der Wert ist plausibilisiert, aber nicht direkt aus einer Quelle abgeschrieben. | +1,9 × 0,25 = **+0,48 Prozentpunkte**. Plausibel, weil der Wert zur hohen Retail-Verlustquote in Fig. 22 passt, aber keine stärker belegte Unterklassen-Beta behauptet. Genau diese Vorsicht macht den Zwischenwert quellenkonform. |
+| **Bank** | WP 2897/3207 sind hier **nicht** passend, weil sie nichtfinanzielle Unternehmen modellieren. Referenz ist EBA 2025 Methodology Kap. 4 zu Net Interest Income, also Zinsüberschuss, plus EBA Results 2025 zur Widerstandsfähigkeit des Zinsüberschusses. | β_rate = −0.05 ist eine kleine Expertenannahme: steigende Zinsen können den Bank-Zinsüberschuss stützen, zugleich steigen Kreditqualitäts- und Refinanzierungsrisiken. Deshalb nur leicht negativ. β_oil = +0.05 minimal und indirekt. | +1,9 × −0,05 = **−0,10 Prozentpunkte**. Plausibel nur als kleine Expertenannahme: die Quellen liefern keine Bank-Ausfall-Beta, daher bleibt der Wert nahe null. Das ist quellenkonform, weil kein empirisch nicht belegter starker Bank-PD-Effekt behauptet wird. |
+| **Sovereign** | EBA Methodology **¶154** behandelt Sovereign-Default- und Impairment-Flows separat. Der Zinsschock wird im Modell über Duration/Marktbewertung abgebildet. EBA Results Fig. 22 zeigt Public Sector mit niedrigen Verlustquoten im Vergleich der Exposure-Klassen. | β_oil = β_rate = 0, um Doppelzählung zu vermeiden: Δr wirkt im Marktbuch-Kanal, nicht zusätzlich als Sovereign-PD-β. | 0 × jeder Schock = **0**. Plausibel gemäß EBA ¶154, weil Sovereign-Impairments separat behandelt werden und der Zinseffekt bereits im Marktbuch-Kurswertkanal liegt. Zusätzlich passt es zum EBA-Results-Vergleich, weil Public Sector in Fig. 22 niedrig bleibt. |
+
+**All-Segment-Querverankerung:** EBA *2025 EU-wide Stress Test — Results*
+(Aug 2025), Fig. 22, liefert einen groben Verlustquotenvergleich nach
+Exposure-Klasse (Retail hoch, Public Sector niedrig) am Startpunkt end-2024.
 
 **Wichtig zur Faktor-Struktur:** Der Zins-Kanal ist direkt auf aktuelle,
 segment-spezifische Quellen kalibrierbar. Der Öl-Kanal wirkt im EBA/ECB-
@@ -207,41 +208,101 @@ WP 2897 identifiziert) — das EBA-2025-Szenario ist selbst öl-/gas-getrieben
 (Energiepreis → HICP +3,9 % → Zinsen ↑ → BIP ↓). Bank-Öl bleibt indirekt
 (kein direkter per-Segment-Anker), daher klein gehalten.
 
-**Limitation:** Die β-PUBLIKATIONEN sind 2024/2025; ihre ökonometrischen
-Schätzfenster sind historisch (WP 2897 und WP 3112: 2014-2019) — methodisch
-unvermeidbar, da die Messung von Default-Sensitivitäten einen Default-Zyklus
-mit hinreichend Ausfällen braucht. Baselines (PD/LGD) = 31.12.2024,
-Schock-Größe = EBA-2025-Szenario. β sind via Sidebar-Override veränderbar.
+**Limitation:** Die Quellen ab 2024 liefern keine fertige aufsichtliche Beta-
+Tabelle. Sie liefern Richtung, relative Stärke und Plausibilitätsanker:
+WP 2897 (2024) für Unternehmens-Ausfallwahrscheinlichkeiten, WP 3112 (2025)
+für Hypotheken-Ausfälle, WP 3207 (2026) für sektorale Unternehmens-Ausfälle
+im Stress-Test-Kontext, EBA Results 2025 für den groben Verlustquotenvergleich
+nach Exposure-Klasse. Baselines
+(PD/LGD) = 31.12.2024, Schock-Größe = EBA-2025-Szenario. β sind via Sidebar-
+Override veränderbar.
 
 **Was Annahme ist (explizit):** Die Aufsicht gibt nur die *Logik* vor
-(§2.4.2 ¶121: sektorale Sensitivitäten, konsistent mit Richtung und
+(§2.4.2 ¶123: sektorale Sensitivitäten, konsistent mit Richtung und
 Größenordnung der Szenario-Schocks) — **keine fertige β-Tabelle**. Wir haben
 also **nichts abgeschrieben**: die Quellen liefern Vorzeichen, relative
 Struktur und Größenordnung; die konkreten Zahlen sind eine **lineare,
-überschreibbare Experten-Kalibrierung**. *Plausibilitäts-Check (keine
-invertierte Quell-Tabelle):* β_rate × EBA-Adverse-Zinsschock (+1,9 pp) →
-Large-Corp +0,38 pp / KMU +0,76 pp / Mortgage +0,57 pp PD — dieselbe
-Größenordnung wie die in ECB WP 2897 gemessene Reaktion.
+überschreibbare Experten-Kalibrierung**.
 
-**Ausblick — portfolio-spezifische β (bewusst nicht im Modell).** Zwei Stufen:
+**Kalibrierungsprinzip — wichtiger Disclaimer:**
 
-*Stufe 1 — machbar mit öffentlichen Daten (Peer-Group-Ansatz):* aus den
-publizierten Merkmalen der 10 Banken ließe sich je Bank ein *eigenes*
-effektives β ableiten — (a) Länder-Mix → bank-spezifischer Zinsschock
-(IT/ES +2,8–2,9 pp vs. DE/NL +1,3 pp aus §4.1.6, mit Länder-Exposure
-skaliert); (b) Portfolio-Mix → exposure-gewichtetes Blend-β; (c) Peer-Gruppen
-nach Geschäftsmodell, quergeprüft gegen die bank-individuellen EBA-2025-
-Results-Verlustquoten.
+| Frage | Einordnung |
+|---|---|
+| Methodischer Anker | EBA *2025 EU-wide Stress Test — Methodological Note*, §2.4.2 ¶122-123: gestresste Risikoparameter sollen modelliert werden; wenn sektorale Modelle fehlen, sind sektorale Sensitivitäten auf Portfolio-Projektionen zulässig. |
+| Empirischer Anker | ECB WP 2897 (2024) schätzt Makro-/Geldpolitik-Schocks auf Corporate-Ausfallwahrscheinlichkeiten; ECB WP 3112 (2025) schätzt Zinsanstiege auf Mortgage-Defaults. |
+| Was ist ein β-Wert hier? | Ein transparenter Übersetzungsfaktor: Schockgröße × β = zusätzliche Ausfallwahrscheinlichkeit in Prozentpunkten. |
+| Warum ist ein Wert plausibel? | Weil seine Wirkung im EBA-Szenario ökonomisch erklärbar bleibt, die Segment-Logik wahrt und nicht größer wirkt als die Quelle tragen kann. |
+| Was behaupten wir nicht? | Nicht: „Die Quelle beweist exakt β = 0,20“. Sondern: „β = 0,20 ist unsere quellenkonforme Basiskalibrierung und per Override sensitivierbar.“ |
 
-*Stufe 2 — Ideal-Weg (bank-intern, EBA §2.4.2 ¶120 „banks should use
-models"):* eigenes Satellitenmodell — (1) Datenpanel eigener Default-/
-Transition-Raten je Klasse über ≥1 Konjunkturzyklus; (2) logit(PD) ~
-β_oil·ΔBrent + β_rate·Δr₁₀ᵧ + Kontrollen (BIP, Arbeitslosigkeit, Hauspreis)
-+ Lags, gemeinsam über Klassen (SUR, wie ECB BEAST WP 2469); (3) EBA-
-Mindeststandards (Solidität, Responsiveness, ¶120) + Out-of-sample-Backtest;
-(4) Plausibilisierung gegen ECB-Benchmark-Parameter (¶122/125). Erfordert
-bank-interne Ausfalldaten, die öffentlich nicht vorliegen — daher die
-sektorweiten Default-β + Override.
+**Plausibilitäts-Checks (keine invertierte Quell-Tabelle):**
+- **Zinsschock-Skalierung:** β_rate × EBA-Adverse-Zinsschock (+1,9 pp) →
+  Large-Corp +0,38 Prozentpunkte / KMU +0,76 Prozentpunkte / Mortgage +0,57
+  Prozentpunkte Ausfallwahrscheinlichkeit. Das hält Corporate moderat, KMU
+  etwa 2× Corporate und Mortgage zinsdominiert.
+- **EBA-Verlustquotenvergleich:** EBA Results Fig. 22 zeigt aggregierte
+  Verlustquoten nach Exposure-Klasse, keine bankindividuellen Detailportfolios.
+  Der Vergleich stützt nur die grobe Richtung: Retail stärker, Public Sector
+  niedrig.
+- **Stress-Randbereich:** WP 3207 zeigt, dass Unternehmens-Ausfälle im harten
+  Stress deutlich stärker reagieren können als im Normalfall; der KMU-
+  Multiplikator 2× ist deshalb bewusst vorsichtig.
+- **Doppelzählung:** Sovereign-Zinsrisiko läuft über Marktbuch-Duration/MtM;
+  ein zusätzliches Sovereign-PD-β auf Δr würde denselben Schock doppelt zählen.
+
+**Ausblick — portfolio-spezifische β (bewusst nicht im aktiven Modell).**
+Die heutige Matrix nutzt sektorweite Default-Werte. Das ist transparent und
+prüfbar, aber langfristig nicht perfekt: eine italienlastige Corporate-Bank,
+eine deutsche Hypothekenbank und eine französische Universalbank sollten nicht
+exakt dieselben Übersetzungsfaktoren verwenden.
+
+Der nächste öffentliche Entwicklungsschritt wäre ein **effektives Bank-β**:
+
+```
+β_effektiv(bank, klasse)
+  = β_segment
+    × Länder-Schockfaktor
+    × Portfolio-Gewicht
+    × einfacher Qualitätsfaktor
+```
+
+Der **Länder-Schockfaktor** würde berücksichtigen, dass das EBA-Szenario je
+Land unterschiedlich hart ist. Italien/Spanien haben im adversen 10-Jahres-
+Zinspfad stärkere Bewegungen als Deutschland/Niederlande. Eine Bank mit viel
+Italien- oder Spanien-Exposure bekäme daher ein höheres effektives Zins-β als
+eine Bank mit eher deutschem oder niederländischem Exposure.
+
+Das **Portfolio-Gewicht** würde die echten Exposure-Anteile der Bank nutzen:
+Corporate-lastige Banken bekämen ein anderes Beta-Profil als mortgage- oder
+retail-lastige Banken. Diese Information liegt teilweise öffentlich in EBA
+Transparency und Pillar-3-Berichten vor.
+
+Ein einfacher **Qualitätsfaktor** könnte die bank-spezifische Ausgangs-
+Ausfallwahrscheinlichkeit aus Pillar 3 berücksichtigen. Eine Bank mit deutlich
+höherem Start-Risiko in einer Klasse bekäme ein leicht höheres effektives β,
+eine Bank mit sehr gutem Kreditbuch ein leicht niedrigeres β. Dieser Faktor
+müsste eng gekappt werden, damit aus einer plausiblen Anpassung keine
+Scheingenauigkeit wird.
+
+Die Plausibilisierung bliebe dieselbe wie heute: β × EBA-Schock muss in einer
+verständlichen Größenordnung liegen; der grobe Verlustquotenvergleich sollte
+zu EBA Results 2025
+passen; und Sovereign-Zinsrisiko darf nicht doppelt gezählt werden.
+
+Prozessual wäre das eine fünfstufige Erweiterung: zuerst Datenbasis aufbauen
+(EBA-Transparency-Exposure je Bank × Klasse × Land, Pillar-3-
+Ausfallwahrscheinlichkeit und Verlustquote, EBA/ESRB-Länderpfade, EBA-Results-
+Peers), dann jede Position auf Exposure-Klasse, Land und Stresskanal mappen,
+dann das effektive β rechnen, anschließend gegen EBA-Verlustquotenvergleich,
+β × Szenario und Peer-Gruppe plausibilisieren, und erst danach als
+dokumentierten Challenger gegen das heutige sektorweite β einsetzen.
+
+Der **Idealweg** wäre ein bankinternes Satellitenmodell im Sinne der EBA-
+Methodik: eigene Ausfall- und Rating-Migrationsdaten je Klasse über mindestens
+einen Konjunkturzyklus, dann eine Schätzung der Ausfallwahrscheinlichkeit als
+Funktion von Brent, Zinsen, Arbeitslosigkeit, Wachstum, Hauspreisen und Lags.
+Das wäre methodisch stärker, ist mit öffentlichen Daten aber nicht möglich.
+Deshalb bleibt die aktive Version bei sektorweiten β und bietet den Override
+als transparenten Sensitivitätstest.
 
 ---
 
@@ -449,8 +510,11 @@ Punkt-Prognose.
   (März 2025).
 - EBA (2025). *EU-wide Transparency Exercise 2025 — Public Disclosure*.
 - EBA GL 14 (ICAAP / Stress-Testing).
-- ECB/ESRB (2024). *Financial Stability Review, Mai 2024* (Energie-/
-  Cost-of-Living-Schock → Haushalts-Default; Sektor-Heterogenität).
+- ECB (2024). *Financial Stability Review, Mai 2024* (Energie-/
+  Lebenshaltungskosten-Schock → Belastung der Haushalte; Sektor-Heterogenität).
+- Konietschke, P., Metzler, J. & Ponte Marques, A. (2026). *A quantile
+  probability model for sectoral corporate defaults in Europe*. ECB
+  Working Paper 3207.
 - Lo Duca, M., Moccero, D. & Parlapiano, F. (2024). *The impact of
   macroeconomic and monetary policy shocks on credit risk in the euro
   area corporate sector*. ECB Working Paper 2897.

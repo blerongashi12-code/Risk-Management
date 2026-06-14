@@ -212,9 +212,9 @@ else:
         f"(Floating-Rate-Affordability), Corporate auf beide Faktoren, "
         f"Bank-Klasse hat <em>negative</em> Zinssensitivität "
         f"(NIM-Effekt — adressiert Professor-Kritik Punkt 7). "
-        f"Quelle: β kalibriert nach EBA-2025-Methodik §2.4.2 ¶121, "
-        f"ECB WP 2897 (Corporate/KMU), ECB WP 3112 (Mortgage) und "
-        f"ECB FSR 2024 (Retail)."
+        f"Quelle: β kalibriert nach EBA-2025-Methodik §2.4.2 ¶123, "
+        f"ECB WP 2897/3207 (Corporate/KMU), ECB WP 3112 (Mortgage) "
+        f"und ECB FSR 2024 + EBA Results Fig. 22 (Retail)."
     )
 
 st.divider()
@@ -298,9 +298,9 @@ with st.expander("① PD · Probability of Default · "
         "Zins — z.B. reagiert Mortgage stark auf Zinsen, Corporate "
         "auf beide Faktoren, und **die Bank-Klasse hat β_rate < 0** "
         "(Net-Interest-Margin-Uplift bei steigenden Zinsen). "
-        "Quellen der Sensitivitäten: EBA-2025-Methodik §2.4.2 ¶120-128, "
-        "ECB WP 2897 (2024, Corporate/KMU-PD), ECB WP 3112 (2025, "
-        "Mortgage-Default ↔ Zins), ECB FSR 2024 (Retail/Haushalte)."
+        "Quellen der Sensitivitäten: EBA-2025-Methodik §2.4.2 ¶122-123, "
+        "ECB WP 2897/3207 (Corporate/KMU-PD), ECB WP 3112 (Mortgage-"
+        "Default ↔ Zins), ECB FSR 2024 + EBA Results Fig. 22 (Retail)."
     )
     st.markdown(
         "Die empirische Korrelations-Analyse (Tab 1 · Faktor-Analyse) "
@@ -389,7 +389,7 @@ with st.expander("② LGD · Loss Given Default · "
         "+1.50pp/+1pp besonders stark auf Zinsen (Property-Value-"
         "Haircut über Duration-Effekt). **Corporate** hat γ_rate = +1.0pp "
         "(Sicherheiten-FV-Verfall bei +Δr). Quellen: EBA-2025-Methodik "
-        "§2.4.2 ¶128 (LGD spiegelt Sicherheiten-Fair-Value) + EBA Credit "
+        "§2.4.2 ¶130 (LGD spiegelt Sicherheiten-Fair-Value) + EBA Credit "
         "Risk Benchmarking 2024."
     )
     st.markdown(
@@ -410,7 +410,7 @@ with st.expander("② LGD · Loss Given Default · "
         "- LGD-Floor bei 5 %, Cap bei 100 % — rein numerische Stabilität "
         "der IRB-Capital-Rechnung, kein ökonomischer Kausal-Cap  \n"
         "- LGD-Sensitivitäten γ_oil / γ_rate sind defensible defaults "
-        "(EBA-2025-Methodik §2.4.2 ¶121/¶128), nicht bank-individuell "
+        "(EBA-2025-Methodik §2.4.2 ¶123/¶130), nicht bank-individuell "
         "kalibriert"
     )
 

@@ -851,10 +851,11 @@ with pd_col_r:
         r"+ \beta_{\text{rate}} \cdot \Delta r_{10y,\text{pp}}"
     )
     st.markdown(
-        "Die β-Werte sind auf aktuelle Quellen (Stichtag 31.12.2024) "
-        "kalibriert: ECB WP 2897 (2024, Corporate/KMU), ECB WP 3112 "
-        "(2025, Mortgage), ECB FSR 2024 (Retail) — im EBA-Methodik-"
-        "Rahmen §2.4.2 ¶121. Vollständige Tabelle im Intro-Tab · "
+        "Die β-Werte sind auf aktuelle Quellen zum Modell-Stichtag "
+        "31.12.2024 kalibriert: ECB WP 2897/3207 (Corporate/KMU), "
+        "ECB WP 3112 (Mortgage), ECB FSR 2024 + EBA Results Fig. 22 "
+        "(Retail) — im EBA-Methodik-Rahmen §2.4.2 ¶123. Vollständige "
+        "Tabelle im Intro-Tab · "
         "Schritt 3b. **Mortgage** "
         "reagiert primär auf Zinsen (β_rate hoch), **QRRE** auf Brent "
         "(β_oil hoch), **Bank** hat β_rate < 0 (NIM-Effekt: steigende "
@@ -935,7 +936,7 @@ with lgd_col_r:
     )
     st.markdown(
         "Werte gefloort bei 5 % und gecappt bei 100 %. Die γ-Werte sind "
-        "nach EBA-2025-Methodik §2.4.2 ¶128 (LGD spiegelt den Sicherheiten-"
+        "nach EBA-2025-Methodik §2.4.2 ¶130 (LGD spiegelt den Sicherheiten-"
         "Fair-Value-Verfall) kalibriert (CRR Art. 181 für Downturn-LGD-"
         "Konvention). Mortgage "
         "hat das größte γ_rate, weil steigende Zinsen direkt den "
@@ -1539,5 +1540,5 @@ footer(
     f"IRB-Banken · PDs/LGDs bank-spezifisch aus Pillar-3 EU-CR6 "
     f"(31.12.2024) · "
     f"β-Sensitivitäten kalibriert nach EBA-2025-Methodik §2.4.2 + "
-    f"ECB WP 2897/3112 + ECB FSR 2024 (Stichtag 31.12.2024)"
+    f"ECB WP 2897/3207/3112 + ECB FSR 2024 (Modell-Stichtag 31.12.2024)"
 )

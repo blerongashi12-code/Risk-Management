@@ -57,11 +57,11 @@ hero(
 # ======================================================================
 # ----- Wiederverwendbare Onboarding-Bausteine (Stepper-Design) --------
 _ONB_STEPS = [
-    ("1", "Was das Modell misst"),
-    ("2", "Die zwei Macro-Faktoren"),
-    ("3", "Wirkung auf eine Bank"),
-    ("4", "Banken & Datenbasis"),
-    ("5", "Die zwei Stress-Kanäle"),
+    ("1", "Zielgröße", "CET1-Quote unter Stress"),
+    ("2", "Faktoren", "Brent und 10-Jahres-Zins"),
+    ("3", "Transmission", "β je Exposure-Klasse"),
+    ("4", "Datenbasis", "Pillar 3 und EBA Transparency"),
+    ("5", "Aggregation", "Kreditbuch plus Sovereign-Kanal"),
 ]
 
 
@@ -69,34 +69,41 @@ def _onb_rail(active: int | None = None) -> None:
     """Horizontaler 5-Schritte-Stepper — macht sofort sichtbar,
     dass die Tour aus genau fünf Schritten besteht."""
     items = []
-    for i, (num, label) in enumerate(_ONB_STEPS, start=1):
+    for i, (num, label, sub) in enumerate(_ONB_STEPS, start=1):
         is_on = (active is None) or (i <= active)
-        circle_bg = "#051C2C" if is_on else "#FFFFFF"
-        circle_fg = "#FFFFFF" if is_on else "#B7C2CB"
-        circle_bd = "#051C2C" if is_on else "#D8DEE3"
-        lbl_color = "#051C2C" if is_on else "#9BA7B0"
+        border = "#051C2C" if is_on else "#D8DEE3"
+        num_bg = "#051C2C" if is_on else "#FFFFFF"
+        num_fg = "#FFFFFF" if is_on else "#9BA7B0"
+        label_color = "#051C2C" if is_on else "#7A8893"
         items.append(
-            '<div style="flex:1;min-width:104px;display:flex;'
-            'flex-direction:column;align-items:center;text-align:center;'
-            'gap:0.45rem;">'
-            f'<div style="width:38px;height:38px;border-radius:50%;'
-            f'background:{circle_bg};color:{circle_fg};'
-            f'border:2px solid {circle_bd};display:flex;align-items:center;'
-            'justify-content:center;font-weight:700;font-size:1.02rem;'
-            "font-family:'Source Serif Pro',Georgia,serif;\">"
+            '<div style="flex:1;min-width:150px;background:#FFFFFF;'
+            f'border:1px solid {border};border-top:3px solid {border};'
+            'padding:0.72rem 0.75rem;min-height:104px;">'
+            '<div style="display:flex;align-items:center;gap:0.55rem;'
+            'margin-bottom:0.4rem;">'
+            f'<div style="width:30px;height:30px;border-radius:50%;'
+            f'background:{num_bg};color:{num_fg};display:flex;'
+            'align-items:center;justify-content:center;font-weight:700;'
+            'font-size:0.92rem;">'
             f'{num}</div>'
-            f'<div style="font-size:0.75rem;font-weight:600;'
-            f'color:{lbl_color};line-height:1.3;">{label}</div>'
+            f'<div style="font-size:0.86rem;font-weight:700;'
+            f'color:{label_color};line-height:1.2;">{label}</div>'
+            '</div>'
+            f'<div style="font-size:0.74rem;color:#5F6F79;'
+            f'line-height:1.35;">{sub}</div>'
             '</div>'
         )
-    arrow = ('<div style="display:flex;align-items:flex-start;color:#C4CDD4;'
-             'font-size:1.1rem;padding-top:7px;font-weight:600;">→</div>')
     st.markdown(
-        '<div style="display:flex;gap:6px;align-items:flex-start;'
-        'flex-wrap:nowrap;overflow-x:auto;margin:0.2rem 0 1.7rem 0;'
-        'padding:0.5rem 0.2rem;background:#FAFBFC;border:1px solid #ECEFF1;'
-        'border-radius:10px;">'
-        + arrow.join(items)
+        '<div style="margin:0.2rem 0 1.55rem 0;">'
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,'
+        'minmax(150px,1fr));gap:0.55rem;align-items:stretch;">'
+        + ''.join(items)
+        + '</div>'
+        '<div style="margin-top:0.55rem;font-size:0.78rem;line-height:1.45;'
+        'color:#5F6F79;border-left:3px solid #A52F4D;padding-left:0.65rem;">'
+        'Leselogik: erst Zielgröße, dann Stressfaktoren, dann β-Transmission, '
+        'danach Datenbasis und finale Aggregation in die CET1-Quote.'
+        '</div>'
         + '</div>',
         unsafe_allow_html=True,
     )
@@ -339,13 +346,16 @@ st.dataframe(example_df, hide_index=True, use_container_width=True,
              height=205)
 
 st.markdown(
-    "Die Sensitivitäten (β-Werte) sind auf **aktuelle Quellen "
-    "(Stichtag 31.12.2024)** kalibriert: das **EBA-2025-Adverse-"
-    "Szenario** (10y-Zinspfad, §4.1.6), **ECB WP 2897 (2024)** für die "
-    "Corporate-/KMU-PD-Reaktion, **ECB WP 3112 (2025)** für Mortgage-"
-    "Defaults und die **ECB FSR 2024** für die übrigen Retail-Klassen — "
+    "Die Sensitivitäten (β-Werte) sind auf **aktuelle Quellen** "
+    "kalibriert; Modell-Stichtag ist 31.12.2024. Zentral sind das "
+    "**EBA-2025-Adverse-Szenario** (10y-Zinspfad, §4.1.6), **ECB WP "
+    "2897 (2024)** für die Ausfallwahrscheinlichkeit von Unternehmen, "
+    "ergänzend **ECB WP 3207 (2026)** für sektorale Unternehmens-Ausfälle "
+    "im Stress-Test-Kontext, "
+    "**ECB WP 3112 (2025)** für Mortgage-Defaults und die **ECB FSR "
+    "2024** für die übrigen Retail-Klassen — "
     "eingebettet in den EBA-"
-    "Methodik-Rahmen **§2.4.2 ¶121** (sektorale Sensitivitäten, "
+    "Methodik-Rahmen **§2.4.2 ¶123** (sektorale Sensitivitäten, "
     "konsistent mit Richtung *und* Größenordnung der Szenario-Schocks). "
     "Komplette Tabelle in `MODEL_ASSUMPTIONS.md`."
 )
@@ -367,7 +377,7 @@ _uc_mech = pd.DataFrame([
      "Ölpreis wirkt als Angebotsschock (Input-Kosten, Margen), höhere "
      "Zinsen erhöhen die Refinanzierungslast — beide Kanäle treiben "
      "die Ausfallrate moderat nach oben.",
-     "ECB WP 2897 (2024); EBA §2.4.2"),
+     "ECB WP 2897 (2024) + WP 3207 (2026); EBA §2.4.2"),
     ("SME-Corporate", "+0,60 / +0,40", "+1,10 pp ↑", "3,93 % → 5,03 %",
      "+0,45 / +1,10", "+2,43 pp ↑",  "14,1 % → 16,5 %",
      "Reagiert ≈ 2× so stark wie Large-Corporate — ECB WP 2897 misst "
@@ -378,8 +388,8 @@ _uc_mech = pd.DataFrame([
      "+0,10 / +1,50", "+3,05 pp ↑",  "14,1 % → 17,1 %",
      "Zins-dominiert: variabel verzinste Darlehen erhöhen sofort die "
      "Schuldendienstquote, zugleich drückt die Immobilien-Neubewertung "
-     "die Recovery (höchstes γ_rate, EBA ¶128).",
-     "ECB WP 3112 (2025); EBA ¶128"),
+     "die Recovery (höchstes γ_rate, EBA ¶130).",
+     "ECB WP 3112 (2025); EBA ¶130"),
     ("QRRE",          "+0,40 / +0,15", "+0,50 pp ↑", "2,97 % → 3,47 %",
      "+0,30 / +0,50", "+1,15 pp ↑",  "54,1 % → 55,3 %",
      "Öl-dominiert: Energiepreis-Inflation belastet das verfügbare "
@@ -397,14 +407,14 @@ _uc_mech = pd.DataFrame([
      "Margin, der NIM-Uplift überkompensiert den Kreditrisiko-Anstieg "
      "→ PD sinkt. Die LGD steigt dennoch, da höhere Zinsen Bond-Werte "
      "und damit die Recovery drücken.",
-     "EBA 2025 Methodik Kap. 4 (NII)"),
+     "EBA 2025 Methodik Kap. 4 (Zinsüberschuss)"),
     ("Sovereign",     "  0,00 /   0,00", "  0,00 pp ·", "0,06 % → 0,06 %",
      "  0,00 /   0,00", "  0,00 pp ·", "8,25 % → 8,25 %",
      "Macro-orthogonal: Sovereign-Default ist ein fiskalisches, kein "
      "makroökonomisches Ereignis. Der Zinsschock wirkt stattdessen "
-     "über den Marktbuch-MtM-Kanal (separate Modellebene, Tab "
+     "über den Marktbuch-Kurswertkanal (separate Modellebene, Tab "
      "Marktbuch).",
-     "MtM-Kanal (EBA ¶153); R&R 2009"),
+     "Kurswertkanal (EBA ¶154); R&R 2009"),
 ], columns=[
     "Klasse",
     "β_oil / β_rate (PD)",
@@ -498,88 +508,231 @@ st.caption(
 )
 
 # --- Schritt 3b: Sektor-Sensitivitäten · Übersicht + optionaler Override ---
-_onb_sub("Vertiefung · Sektor-Sensitivitäten (β-Werte)")
+_onb_sub("Schritt 3 · Annahmenblock: Sektor-Sensitivitäten (β-Werte)")
 
 st.markdown(
-    "Diese Tabelle zeigt die Default-β-Werte je Exposure-Klasse. "
-    "**β_oil** misst, um wie viele Prozentpunkte die PD steigt, wenn "
-    "Brent um +100 % (log = +0.70) springt; **β_rate** entsprechend "
-    "für +100 bp Δr_10y."
-)
-
-st.markdown(
-    "Dies ist die **zentralste Annahme des gesamten Modells** — deshalb "
-    "legen wir sie offen. Die EBA gibt vor, **wie** man kalibriert "
-    "(§2.4.2 ¶121: sektorale Sensitivitäten, konsistent mit Richtung und "
-    "Größenordnung der Szenario-Schocks), **aber keine fertige Tabelle** — "
-    "die konkreten Zahlen sind unsere *lineare, plausibilisierte und "
-    "überschreibbare* Annahme, **nicht abgeschrieben**. Warum welcher Wert "
-    "für welches Segment plausibel ist, steht **direkt unter der Tabelle**."
-)
-
-import pandas as pd
-# β-Werte werden LIVE aus der two_factor_stress.SENSITIVITY_MATRIX gezogen —
-# Single Source of Truth, damit Intro-Doku und Modell nie auseinanderlaufen.
-# Der statische Fallback (gleiche Werte) greift nur, falls das Backend-Modul
-# einmal nicht importierbar ist.
-_beta_rows_meta = [
-    ("Corporate",     "corporate",     (0.30,  0.20), "ECB WP 2897 (2024); EBA §2.4.2 ¶120-128"),
-    ("SME Corporate", "sme_corporate", (0.60,  0.40), "ECB WP 2897 (2024) Fig. 5 — KMU-PD ≈2× Large-Corp"),
-    ("Mortgage",      "mortgage",      (0.05,  0.30), "Zins: ECB WP 3112 (2025); Öl: ECB FSR 2024; EBA ¶128"),
-    ("QRRE",          "qrre",          (0.40,  0.15), "ECB FSR Mai 2024 (Energie/Zins → Haushalte); EBA Results 2025"),
-    ("Other Retail",  "other_retail",  (0.30,  0.25), "ECB FSR Mai 2024; EBA-2025-Results Fig. 22 (Retail)"),
-    ("Bank",          "bank",          (0.05, -0.05), "EBA 2025 Methodik Kap. 4 (NII) — NIM-Uplift, β_rate<0"),
-    ("Sovereign",     "sovereign",     (0.00,  0.00), "Macro-orthogonal; Zins über Marktbuch-MtM-Kanal (EBA ¶153)"),
-]
-try:
-    from two_factor_stress import SENSITIVITY_MATRIX as _SENS  # type: ignore
-except Exception:
-    _SENS = {}
-
-
-def _fmt_beta(v: float) -> str:
-    return ("0.00" if v == 0 else f"{v:+.2f}").replace("-", "−")
-
-
-_beta_table = pd.DataFrame(
-    [(name,
-      _fmt_beta(_SENS.get(key, {}).get("pd_oil",  fb[0])),
-      _fmt_beta(_SENS.get(key, {}).get("pd_rate", fb[1])),
-      src)
-     for name, key, fb, src in _beta_rows_meta],
-    columns=["Exposure-Klasse", "β_oil", "β_rate", "Quelle / Logik"],
-)
-st.dataframe(_beta_table, hide_index=True, use_container_width=True,
-             height=290)
-
-st.markdown(
-    '<div style="background:#F9FBFC;border:1px solid #D9E4EA;'
-    'border-radius:6px;padding:0.9rem 1.1rem;margin:0.3rem 0 0.7rem 0;'
-    'color:#051C2C;font-size:0.88rem;line-height:1.7;">'
-    '<strong>Warum welcher Wert je Segment</strong> '
-    '(β_oil / β_rate · ökonomischer Treiber · Beleg):<br>'
-    '• <strong>Corporate (0,30 / 0,20)</strong> — Öl verteuert Input-Kosten '
-    'und drückt Margen, Zins die Refinanzierung; <em>beide</em> Kanäle '
-    'wirken moderat positiv. <em>ECB WP 2897.</em><br>'
-    '• <strong>SME (0,60 / 0,40 = 2× Corporate)</strong> — dieselben Kanäle, '
-    'aber doppelt so empfindlich: dünnere Liquiditätspuffer, weniger '
-    'Preissetzungsmacht. <em>WP 2897 misst KMU ≈ 2× (Öl) bzw. ≈ 3× '
-    '(Zins).</em><br>'
-    '• <strong>Mortgage (0,05 / 0,30)</strong> — Öl fast irrelevant (nur '
-    'mittelbar übers Einkommen); <em>Zins dominiert</em>: Floating-Rate-'
-    'Belastung + fallende Hauspreise. <em>ECB WP 3112.</em><br>'
-    '• <strong>QRRE (0,40 / 0,15)</strong> — genau umgekehrt: <em>Öl '
-    'dominiert</em> (Energie-Inflation frisst das Konsumenten-Einkommen), '
-    'Zins kaum (kurze Laufzeiten, ohnehin hohe Sätze). <em>ECB FSR 2024.</em><br>'
-    '• <strong>Other Retail (0,30 / 0,25)</strong> — Mischprofil zwischen '
-    'Mortgage und QRRE. <em>FSR 2024 / EBA-Results.</em><br>'
-    '• <strong>Bank (0,05 / −0,05)</strong> — Zins-β <em>negativ</em>: '
-    'steigende Zinsen heben die Zinsmarge (NIM) stärker, als das Kreditrisiko '
-    'steigt → PD sinkt netto. <em>EBA-NII-Kapitel.</em><br>'
-    '• <strong>Sovereign (0 / 0)</strong> — makro-neutral: der Zins wirkt hier '
-    'nicht über die PD, sondern über den Kursverlust im Marktbuch (separater '
-    'Kanal). <em>EBA ¶153.</em>'
+    '<div style="margin:0.25rem 0 0.75rem 0;color:#051C2C;">'
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,'
+    'minmax(360px,1fr));gap:0.75rem;align-items:stretch;">'
+    '<div style="background:#F6FAFC;border:1px solid #D8E6ED;'
+    'border-left:4px solid #034B6F;padding:0.85rem 0.95rem;">'
+    '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.10em;'
+    'text-transform:uppercase;color:#5F6F79;margin-bottom:0.35rem;">'
+    'Was passiert in diesem Schritt?</div>'
+    '<div style="font-size:0.90rem;line-height:1.55;">'
+    'Der Makro-Schock wird in eine zusätzliche '
+    '<strong>Ausfallwahrscheinlichkeit</strong> übersetzt. Die zentrale '
+    'Formel lautet:</div>'
+    '<div style="margin-top:0.55rem;background:#FFFFFF;border:1px solid #DCE1E6;'
+    'padding:0.55rem 0.7rem;font-family:JetBrains Mono,Consolas,monospace;'
+    'font-size:0.84rem;text-align:center;">'
+    'ΔPD = β<sub>oil</sub> · ΔBrent<sub>log</sub> + β<sub>rate</sub> · Δr<sub>10y</sub>'
+    '</div>'
+    '<div style="font-size:0.78rem;color:#5F6F79;line-height:1.45;'
+    'margin-top:0.45rem;">'
+    'Die β greifen linear bei jeder Faktorbewegung: halber Schock, halbe '
+    'Wirkung; negatives Vorzeichen, gegenläufige Wirkung.</div>'
+    '</div>'
+    '<div style="background:#FFFDF8;border:1px solid #E4D8C2;'
+    'border-left:4px solid #B8860B;padding:0.85rem 0.95rem;">'
+    '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.10em;'
+    'text-transform:uppercase;color:#7A6A3A;margin-bottom:0.35rem;">'
+    'Wichtiger Disclaimer</div>'
+    '<table style="width:100%;border-collapse:collapse;font-size:0.78rem;'
+    'line-height:1.45;">'
+    '<tbody>'
+    '<tr><td style="padding:0.22rem 0.45rem 0.22rem 0;font-weight:700;'
+    'white-space:nowrap;">Methodischer Anker</td><td style="padding:0.22rem 0;">'
+    'EBA 2025 Methodological Note §2.4.2 ¶122-123: gestresste '
+    'Risikoparameter sollen modelliert werden; wenn sektorale Modelle fehlen, '
+    'sind sektorale Sensitivitäten auf Portfolio-Projektionen zulässig.</td></tr>'
+    '<tr><td style="padding:0.22rem 0.45rem 0.22rem 0;font-weight:700;'
+    'white-space:nowrap;">Empirischer Anker</td><td style="padding:0.22rem 0;">'
+    'ECB WP 2897 (2024) schätzt Makro-/Geldpolitik-Schocks auf Corporate-'
+    'Ausfallwahrscheinlichkeiten; ECB WP 3112 (2025) schätzt Zinsanstiege auf '
+    'Mortgage-Defaults.</td></tr>'
+    '<tr><td style="padding:0.22rem 0.45rem 0.22rem 0;font-weight:700;'
+    'white-space:nowrap;">β-Wert</td><td style="padding:0.22rem 0;">'
+    'Übersetzungsfaktor von Schockgröße in Prozentpunkte Ausfallwahrscheinlichkeit.</td></tr>'
+    '<tr><td style="padding:0.22rem 0.45rem 0.22rem 0;font-weight:700;'
+    'white-space:nowrap;">Plausibel</td><td style="padding:0.22rem 0;">'
+    'Wenn die Szenario-Wirkung erklärbar bleibt und nicht mehr behauptet, '
+    'als die Quelle tragen kann.</td></tr>'
+    '<tr><td style="padding:0.22rem 0.45rem 0.22rem 0;font-weight:700;'
+    'white-space:nowrap;">Nicht</td><td style="padding:0.22rem 0;">'
+    'Keine Behauptung, dass eine Quelle exakt β = 0,20 beweist; es ist eine '
+    'quellenkonforme Basiskalibrierung.</td></tr>'
+    '</tbody></table>'
+    '</div>'
+    '</div>'
+    '<div style="margin-top:0.55rem;font-size:0.80rem;color:#5F6F79;'
+    'line-height:1.5;">'
+    'Die Detailtabelle darunter ist deshalb die maßgebliche Stelle: Sie zeigt '
+    'je Segment Quelle, konkrete Wertlogik und kurzen Plausibilitäts-Check.'
+    '</div>'
     '</div>',
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    '<div style="font-size:0.92rem;font-weight:600;color:#051C2C;'
+    'margin:0.5rem 0 0.35rem 0;">Warum genau dieser Wert je Segment '
+    '— was die Quelle modelliert und wie wir daraus die Zahl ableiten</div>'
+    '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;'
+    'color:#051C2C;line-height:1.5;">'
+    '<thead><tr style="background:#034B6F;color:#FFFFFF;text-align:left;">'
+    '<th style="padding:0.45rem 0.6rem;width:14%;">Segment · β_oil / β_rate</th>'
+    '<th style="padding:0.45rem 0.6rem;width:30%;">Was die Quelle modelliert</th>'
+    '<th style="padding:0.45rem 0.6rem;width:34%;">Warum genau dieser konkrete Wert</th>'
+    '<th style="padding:0.45rem 0.6rem;width:22%;">Plausibilitäts-Check</th>'
+    '</tr></thead><tbody>'
+
+    '<tr style="background:#FFFFFF;border-bottom:1px solid #E6E6E6;vertical-align:top;">'
+    '<td style="padding:0.45rem 0.6rem;"><strong>Corporate</strong><br>+0,30 / +0,20</td>'
+    '<td style="padding:0.45rem 0.6rem;">ECB WP 2897 (2024) modelliert, wie '
+    'makroökonomische Schocks die <strong>Ausfallwahrscheinlichkeit</strong> '
+    'nichtfinanzieller Unternehmen verändern. Das passt zu unserem Bankbuch, '
+    'weil diese Unternehmen die Kreditnehmer hinter Corporate- und KMU-'
+    'Exposures sind. ECB WP 3207 (2026) bestätigt zusätzlich: Unternehmens-'
+    'Ausfälle unterscheiden sich im Stress stark nach Sektor.</td>'
+    '<td style="padding:0.45rem 0.6rem;">Der Ölkanal ist ein '
+    '<strong>Proxy</strong>: Brent steht nicht für eine veröffentlichte Öl-Beta, '
+    'sondern für den Energie-/Angebotsschock im Szenario. Höhere Energiepreise '
+    'erhöhen Kosten, drücken Margen und verschlechtern Cashflows. Deshalb setzen '
+    'wir β_oil moderat auf +0,30. Der Zinskanal ist direkter: höhere Zinsen '
+    'verteuern Refinanzierung, daher β_rate +0,20.</td>'
+    '<td style="padding:0.45rem 0.6rem;">Bei +1,9 Prozentpunkten Zinsstress: '
+    '0,20 × 1,9 = <strong>+0,38 Prozentpunkte</strong>. Das ist bewusst '
+    'moderat und passt zur Quelle: große Unternehmen reagieren, aber nicht '
+    'explosiv. Methodisch zulässig nach EBA §2.4.2 ¶123: sektorale '
+    'Sensitivitäten müssen Richtung und Größenordnung des Szenarios treffen, '
+    'nicht als fertige Beta-Tabelle vorliegen. Genau deshalb ist +0,20 als '
+    'moderater Corporate-Anker plausibel.</td></tr>'
+
+    '<tr style="background:#F7F9FA;border-bottom:1px solid #E6E6E6;vertical-align:top;">'
+    '<td style="padding:0.45rem 0.6rem;"><strong>SME</strong><br>+0,60 / +0,40</td>'
+    '<td style="padding:0.45rem 0.6rem;">WP 2897 zeigt: kleine und mittlere '
+    'Unternehmen reagieren auf Angebots- und Zinsschocks deutlich stärker als '
+    'große Unternehmen. WP 3207 bestätigt ab 2026 dieselbe Grundidee im '
+    'Stress-Test-Kontext: Stress trifft Branchen und Unternehmensgruppen nicht '
+    'gleich stark.</td>'
+    '<td style="padding:0.45rem 0.6rem;">β_oil und β_rate sind exakt '
+    '<strong>2× Corporate</strong>. Das ist bewusst der untere Rand der '
+    '2-3×-Evidenz aus WP 2897, damit die Kalibrierung vorsichtig bleibt. '
+    'Ökonomisch: geringere Diversifikation, kürzere Refinanzierungsprofile, '
+    'weniger Preissetzungsmacht.</td>'
+    '<td style="padding:0.45rem 0.6rem;">Bei +1,9 Prozentpunkten Zinsstress: '
+    '0,40 × 1,9 = <strong>+0,76 Prozentpunkte</strong>. Genau 2× Corporate '
+    'und damit am unteren Rand der stärkeren KMU-Reaktion. Plausibel gemäß '
+    'WP 2897, weil die Quelle kleine/mittlere Unternehmen empirisch deutlich '
+    'sensitiver als große Unternehmen einordnet. Plausibel gemäß EBA ¶123, '
+    'weil der Aufschlag die Segment-Rangfolge und die Szenario-Größenordnung '
+    'transparent wahrt.</td></tr>'
+
+    '<tr style="background:#FFFFFF;border-bottom:1px solid #E6E6E6;vertical-align:top;">'
+    '<td style="padding:0.45rem 0.6rem;"><strong>Mortgage</strong><br>+0,05 / +0,30</td>'
+    '<td style="padding:0.45rem 0.6rem;">ECB WP 3112 (2025) modelliert '
+    'Ausfälle variabel verzinster Hypotheken. Die Kernaussage: Zinsanstiege '
+    'erhöhen die Ausfallwahrscheinlichkeit deutlich stärker als Zinssenkungen '
+    'sie senken. EBA ¶130 ergänzt: im Stress müssen sinkende Sicherheitenwerte '
+    'berücksichtigt werden.</td>'
+    '<td style="padding:0.45rem 0.6rem;">β_rate +0,30 liegt über Corporate '
+    '(Affordability- und Hauspreis-Kanal), aber unter SME, weil Hypotheken '
+    'besichert sind. β_oil +0,05 bleibt nahe null: Energiepreise wirken nur '
+    'indirekt über Haushaltsbudgets, nicht als direkter Öl-Ausfalltreiber. '
+    'γ_rate ist deshalb am höchsten, weil Wohnsicherheiten bei +Δr an Wert '
+    'verlieren.</td>'
+    '<td style="padding:0.45rem 0.6rem;">Bei +1,9 Prozentpunkten Zinsstress: '
+    '0,30 × 1,9 = <strong>+0,57 Prozentpunkte</strong>. Das liegt zwischen '
+    'Corporate und KMU: stark zinsgetrieben, aber besichert. Plausibel gemäß '
+    'WP 3112, weil dort gerade Zinsanstiege bei variablen Hypotheken als '
+    'asymmetrisch starker Ausfalltreiber modelliert werden. Plausibel gemäß '
+    'EBA ¶130, weil Sicherheitenwerte im Stress zusätzlich berücksichtigt '
+    'werden müssen.</td></tr>'
+
+    '<tr style="background:#F7F9FA;border-bottom:1px solid #E6E6E6;vertical-align:top;">'
+    '<td style="padding:0.45rem 0.6rem;"><strong>QRRE</strong><br>+0,40 / +0,15</td>'
+    '<td style="padding:0.45rem 0.6rem;">Der ECB Financial Stability Review '
+    'Mai 2024 beschreibt Haushalts-Verwundbarkeit durch Schuldendienst sowie '
+    'Lebenshaltungs- und Energiepreise. '
+    'EBA Results 2025, Fig. 22, zeigt Retail als Portfolio mit höchster '
+    'projizierter Verlustquote; Retail stellt unter 10 % der Exposures, aber fast '
+    '30 % der projizierten Kreditrisikoverluste.</td>'
+    '<td style="padding:0.45rem 0.6rem;">Qualifying Revolving Retail Exposures '
+    '(revolvierende Konsumentenkredite, z. B. Kreditkarten) sind oft '
+    'unbesichert und einkommensnah: '
+    'β_oil +0,40 liegt über Corporate, weil Energie-/Inflationsschocks direkt '
+    'verfügbares Einkommen treffen. β_rate +0,15 bleibt niedriger als Mortgage, '
+    'weil Revolving-Sätze bereits hoch/variabel sind und der zusätzliche '
+    '100-Basispunkte-Schock relativ weniger neue Information zur Tragfähigkeit enthält.</td>'
+    '<td style="padding:0.45rem 0.6rem;">Bei +50 % Brent-log-Schock: '
+    '0,40 × 0,50 = <strong>+0,20 Prozentpunkte</strong>. Das ist höher als '
+    'Corporate, aber plausibel, weil diese Kredite unbesichert und einkommensnah sind. '
+    'Methodisch plausibel gemäß EBA ¶123, weil die Sensitivität Richtung '
+    'und Größenordnung des Stress-Szenarios treffen muss. EBA Results '
+    'Fig. 22 dient hier nur als grober Verlustquotenvergleich nach '
+    'Exposure-Klasse: Retail liegt dort im Stress hoch.</td></tr>'
+
+    '<tr style="background:#FFFFFF;border-bottom:1px solid #E6E6E6;vertical-align:top;">'
+    '<td style="padding:0.45rem 0.6rem;"><strong>Other Retail</strong><br>+0,30 / +0,25</td>'
+    '<td style="padding:0.45rem 0.6rem;">Gleiche Quellenebene wie oben: ECB '
+    'Financial Stability Review Mai 2024 für Haushalts-Schuldendienst und '
+    'Lebenshaltungskosten-Risiken sowie EBA '
+    'Results 2025 Fig. 22 als Portfolio-Plausibilisierung der hohen Retail-'
+    'Verlustanfälligkeit.</td>'
+    '<td style="padding:0.45rem 0.6rem;">Other Retail ist ein Mischportfolio '
+    '(Auto, Personal Loans, teils besichert, teils unbesichert). Deshalb liegt '
+    'β_oil +0,30 unter revolvierendem Retail und β_rate +0,25 unter Mortgage, '
+    'aber beide über bzw. nahe Corporate. Der Wert ist ein Mischprofil zwischen '
+    'Kreditkarte/Konsumkredit und Hypothek, nicht direkt aus einer Quelle '
+    'abgeschrieben.</td>'
+    '<td style="padding:0.45rem 0.6rem;">Bei +1,9 Prozentpunkten Zinsstress: '
+    '0,25 × 1,9 = <strong>+0,48 Prozentpunkte</strong>. Das liegt zwischen '
+    'Corporate und Mortgage und passt zum Mischportfolio. Plausibel gemäß '
+    'EBA-Rahmen, weil die Kalibrierung zur hohen Retail-Verlustquote in '
+    'Fig. 22 passt, aber keine stärker belegte Unterklasse behauptet. Genau '
+    'diese Vorsicht macht den Zwischenwert quellenkonform.</td></tr>'
+
+    '<tr style="background:#F7F9FA;border-bottom:1px solid #E6E6E6;vertical-align:top;">'
+    '<td style="padding:0.45rem 0.6rem;"><strong>Bank</strong><br>+0,05 / <strong>−0,05</strong></td>'
+    '<td style="padding:0.45rem 0.6rem;">Hier passt WP 2897 ausdrücklich '
+    '<em>nicht</em>, weil es nichtfinanzielle Unternehmen modelliert. Der '
+    'Anker ist EBA-Methodik Kap. 4 zu Net Interest Income, also '
+    'Zinsüberschuss, und EBA Results 2025 zur Widerstandsfähigkeit des '
+    'Zinsüberschusses bei einlagenstarken Banken. Das ist eine Ertragslogik, '
+    'keine veröffentlichte Bank-Ausfallwahrscheinlichkeits-Beta.</td>'
+    '<td style="padding:0.45rem 0.6rem;">β_rate −0,05 ist deshalb als kleine '
+    'Expertenannahme markiert: steigende Zinsen können den Bank-Zinsüberschuss '
+    'stützen, gleichzeitig steigen Kreditqualitäts- und Refinanzierungsrisiken. Das Netto-'
+    'Vorzeichen wird leicht negativ gesetzt, nicht stark. β_oil +0,05 bleibt '
+    'minimal, weil Öl Banken nur indirekt über Kreditqualität/Marktstress trifft.</td>'
+    '<td style="padding:0.45rem 0.6rem;">Bei +1,9 Prozentpunkten Zinsstress: '
+    '−0,05 × 1,9 = <strong>−0,10 Prozentpunkte</strong>. Sehr klein: nur '
+    'Richtungssignal für Zinsüberschuss, keine starke Bank-Beta. Plausibel, '
+    'weil die Quelle hier keine Ausfall-Beta liefert; deshalb bleibt der Wert '
+    'nahe null und wird ausdrücklich als Expertenannahme markiert. Das ist '
+    'quellenkonform, weil kein empirisch nicht belegter starker Bank-PD-Effekt '
+    'behauptet wird.</td></tr>'
+
+    '<tr style="background:#FFFFFF;vertical-align:top;">'
+    '<td style="padding:0.45rem 0.6rem;"><strong>Sovereign</strong><br>0 / 0</td>'
+    '<td style="padding:0.45rem 0.6rem;">EBA ¶154 behandelt Sovereign-Default-'
+    'und Impairment-Flows für AC-Sovereigns separat. Für unser Modell wird der '
+    'Zinsschock im Sovereign-Buch über Duration/Kurswert abgebildet, nicht über '
+    'eine Corporate-artige PD-Regression.</td>'
+    '<td style="padding:0.45rem 0.6rem;">β_oil = β_rate = 0 verhindert '
+    'Doppelzählung: derselbe Δr-Schock würde sonst einmal als Kursverlust und '
+    'nochmals als Sovereign-PD-Schock wirken. EBA Results Fig. 22 plausibilisiert '
+    'zusätzlich, dass Public-Sector-Verlustquoten im EBA-Vergleich nach '
+    'Exposure-Klasse niedrig liegen.</td>'
+    '<td style="padding:0.45rem 0.6rem;">0 × jeder Schock = <strong>0</strong>. '
+    'Das ist beabsichtigt: der Zinsschock wird schon im Marktbuch-Kurswertkanal '
+    'gerechnet und soll nicht doppelt in der Ausfallwahrscheinlichkeit landen. '
+    'Plausibel gemäß EBA ¶154, weil Sovereign-Impairments separat behandelt '
+    'werden. Zusätzlich passt es zum EBA-Results-Vergleich, weil Public Sector '
+    'in Fig. 22 niedrig bleibt.</td></tr>'
+
+    '</tbody></table>',
     unsafe_allow_html=True,
 )
 
@@ -588,15 +741,26 @@ st.markdown(
     'border-top:2px solid #034B6F;border-radius:4px;'
     'padding:0.8rem 1.0rem;margin:0.2rem 0 0.6rem 0;color:#051C2C;'
     'font-size:0.86rem;line-height:1.55;">'
-    '<strong>Plausibilitäts-Check</strong> (Größenordnungs-Validierung, '
-    '<em>keine</em> invertierte Quell-Tabelle): wendet man die β auf den '
-    'EBA-Adverse-Zinsschock (+1,9 pp Euroraum) an, ergibt sich für '
-    'Large-Corporate 0,20 × 1,9 = <strong>+0,38 pp PD</strong>, für KMU '
-    '0,40 × 1,9 = <strong>+0,76 pp</strong>, für Mortgage 0,30 × 1,9 = '
-    '<strong>+0,57 pp</strong>. Das liegt in derselben Größenordnung wie die '
-    'in ECB WP 2897 gemessene Reaktion (Large-Corp einige Zehntel-pp unter '
-    'kombiniertem Stress, KMU ≈ 2–3×) — die β sind damit szenario-konsistent '
-    'im Sinne von §2.4.2 ¶121.'
+    '<strong>Plausibilitäts-Checks</strong> (Größenordnung, EBA-Vergleich, '
+    'Doppelzählung):<br>'
+    '① <strong>Zinsschock-Skalierung:</strong> auf den EBA-Adverse-'
+    'Euroraum-Schock von +1,9 pp angewandt ergeben sich Large-Corp '
+    '<strong>+0,38 Prozentpunkte Ausfallwahrscheinlichkeit</strong>, KMU '
+    '<strong>+0,76 Prozentpunkte</strong>, Mortgage '
+    '<strong>+0,57 Prozentpunkte</strong>. Das passt zur WP-2897-Logik: '
+    'Corporate reagiert moderat, KMU etwa 2-3× stärker.<br>'
+    '② <strong>EBA-Verlustquotenvergleich:</strong> EBA Results 2025 Fig. 22 '
+    'zeigt aggregierte Verlustquoten nach Exposure-Klasse, keine '
+    'bankindividuellen Detailportfolios. Der Vergleich stützt nur die grobe '
+    'Richtung: Retail stärker, Public Sector niedrig.<br>'
+    '③ <strong>Stress-Randbereich:</strong> WP 3207 zeigt, dass Unternehmens-'
+    'Ausfälle im harten Stress deutlich stärker reagieren können als im '
+    'Normalfall; unser KMU-Multiplikator von 2× ist daher bewusst vorsichtig.<br>'
+    '④ <strong>Keine Doppelzählung:</strong> Sovereign-Zinsrisiko läuft über '
+    'Duration/Kurswert im Marktbuch; ein zusätzliches Sovereign-β auf Δr würde '
+    'denselben Schock zweimal zählen. Insgesamt sind die β damit plausibel '
+    'im Sinne von EBA §2.4.2 ¶123, aber ausdrücklich keine aufsichtliche '
+    'Beta-Tabelle.'
     '</div>',
     unsafe_allow_html=True,
 )
@@ -681,41 +845,162 @@ with st.expander("β-Werte überschreiben (Sensitivitäts-Analyse, advanced)",
 
 # --- Ausblick · portfolio-spezifische β-Schätzung (bewusst nicht im Modell) -
 st.markdown(
-    '<div style="background:#FBF7EF;border:1px solid #E4D8C2;'
-    'border-left:4px solid #B8860B;border-radius:6px;'
-    'padding:0.95rem 1.1rem;margin:0.7rem 0 0.4rem 0;color:#051C2C;'
-    'font-size:0.88rem;line-height:1.6;">'
-    '<strong>Ausblick · Wie man die β portfolio-spezifisch machen '
-    'könnte</strong><br><br>'
-    'Berechtigte Kritik: β sollten eigentlich <em>portfolio-spezifisch</em> '
-    'sein, nicht sektorweit (Regionen-Mix, Sicherheiten, Kundenqualität '
-    'unterscheiden sich je Bank). Zwei Stufen, wie man dahin käme:<br><br>'
-    '<strong>Stufe 1 — machbar in DIESEM Modell (Peer-Group-Ansatz, nur '
-    'öffentliche Daten):</strong> Wir haben 10 Banken mit publizierten '
-    'Portfolio-Merkmalen — daraus ließe sich je Bank ein <em>eigenes</em> '
-    'effektives β ableiten, ganz ohne interne Ausfalldaten:<br>'
-    '• <strong>Länder-Mix → Zins-β:</strong> eine IT/ES-lastige Bank erlebt '
-    'einen größeren 10y-Schock (+2,8–2,9 pp) als eine DE/NL-lastige '
-    '(+1,3 pp) — die Länder-Pfade aus EBA-Szenario §4.1.6 liegen vor, das '
-    'β_rate ließe sich also mit dem Länder-Exposure der Bank skalieren.<br>'
-    '• <strong>Portfolio-Mix → Blend-β:</strong> das Segment-β mit den '
-    'echten Exposure-Gewichten der Bank verrechnen → ein bank-spezifisches '
-    'Aggregat-β (mortgage-lastig ≠ corporate-lastig).<br>'
-    '• <strong>Peer-Gruppen → Quer-Kalibrierung:</strong> Banken nach '
-    'Geschäftsmodell gruppieren (retail- vs. corporate-lastig vs. universal) '
-    'und die Gruppen-β gegen die <em>bank-individuellen</em> Verlustquoten '
-    'der EBA-2025-Results plausibilisieren.<br><br>'
-    '<strong>Stufe 2 — der Ideal-Weg (bank-intern, EBA §2.4.2 ¶120 „banks '
-    'should use models"):</strong> eigenes Satellitenmodell — '
-    '(1) Datenpanel eigener Default-/Transition-Raten je Klasse über ≥ 1 '
-    'Konjunkturzyklus; (2) logit(PD)<sub>Klasse</sub> = β_oil · ΔBrent + '
-    'β_rate · Δr₁₀ᵧ + Kontrollen (BIP, Arbeitslosigkeit, Hauspreis) + Lags, '
-    'gemeinsam geschätzt (SUR, wie ECB BEAST WP 2469); (3) EBA-Mindeststandards '
-    '(ökonometrische Solidität, Responsiveness) + Out-of-sample-Backtest; '
-    '(4) Plausibilisierung gegen ECB-Benchmark-Parameter (¶122/125). '
-    'Erfordert bank-interne Ausfalldaten — die öffentlich nicht vorliegen; '
-    'deshalb nutzt unser Modell die sektorweiten Default-β + die '
-    'Override-Funktion oben.'
+    '<div style="margin:0.9rem 0 0.5rem 0;color:#051C2C;">'
+    '<div style="font-size:1.02rem;font-weight:700;margin-bottom:0.2rem;">'
+    'Ausblick · Wie man die β später portfolio-spezifisch machen könnte</div>'
+    '<div style="font-size:0.87rem;color:#3A4A57;line-height:1.55;'
+    'max-width:980px;">Die heutige Matrix ist bewusst einfach: eine '
+    'Exposure-Klasse bekommt über alle Banken denselben Startwert. Das ist '
+    'transparent und prüfbar, aber natürlich nicht das Ende der Modelllogik. '
+    'Eine italienlastige Corporate-Bank, eine deutsche Hypothekenbank und eine '
+    'französische Universalbank sollten langfristig nicht exakt dieselben '
+    'Übersetzungsfaktoren verwenden. Der nächste Entwicklungsschritt wäre daher '
+    'ein <strong>effektives Bank-β</strong>, das den veröffentlichten '
+    'Portfolio-Mix der Bank berücksichtigt.</div>'
+
+    '<div style="margin:0.75rem 0;padding:0.65rem 0.85rem;'
+    'border-left:4px solid #034B6F;background:#F6FAFC;font-size:0.84rem;'
+    'line-height:1.55;">'
+    '<strong>Grundidee:</strong> effektives β der Bank = Segment-β × '
+    'Länder-Schockfaktor × Portfolio-Gewicht × einfacher Qualitätsfaktor. '
+    'Damit bleibt die Logik dieselbe wie heute, aber sie wird auf die konkrete '
+    'Bank zugeschnitten.</div>'
+
+    '<div style="margin:0.75rem 0 0.85rem 0;">'
+    '<div style="font-size:0.86rem;font-weight:700;margin-bottom:0.35rem;">'
+    'Prozessgrafik · vom heutigen Default-β zum bank-spezifischen β</div>'
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));'
+    'gap:0.45rem;align-items:stretch;">'
+    '<div style="background:#FFFFFF;border:1px solid #DCE1E6;border-top:3px solid #7A8893;'
+    'padding:0.55rem 0.6rem;min-height:118px;">'
+    '<div style="font-size:0.68rem;font-weight:700;color:#7A8893;">1 · Datenbasis</div>'
+    '<div style="font-size:0.78rem;line-height:1.42;margin-top:0.25rem;">'
+    'Benötigt: EBA-Transparency-Exposure je Bank × Klasse × Land, Pillar-3-'
+    'Ausfallwahrscheinlichkeit und Verlustquote, EBA/ESRB-Länderpfade, '
+    'EBA-Results-Peers.</div></div>'
+    '<div style="background:#FFFFFF;border:1px solid #DCE1E6;border-top:3px solid #034B6F;'
+    'padding:0.55rem 0.6rem;min-height:118px;">'
+    '<div style="font-size:0.68rem;font-weight:700;color:#034B6F;">2 · Mapping</div>'
+    '<div style="font-size:0.78rem;line-height:1.42;margin-top:0.25rem;">'
+    'Jede Position wird einer Exposure-Klasse, einem Land und einem '
+    'Stresskanal zugeordnet: Öl-Proxy, Zins oder beides.</div></div>'
+    '<div style="background:#FFFFFF;border:1px solid #DCE1E6;border-top:3px solid #034B6F;'
+    'padding:0.55rem 0.6rem;min-height:118px;">'
+    '<div style="font-size:0.68rem;font-weight:700;color:#034B6F;">3 · β rechnen</div>'
+    '<div style="font-size:0.78rem;line-height:1.42;margin-top:0.25rem;">'
+    'Segment-β wird mit Länder-Schock, Portfolio-Gewicht und vorsichtigem '
+    'Qualitätsfaktor multipliziert.</div></div>'
+    '<div style="background:#FFFFFF;border:1px solid #DCE1E6;border-top:3px solid #B8860B;'
+    'padding:0.55rem 0.6rem;min-height:118px;">'
+    '<div style="font-size:0.68rem;font-weight:700;color:#9A6B00;">4 · Plausi</div>'
+    '<div style="font-size:0.78rem;line-height:1.42;margin-top:0.25rem;">'
+    'Prüfung gegen EBA-Verlustquotenvergleich, β × Szenario-Rechnung und '
+    'Peer-Gruppe. '
+    'Ausreißer werden gekappt oder begründet.</div></div>'
+    '<div style="background:#FFFFFF;border:1px solid #DCE1E6;border-top:3px solid #1E8449;'
+    'padding:0.55rem 0.6rem;min-height:118px;">'
+    '<div style="font-size:0.68rem;font-weight:700;color:#1E8449;">5 · Einsatz</div>'
+    '<div style="font-size:0.78rem;line-height:1.42;margin-top:0.25rem;">'
+    'Bank-spezifisches β wird dokumentiert, versioniert und als Challenger '
+    'gegen das heutige sektorweite β getestet.</div></div>'
+    '</div></div>'
+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));'
+    'gap:0.65rem;align-items:stretch;">'
+
+    '<div style="border-top:4px solid #9AA7B0;padding:0.75rem 0.65rem;'
+    'background:#FFFFFF;border-bottom:1px solid #DCE1E6;">'
+    '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.08em;'
+    'text-transform:uppercase;color:#7A8893;">Heute</div>'
+    '<div style="font-size:0.92rem;font-weight:700;margin:0.12rem 0 0.35rem 0;">'
+    'Sektorweite Default-Werte</div>'
+    '<div style="font-size:0.80rem;line-height:1.48;color:#3A4A57;">'
+    'Corporate, KMU, Mortgage, Retail, Bank und Sovereign erhalten feste '
+    'Startwerte. Diese Werte sind quellenbasiert plausibilisiert und können '
+    'im Sensitivitäts-Override verändert werden. Der Vorteil ist Klarheit: '
+    'jeder sieht sofort, welche Annahme das Ergebnis treibt.</div>'
+    '</div>'
+
+    '<div style="border-top:4px solid #034B6F;padding:0.75rem 0.65rem;'
+    'background:#FFFFFF;border-bottom:1px solid #CADAE3;">'
+    '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.08em;'
+    'text-transform:uppercase;color:#034B6F;">Nächster Schritt</div>'
+    '<div style="font-size:0.92rem;font-weight:700;margin:0.12rem 0 0.35rem 0;">'
+    'Bank-spezifisch mit öffentlichen Daten</div>'
+    '<div style="font-size:0.80rem;line-height:1.48;color:#3A4A57;">'
+    'Aus EBA-Transparency-Exposures und Pillar-3-Werten lässt sich je Bank ein '
+    'eigenes Beta berechnen: Länder mit höherem Zinsschock erhöhen den '
+    'Zinsfaktor, der echte Portfolio-Mix gewichtet die Segment-Betas, und ein '
+    'einfacher Qualitätsfaktor kann hohe oder niedrige Ausgangsrisiken abbilden.</div>'
+    '</div>'
+
+    '<div style="border-top:4px solid #B8860B;padding:0.75rem 0.65rem;'
+    'background:#FFFFFF;border-bottom:1px solid #E4D8C2;">'
+    '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.08em;'
+    'text-transform:uppercase;color:#9A6B00;">Ideal</div>'
+    '<div style="font-size:0.92rem;font-weight:700;margin:0.12rem 0 0.35rem 0;">'
+    'Eigenes bankinternes Satellitenmodell</div>'
+    '<div style="font-size:0.80rem;line-height:1.48;color:#3A4A57;">'
+    'Mit internen Ausfall- und Rating-Migrationsdaten könnte die Bank die '
+    'Betas selbst schätzen: Ausfallwahrscheinlichkeit als Funktion von Brent, '
+    'Zins, Arbeitslosigkeit, Wachstum, Hauspreisen und Verzögerungen. Das wäre '
+    'methodisch am stärksten, ist mit öffentlichen Daten aber nicht erreichbar.</div>'
+    '</div>'
+    '</div>'
+
+    '<div style="margin-top:0.75rem;border-collapse:collapse;width:100%;'
+    'font-size:0.82rem;line-height:1.5;">'
+    '<table style="width:100%;border-collapse:collapse;">'
+    '<thead><tr style="background:#034B6F;color:#FFFFFF;text-align:left;">'
+    '<th style="padding:0.45rem 0.6rem;width:23%;">Baustein</th>'
+    '<th style="padding:0.45rem 0.6rem;width:42%;">Wie würde man ihn rechnen?</th>'
+    '<th style="padding:0.45rem 0.6rem;width:35%;">Warum verbessert das die β?</th>'
+    '</tr></thead><tbody>'
+    '<tr style="border-bottom:1px solid #E6E6E6;background:#FFFFFF;">'
+    '<td style="padding:0.45rem 0.6rem;font-weight:700;">Länder-Mix</td>'
+    '<td style="padding:0.45rem 0.6rem;">Der EBA-Zinsschock ist je Land '
+    'unterschiedlich. Eine Bank mit viel Italien/Spanien-Exposure bekommt '
+    'einen höheren effektiven Zinsfaktor als eine Bank mit viel Deutschland/'
+    'Niederlande-Exposure.</td>'
+    '<td style="padding:0.45rem 0.6rem;">Der gleiche +100-Basispunkte-β-Wert '
+    'wird nicht pauschal angewandt, sondern an den tatsächlichen Stress der '
+    'Gegenparteienländer angepasst.</td></tr>'
+    '<tr style="border-bottom:1px solid #E6E6E6;background:#F7F9FA;">'
+    '<td style="padding:0.45rem 0.6rem;font-weight:700;">Portfolio-Mix</td>'
+    '<td style="padding:0.45rem 0.6rem;">Für jede Bank: Segment-β × '
+    'Exposure-Anteil. Eine mortgage-lastige Bank erhält dadurch ein anderes '
+    'Beta-Profil als eine corporate-lastige Bank.</td>'
+    '<td style="padding:0.45rem 0.6rem;">Das Modell erklärt dann nicht nur '
+    'den Durchschnittsbank-Effekt, sondern warum Banken mit anderem Geschäfts-'
+    'modell unterschiedlich stark reagieren.</td></tr>'
+    '<tr style="border-bottom:1px solid #E6E6E6;background:#FFFFFF;">'
+    '<td style="padding:0.45rem 0.6rem;font-weight:700;">Portfolio-Qualität</td>'
+    '<td style="padding:0.45rem 0.6rem;">Die bank-spezifische Ausgangs-'
+    'Ausfallwahrscheinlichkeit aus Pillar 3 kann vorsichtig skalieren: höhere '
+    'Start-Risiken etwas höheres effektives β, niedrige Start-Risiken etwas '
+    'niedrigeres β, jeweils mit enger Kappung.</td>'
+    '<td style="padding:0.45rem 0.6rem;">So wird vermieden, dass eine Bank mit '
+    'sehr gutem Kreditbuch und eine Bank mit schwächerem Kreditbuch exakt '
+    'gleich reagieren.</td></tr>'
+    '<tr style="background:#F7F9FA;">'
+    '<td style="padding:0.45rem 0.6rem;font-weight:700;">Plausibilisierung</td>'
+    '<td style="padding:0.45rem 0.6rem;">Das bank-spezifische Ergebnis wird '
+    'gegen EBA-2025-Verlustquoten, Rangfolgen der Peer-Gruppe und einfache '
+    'Stress-Rechnungen wie β × +1,9 Prozentpunkte geprüft.</td>'
+    '<td style="padding:0.45rem 0.6rem;">Damit bleibt das Beta nicht nur '
+    'rechnerisch individuell, sondern auch erklärbar und in derselben '
+    'Größenordnung wie die öffentlichen Stress-Test-Ergebnisse.</td></tr>'
+    '</tbody></table></div>'
+
+    '<div style="font-size:0.82rem;color:#7A6A3A;background:#FBF7EF;'
+    'border-left:4px solid #B8860B;padding:0.55rem 0.75rem;'
+    'margin-top:0.65rem;line-height:1.5;">'
+    '<strong>Warum noch nicht im aktiven Modell?</strong> Der öffentlich '
+    'machbare Ansatz wäre eine gute nächste Ausbaustufe, aber er bringt neue '
+    'Annahmen hinein: Länderzuordnung, Qualitätskappung und Peer-Group-'
+    'Kalibrierung. Für die aktuelle Version bleiben die sektorweiten β deshalb '
+    'der saubere Default; die Override-Funktion oben zeigt transparent, wie '
+    'sensitiv das Ergebnis auf alternative β reagiert.</div>'
     '</div>',
     unsafe_allow_html=True,
 )
@@ -1138,7 +1423,7 @@ st.markdown(
     '<td class="a-src">Sektor-Sensitivitäten der Klasse Corporate — '
     'kalibriert nach ECB WP 2897 (2024, Makro-/Geldpolitik-Schocks → '
     'Corporate-PD im Euroraum) im Rahmen der EBA-2025-Methodik §2.4.2 '
-    '¶120-128. Vollständige Matrix in Schritt 3b oben.</td></tr>'
+    '¶122-130. Vollständige Matrix in Schritt 3b oben.</td></tr>'
     '</table>'
     '</div>'
 
@@ -1155,9 +1440,9 @@ st.markdown(
     '<strong>Fundament:</strong> Basel III IRB-Ansatz (BCBS 2017, Art. '
     '153 CRR) · bank-spezifische Pillar-3 EU-CR6 (31.12.2024) für die regulatorisch '
     'publizierten A-IRB-PDs und -LGDs · β-Sensitivitäten kalibriert nach '
-    'EBA-2025-Methodik §2.4.2 ¶121, EBA-2025-Adverse-Szenario §4.1.6 '
-    '(10y-Pfad), ECB WP 2897 (Corporate/KMU), ECB WP 3112 (Mortgage) '
-    'und ECB FSR 2024 (Retail).'
+    'EBA-2025-Methodik §2.4.2 ¶123, EBA-2025-Adverse-Szenario §4.1.6 '
+    '(10y-Pfad), ECB WP 2897/3207 (Corporate/KMU), ECB WP 3112 '
+    '(Mortgage) und ECB FSR 2024 + EBA Results Fig. 22 (Retail).'
     '</div>'
 
     '</div>',

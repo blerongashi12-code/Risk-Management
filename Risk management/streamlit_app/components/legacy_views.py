@@ -504,7 +504,7 @@ und das Mark-to-Market-Risiko europäischer Banken.
         ("EBA Transparency 2020-2024","transparency_YYYY/*.csv","Q4 2019 – Q2 2024",
          "Historische Vintages für Backtesting","~1.06 GB","jährlich"),
         ("EBA Stress Test 2025","Methodology Note + Szenario","Nov 2024 / Jan 2025",
-         "β-Rahmen §2.4.2 ¶121 + Adverse-Szenario §4.1.6 (10y +1,9pp EA)","—","bi-annual"),
+         "β-Rahmen §2.4.2 ¶123 + Adverse-Szenario §4.1.6 (10y +1,9pp EA)","—","bi-annual"),
         ("Deutsche Bundesbank","bundesbank_svensson.csv","tagesaktuell",
          "Svensson-Parameter β₀-β₃, τ₁, τ₂","~212 KB","täglich"),
         ("ICE / yfinance","brent_crude.parquet","tagesaktuell",

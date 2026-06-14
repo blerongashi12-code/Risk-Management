@@ -486,41 +486,48 @@ Pro Exposure-Klasse vier Koeffizienten: β_oil (PD), β_rate (PD), γ_oil (LGD),
 | Klasse | β_oil | β_rate | γ_oil | γ_rate | Ökonomische Logik |
 |---|---:|---:|---:|---:|---|
 | Corporate | +0,30 | +0,20 | +0,50 | +1,00 | Energie-Input-Kosten + Bond-Refi-Kosten |
-| SME Corporate | +0,60 | +0,40 | +0,45 | +1,10 | SMEs reagieren ≈2× so stark wie Large-Corp (ECB WP 2897 2024, Größen-Heterogenität); geringere Diversifikation, kürzere Refi-Profile |
+| SME Corporate | +0,60 | +0,40 | +0,45 | +1,10 | Kleine und mittlere Unternehmen reagieren ≈2× so stark wie Large-Corp (ECB WP 2897 2024); geringere Diversifikation, kürzere Refi-Profile |
 | Mortgage | +0,05 | +0,30 | +0,10 | +1,50 | Floating-Rate-Affordability + Property-Value-Haircut bei Δr |
-| QRRE | +0,40 | +0,15 | +0,30 | +0,50 | Konsumenten-Inflation belastet Disposable Income stark |
+| QRRE | +0,40 | +0,15 | +0,30 | +0,50 | Revolvierende Konsumentenkredite, z. B. Kreditkarten: Inflation belastet verfügbares Einkommen stark |
 | Other Retail | +0,30 | +0,25 | +0,25 | +0,80 | zwischen Mortgage und QRRE |
 | **Bank** | +0,05 | **−0,05** | +0,10 | +0,50 | **NIM-Uplift** bei steigenden Zinsen — adressiert die Kritik, dass „steigende Zinsen pauschal schlecht" ökonomisch unkorrekt ist |
 | Sovereign | 0 | 0 | 0 | 0 | fiskalisch determiniert, nicht macro-getrieben |
 
 ### 6.2 · Quellen pro Wert
 
-Methodischer Rahmen: **EBA 2025 Methodology Note §2.4.2 ¶120-128** (¶121
-„sectoral sensitivities applied to portfolio-level projections", konsistent
-mit Richtung *und* Größenordnung der Szenario-Schocks; ¶128 LGD spiegelt den
-Sicherheiten-Fair-Value). Schock-Größe: **EBA 2025 Macro-financial scenario
+Methodischer Rahmen: **EBA 2025 Methodology Note §2.4.2 ¶122-123** (Modelle
+für gestresste TR/LGD/LR; ¶123 erlaubt sektorale Sensitivitäten auf
+Portfolio-Projektionen, wenn keine geeigneten sektoralen Satellite-Modelle
+verfügbar sind). **¶130** verankert den LGD-Kanal über sinkende Fair Values
+von Credit-Risk-Mitigants. Schock-Größe: **EBA 2025 Macro-financial scenario
 §4.1.6** (adverser 10y-Pfad, Start Dez-2024). Quelle der per-Segment-β:
 
 | Klasse | Quelle für β-Werte (aktuell, Stichtag 31.12.2024) |
 |---|---|
-| Corporate | ECB WP 2897 (2024) — Makro-/Geldpolitik-Schocks → Large-Corp-PD im Euroraum (DE/FR/IT/ES); EBA §2.4.2 ¶120-128 |
-| SME Corporate | ECB WP 2897 (2024), Fig. 5 — KMU/Mikro-PD ≈2× (Angebot) bzw. ≈3× (Geldpolitik) Large-Corp; ersetzt Drehmann/Juselius (2014, ≈1,5×) |
-| Mortgage | Zins: ECB WP 3112 (2025) Variable-Rate-Mortgage-Defaults ↔ Zins · Öl: ECB FSR Mai 2024 (Energie → Haushalts-Default) · LGD: EBA §2.4.2 ¶128 |
-| QRRE | ECB FSR Mai 2024 (Haushalts-Schuldendienst ↔ Zins; Energie → Konsumenten-Arrears); EBA-2025-Results Fig. 22 (Retail = höchste Verlustquote) |
-| Other Retail | ECB FSR Mai 2024; EBA-2025-Results Fig. 22 (Retail-Portfolio); Profil zwischen Mortgage und QRRE |
-| **Bank** | EBA 2025 Methodology Note Kap. 4 (Net Interest Income) — NIM-Profit-Effekt bei steigenden Zinsen (β_rate < 0) |
-| Sovereign | macro-orthogonal; Sovereign-Risiko via Marktbuch-MtM/Duration (EBA §2.4.2 ¶153). EBA-2025-Results Fig. 22 bestätigt: Public sector = niedrigste Verlustquote. β_oil = 0 ist begründete Modellentscheidung, keine Auslassung |
+| Corporate | ECB WP 2897 (2024): Schocks verändern die **Ausfallwahrscheinlichkeit** nichtfinanzieller Unternehmen; genau diese Firmen sind die Kreditnehmer hinter Corporate-Exposures. ECB WP 3207 (2026): sektorale Unternehmens-Ausfälle unterscheiden sich im Stress-Test stark. Öl ist hier ein **Proxy** für den Energie-/Angebotsschock, keine veröffentlichte Öl-Beta |
+| SME Corporate | ECB WP 2897 (2024): kleine und mittlere Unternehmen reagieren deutlich stärker als große Unternehmen; deshalb β = 2× Corporate. ECB WP 3207 (2026): bestätigt sektorale Unterschiede im Stress-Test |
+| Mortgage | ECB WP 3112 (2025): Zinsanstiege erhöhen Ausfallwahrscheinlichkeiten variabel verzinster Hypotheken deutlich; Öl nur indirekt via Haushaltsbudgets · LGD: EBA §2.4.2 ¶130 Sicherheitenwert |
+| QRRE | ECB Financial Stability Review Mai 2024 — Haushalts-Schuldendienst, Lebenshaltungskosten und Energiepreise; EBA-2025-Results Fig. 22 — Retail höchste Verlustquote |
+| Other Retail | ECB Financial Stability Review Mai 2024 + EBA-2025-Results Fig. 22; Mischprofil zwischen revolvierendem Retail/Konsumkredit und Mortgage, keine direkt publizierte Unterklassen-Beta |
+| **Bank** | WP 2897/3207 ausdrücklich **nicht** passend, weil sie nichtfinanzielle Unternehmen modellieren. EBA 2025 Methodology Kap. 4 (Net Interest Income = Zinsüberschuss) + EBA Results 2025 zur Zinsüberschuss-Resilienz; β_rate < 0 als kleine Expertenannahme, keine publizierte Bank-Ausfall-Beta |
+| Sovereign | EBA §2.4.2 ¶154 (Sovereign-Default-/Impairment-Flows separat); Zinsrisiko via Marktbuch-Duration/Marktbewertung. EBA-2025-Results Fig. 22: Public Sector niedrige Verlustquote. β = 0 verhindert Doppelzählung |
 
-Die γ-Werte (LGD-Stress) sind nach EBA §2.4.2 ¶128 kalibriert (LGD spiegelt
+Die γ-Werte (LGD-Stress) sind nach EBA §2.4.2 ¶130 kalibriert (LGD spiegelt
 den Sicherheiten-Fair-Value-Verfall). CRR Art. 181 fordert „Downturn-LGD"
 für IRB-Banken — die γ-Werte bilden den Downturn-Aufschlag faktor-spezifisch ab.
 
-> **Hinweis zu den Schätzfenstern:** Die β-*Publikationen* sind 2024/2025;
-> ihre ökonometrischen *Schätzfenster* sind historisch (WP 2897 und WP 3112:
-> 2014-2019) — methodisch unvermeidbar, da die Messung von Default-Sensitivitäten
-> einen Default-*Zyklus* mit hinreichend Ausfällen benötigt (die ruhigen Jahre
-> 2020-2024 liefern dafür kaum Signal). Baselines (PD/LGD) sind 31.12.2024, die
-> Schock-Größe stammt aus dem EBA-2025-Adverse-Szenario.
+> **Plausibilitäts-Checks:** β_rate × EBA-Adverse-Zinsschock (+1,9 pp) ergibt
+> Large-Corp +0,38 Prozentpunkte / KMU +0,76 Prozentpunkte / Mortgage +0,57
+> Prozentpunkte Ausfallwahrscheinlichkeit. Das hält Corporate moderat, KMU
+> ≈2× Corporate und Mortgage zinsdominiert. EBA Results Fig. 22 plausibilisiert
+> Retail hoch und Public Sector niedrig; WP 3207 stützt, dass Unternehmens-
+> Ausfälle im harten Stress deutlich stärker reagieren können als im Normalfall.
+> Sovereign β = 0 verhindert Doppelzählung, weil Δr bereits im Marktbuch-Kanal wirkt.
+
+> **Hinweis:** Die Quellen ab 2024 liefern keine fertige Beta-Tabelle. Sie liefern
+> Richtung, relative Stärke und Plausibilitätsanker. Die konkreten β-Werte sind
+> transparente, überschreibbare Kalibrierungsannahmen auf Basis des Modell-
+> Stichtags 31.12.2024 und des EBA-2025-Adverse-Szenarios.
 
 ### 6.3 · Override-Möglichkeit für Sensitivitäts-Analysen
 
@@ -674,16 +681,23 @@ Risk management/
 
 - **Lo Duca, M., Moccero, D. & Parlapiano, F. (2024).** "The impact of macroeconomic
   and monetary policy shocks on credit risk in the euro area corporate sector."
-  *ECB Working Paper Series* No 2897. — Corporate/SME, beide Faktoren
-  (Angebotsschock ≈ Öl, Geldpolitik ≈ Zins); KMU ≈2×/3× Large-Corp.
+  *ECB Working Paper Series* No 2897. — Corporate/KMU: Angebots- und
+  Zinsschocks erhöhen Ausfallwahrscheinlichkeiten; Öl im Modell als Proxy
+  für den Energie-/Angebotsschock.
   https://www.ecb.europa.eu/pub/pdf/scpwps/ecb.wp2897~449ca98c99.en.pdf
+
+- **Konietschke, P., Metzler, J. & Ponte Marques, A. (2026).** "A quantile
+  probability model for sectoral corporate defaults in Europe." *ECB Working
+  Paper Series* No 3207. — Corporate/KMU-Zusatzanker: sektorale Unternehmens-
+  Ausfälle unterscheiden sich im Stress-Test deutlich.
+  https://www.ecb.europa.eu/pub/pdf/scpwps/ecb.wp3207~4ec5f4abf6.en.pdf
 
 - **Bandoni, E., Fourné, F. & Jarmulska, B. (2025).** "Mortgage loan rates and the
   defaults of variable rate mortgages." *ECB Working Paper Series* No 3112. —
-  Mortgage-Default ↔ Zins, nichtlinear & asymmetrisch.
+  Hypotheken-Ausfälle ↔ Zins, nichtlinear & asymmetrisch.
   https://www.ecb.europa.eu/pub/pdf/scpwps/ecb.wp3112~d8d7660171.en.pdf
 
-- **ECB/ESRB (2024).** *Financial Stability Review, Mai 2024.* — Energie-/Cost-of-
+- **ECB (2024).** *Financial Stability Review, Mai 2024.* — Energie-/Cost-of-
   Living-Schock → Haushalts-Arrears/Default (untere Einkommensquintile);
   Sektor-Heterogenität der erwarteten Default-Raten.
   https://www.ecb.europa.eu/press/financial-stability-publications/fsr/html/index.en.html
