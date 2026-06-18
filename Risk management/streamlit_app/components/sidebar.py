@@ -4,7 +4,7 @@ Schlankes Design nach Removal des Vasicek-Single-Factor-M:
 - Genau 2 Slider: ΔBrent log-Return + Δr_10y in Prozentpunkten
 - Keine Quick-Scenarios, keine M-Aggregation, keine V2-LGD-Knobs
 - KEINE Sektor-Sensitivitäts-Override-UI im Sidebar — diese liegt
-  methodisch im Intro-Tab (Schritt 3), wo die β-Werte ökonomisch
+  methodisch im Intro-Tab, wo die β-Werte ökonomisch
   begründet werden. Die Sidebar liest die Overrides aus
   ``st.session_state["sensitivity_overrides"]`` (vom Intro-Tab gesetzt).
 - KEINE Yield-Curve-spezifischen β-Slider — der Zins-Slider wirkt
@@ -42,21 +42,24 @@ def render_sidebar() -> dict:
                                 (aus st.session_state, gesetzt im Intro)
     """
     with st.sidebar:
-        st.title("Makro-Stress")
-        st.caption("Zwei direkte Faktoren steuern alle Analysen live. "
-                   "Keine Aggregation in einen Einzelfaktor.")
+        st.markdown(
+            '<div class="rm-sidebar-head">'
+            '<div class="rm-sidebar-kicker">Model inputs</div>'
+            '<div class="rm-sidebar-title">Makro-Stress</div>'
+            '<div class="rm-sidebar-sub">Zwei direkte Faktoren steuern alle '
+            'Analysen live. Keine Aggregation in einen Einzelfaktor.</div>'
+            '</div>',
+            unsafe_allow_html=True,
+        )
 
         # ------------------------------------------------------------------
         # 1. Die zwei Haupt-Slider
         # ------------------------------------------------------------------
         st.markdown(
-            '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
-            'border-left:3px solid #034B6F;padding:0.5rem 0.7rem;'
-            'border-radius:5px;margin:0.2rem 0 0.8rem 0;'
-            'font-size:0.78rem;color:#051C2C;line-height:1.45;">'
-            '<strong>Faktor 1 · Brent (Öl)</strong><br>'
-            'Log-Return des Brent-Crude-Preises (geometric).<br>'
-            '+0.50 ≈ +50%, −0.50 ≈ −40%.'
+            '<div class="rm-sidebar-card rm-sidebar-card-oil">'
+            '<div class="rm-sidebar-card-title">Brent-Ölpreis</div>'
+            '<div class="rm-sidebar-card-text">Log-Return des Brent-Crude-'
+            'Preises. +0.50 ≈ +50%, −0.50 ≈ −40%.</div>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -69,16 +72,18 @@ def render_sidebar() -> dict:
                  "Ölpreis steigt (Energie-Schock), negativ = Ölpreis fällt.",
         )
         brent_pct = (np.exp(d_brent) - 1) * 100
-        st.caption(f"= **{brent_pct:+.0f}%** Ölpreis-Veränderung")
+        st.markdown(
+            f'<div class="rm-sidebar-readout">= <strong>{brent_pct:+.0f}%</strong> '
+            'Ölpreis-Veränderung</div>',
+            unsafe_allow_html=True,
+        )
 
         st.markdown(
-            '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
-            'border-left:3px solid #A52F4D;padding:0.5rem 0.7rem;'
-            'border-radius:5px;margin:0.8rem 0 0.6rem 0;'
-            'font-size:0.78rem;color:#051C2C;line-height:1.45;">'
-            '<strong>Faktor 2 · 10y-Zins</strong><br>'
-            'Verschiebung des 10-Jahres-Zinses in Prozentpunkten.<br>'
-            '+1.00 = +100bp, −0.50 = −50bp.'
+            '<div class="rm-sidebar-card rm-sidebar-card-rate">'
+            '<div class="rm-sidebar-card-title">10-Jahres-Zins</div>'
+            '<div class="rm-sidebar-card-text">Verschiebung des '
+            '10-Jahres-Zinses in Prozentpunkten. +1.00 = +100bp, '
+            '−0.50 = −50bp.</div>'
             '</div>',
             unsafe_allow_html=True,
         )
@@ -89,7 +94,11 @@ def render_sidebar() -> dict:
             key="d_r_10y_pp_main",
             help="Parallel-Shift der Zinskurve am 10y-Punkt, in pp.",
         )
-        st.caption(f"= **{d_r_10y_pp*100:+.0f} bp** Δr_10y")
+        st.markdown(
+            f'<div class="rm-sidebar-readout">= <strong>{d_r_10y_pp*100:+.0f} bp</strong> '
+            'Δr_10y</div>',
+            unsafe_allow_html=True,
+        )
 
         # ------------------------------------------------------------------
         # 2. Reset-Knopf
@@ -104,25 +113,25 @@ def render_sidebar() -> dict:
         st.divider()
 
         # ------------------------------------------------------------------
-        # 3. Hinweis: Sektor-Sensitivitäten liegen im Intro-Tab
+        # Hinweis: Sektor-Sensitivitäten liegen im Intro-Tab
         # ------------------------------------------------------------------
         _ov = st.session_state.get("sensitivity_overrides")
         if _ov:
             st.markdown(
-                '<div style="background:#FFF8E1;border:1px solid #FFE082;'
-                'border-radius:5px;padding:0.5rem 0.7rem;margin:0.2rem 0;'
-                'font-size:0.74rem;color:#051C2C;line-height:1.45;">'
+                '<div class="rm-sidebar-note rm-sidebar-note-warn">'
                 f'<strong>{len(_ov)} Sektor-Sensitivität(en) '
                 'überschrieben</strong><br>'
-                'Override-UI liegt im Intro-Tab (Schritt 3).'
+                'Override-UI liegt im Intro-Tab · Sensitivitäten.'
                 '</div>',
                 unsafe_allow_html=True,
             )
         else:
-            st.caption(
-                "Sektor-Sensitivitäten (β-Werte pro Exposure-Klasse) sind "
-                "im **Intro-Tab · Schritt 3** dokumentiert und dort "
-                "optional überschreibbar."
+            st.markdown(
+                '<div class="rm-sidebar-note">Sektor-Sensitivitäten '
+                '(β-Werte pro Exposure-Klasse) sind im <strong>Intro-Tab · '
+                'Sensitivitäten</strong> dokumentiert und dort optional '
+                'überschreibbar.</div>',
+                unsafe_allow_html=True,
             )
 
         st.divider()
@@ -131,13 +140,13 @@ def render_sidebar() -> dict:
         # 4. Footer: Datenquellen-Banner
         # ------------------------------------------------------------------
         st.markdown(
-            '<div style="font-size:0.72rem;color:#6E6E6E;line-height:1.4;">'
-            '<strong>Datenbasis:</strong><br>'
-            '• PDs/LGDs: Pillar-3 EU-CR6 bank-spezifisch (31.12.2024)<br>'
-            '• Brent: ICE (yfinance), täglich<br>'
-            '• 10y-Zins: Bundesbank Svensson, täglich<br>'
-            '• Banken-Universe: 10 IRB-Banken<br>'
-            '• Stress-Sensitivitäten: EBA §2.4.2 ¶123 + ECB WP 2897/3207/3112 + FSR 2024'
+            '<div class="rm-sidebar-data">'
+            '<div class="rm-sidebar-data-title">Aktive Datenbasis</div>'
+            '<div>PDs/LGDs · Pillar-3 EU-CR6 bank-spezifisch (31.12.2024)</div>'
+            '<div>Brent · ICE (yfinance), täglich</div>'
+            '<div>10y-Zins · Bundesbank Svensson, täglich</div>'
+            '<div>Banken-Universe · 10 IRB-Banken</div>'
+            '<div>Sensitivitäten · EBA §2.4.2 ¶123 + ECB WP 2897/3207/3112 + FSR 2024</div>'
             '</div>',
             unsafe_allow_html=True,
         )

@@ -11,7 +11,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from components.theme import (tab_breadcrumb, apply_theme, hero, eyebrow, insight, footer,
+from components.theme import (tab_breadcrumb, apply_theme, eyebrow, insight, footer,
                               COLORS, PALETTE_DISCRETE)
 from components.sidebar import render_sidebar
 from components.data_loader import load_data_layer
@@ -34,22 +34,46 @@ st.set_page_config(page_title="Kreditbuch · Loan Book", layout="wide")
 apply_theme()
 config = render_sidebar()
 
-hero(
-    "Kreditbuch · Loan Book Channel",
-    eyebrow="Tab 2 · Basel III IRB · 10 Top-EU-Banken · bank-spezifische "
-            "Pillar-3-PDs",
-    deck="Loan-Exposures der Top-10-IRB-Banken unter makroökonomischem "
-         "Stress. PD- und LGD-Parameter <strong>bank-spezifisch aus den "
-         "Pillar-3-Reports</strong> der jeweiligen Bank (EU-CR6-Tabelle, "
-         "EAD-gewichtete 1-Jahres-PD pro IRB-Klasse, regulatorisch "
-         "publiziert nach CRR Art. 431–455 und EBA ITS/2020/04). "
-         "Capital-Bridge zeigt die schrittweise Aufschlüsselung des "
-         "Stress-Effekts auf PD und LGD.",
+st.markdown(
+    '<div style="margin:0.35rem 0 0.75rem 0;padding:0.95rem 1.1rem;'
+    'background:#FFFFFF;border:1px solid #E6E6E6;border-left:4px solid #051C2C;'
+    'border-top:4px solid #2251FF;color:#051C2C;">'
+    '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.12em;'
+    'text-transform:uppercase;color:#6E6E6E;margin-bottom:0.25rem;">'
+    'Tab 2 · Kreditbuch-Stressmodell · Basel III IRB</div>'
+    '<div style="font-size:1.28rem;font-weight:800;line-height:1.2;'
+    'font-family:Inter,-apple-system,Segoe UI,sans-serif;'
+    'letter-spacing:0.005em;'
+    'margin-bottom:0.35rem;">'
+    'Kreditbuch: PD/LGD-Stress, Expected Loss und RWA</div>'
+    '<div style="font-size:0.90rem;line-height:1.55;color:#3A4A57;'
+    'max-width:1080px;">'
+    'Dieser Tab zeigt die Kreditbuch-Wirkung des aktiven Öl-/Zins-Szenarios '
+    'für die zehn IRB-Banken. Bank-spezifische Pillar-3-PDs und -LGDs werden '
+    'je Exposure-Klasse gestresst; anschließend werden Expected Loss, '
+    'Capital-Charge K und Risk-Weighted Assets berechnet.'
+    '</div>'
+    '<div style="display:flex;gap:0.45rem;flex-wrap:wrap;margin-top:0.65rem;">'
+    '<span style="font-size:0.70rem;font-weight:700;color:#034B6F;'
+    'background:#EEF6FA;border:1px solid #D8E6ED;padding:0.25rem 0.45rem;">'
+    'Pillar-3 PD/LGD</span>'
+    '<span style="font-size:0.70rem;font-weight:700;color:#034B6F;'
+    'background:#EEF6FA;border:1px solid #D8E6ED;padding:0.25rem 0.45rem;">'
+    'EBA Exposure Value</span>'
+    '<span style="font-size:0.70rem;font-weight:700;color:#7A1F38;'
+    'background:#FAEEF2;border:1px solid #E8CAD4;padding:0.25rem 0.45rem;">'
+    'β/γ Stress-Transmission</span>'
+    '<span style="font-size:0.70rem;font-weight:700;color:#051C2C;'
+    'background:#F4F4F4;border:1px solid #E0E0E0;padding:0.25rem 0.45rem;">'
+    'Basel-IRB Capital</span>'
+    '</div>'
+    '</div>',
+    unsafe_allow_html=True,
 )
 
 tab_breadcrumb(2)
 
-# === Datenquellen-Banner mit Coverage-Status ==========================
+# === Tab-Intro + Datenquellen-Banner ==================================
 try:
     from eba_pd_loader import coverage_report                  # type: ignore
     _kb_cov = coverage_report()
@@ -57,26 +81,76 @@ try:
     _kb_n_verified = len(_kb_verified)
 except Exception:
     _kb_verified, _kb_n_verified = [], 0
-try:
-    from eba_pd_loader import load_pd_table                  # type: ignore
-    _kb_df = load_pd_table()
-    _kb_pending = sorted(set(_kb_df["bank_name"].unique())
-                           - set(_kb_verified))
-except Exception:
-    _kb_pending = []
+
+st.markdown(
+    '<div style="margin:0.4rem 0 1.0rem 0;color:#051C2C;">'
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,'
+    'minmax(320px,1fr));gap:0.75rem;align-items:stretch;">'
+    '<div style="background:#F6FAFC;border:1px solid #D8E6ED;'
+    'border-left:4px solid #034B6F;padding:0.95rem 1.05rem;">'
+    '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.10em;'
+    'text-transform:uppercase;color:#5F6F79;margin-bottom:0.35rem;">'
+    'Tab-Übersicht · Kreditbuch</div>'
+    '<div style="font-size:0.92rem;line-height:1.58;">'
+    'Der Kreditbuch-Tab übersetzt den aktiven Öl-/Zins-Schock aus der '
+    'Sidebar in gestresste <strong>Ausfallwahrscheinlichkeiten</strong> '
+    'und <strong>Verlustquoten</strong> je Bank und Exposure-Klasse. '
+    'Daraus berechnen wir erwarteten Verlust, Basel-Capital-Charge '
+    '<strong>K</strong> und risikogewichtete Aktiva.</div>'
+    '</div>'
+    '<div style="background:#FFFDF8;border:1px solid #E4D8C2;'
+    'border-left:4px solid #B8860B;padding:0.95rem 1.05rem;">'
+    '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.10em;'
+    'text-transform:uppercase;color:#7A6A3A;margin-bottom:0.35rem;">'
+    'Ökonomische Leselogik</div>'
+    '<div style="font-size:0.86rem;line-height:1.55;">'
+    '<strong>PD</strong> und <strong>LGD</strong> kommen aus Pillar 3; '
+    '<strong>EAD</strong> kommt aus EBA Transparency. Der Stress verändert '
+    'nur PD/LGD, nicht die Exposure-Höhe. <strong>EL</strong> belastet die '
+    'Gewinn- und Verlustrechnung; <strong>K/RWA</strong> belasten den '
+    'Kapitalnenner der CET1-Quote.</div>'
+    '</div>'
+    '</div>'
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,'
+    'minmax(170px,1fr));gap:0.5rem;margin-top:0.65rem;">'
+    '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+    'padding:0.55rem 0.7rem;">'
+    '<div style="font-size:0.68rem;font-weight:700;color:#6E6E6E;">Input · Daten</div>'
+    '<div style="font-size:0.80rem;line-height:1.35;">Pillar-3 PD/LGD und '
+    'EBA Exposure Value</div></div>'
+    '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+    'padding:0.55rem 0.7rem;">'
+    '<div style="font-size:0.68rem;font-weight:700;color:#6E6E6E;">Transmission · Stress</div>'
+    '<div style="font-size:0.80rem;line-height:1.35;">β/γ-Sensitivitäten '
+    'je Exposure-Klasse</div></div>'
+    '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+    'padding:0.55rem 0.7rem;">'
+    '<div style="font-size:0.68rem;font-weight:700;color:#6E6E6E;">Output · Expected Loss</div>'
+    '<div style="font-size:0.80rem;line-height:1.35;">PD × LGD × EAD, '
+    'aggregiert pro Bank</div></div>'
+    '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+    'padding:0.55rem 0.7rem;">'
+    '<div style="font-size:0.68rem;font-weight:700;color:#6E6E6E;">Output · Kapital</div>'
+    '<div style="font-size:0.80rem;line-height:1.35;">K und RWA über '
+    'Basel-IRB/Vasicek</div></div>'
+    '</div>'
+    '</div>',
+    unsafe_allow_html=True,
+)
 
 st.markdown(
     '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
     'border-left:4px solid #00A9A5;padding:0.85rem 1.1rem;'
     'border-radius:6px;margin:0.4rem 0 1rem 0;color:#051C2C;'
     'font-size:0.88rem;line-height:1.65;">'
-    '<strong>Woher kommen die PDs in diesem Tab?</strong><br>'
+    '<strong>Datenbasis dieses Tabs</strong><br>'
     'Pro Bank × IRB-Klasse zeigen wir die <strong>EAD-gewichtete 1-Jahres-'
     'Average-PD aus der EU-CR6-Tabelle des jeweiligen Pillar-3-Reports</strong> '
-    'der Bank. Das ist die bank-interne Schätzung, die regulatorisch nach '
-    'CRR Art. 180 berechnet und gemäß CRR Art. 431–455 + EBA ITS/2020/04 '
-    'als Pillar-3-Disclosure veröffentlicht werden muss. Bank-spezifisch, '
-    'nicht aus Country-Aggregaten abgeleitet.<br><br>'
+    'der Bank; die LGD kommt aus derselben Pillar-3-Zeile. Das sind bankinterne '
+    'IRB-Schätzungen, die regulatorisch nach CRR Art. 180/181 berechnet und '
+    'gemäß CRR Art. 431–455 + EBA ITS/2020/04 als Pillar-3-Disclosure '
+    'veröffentlicht werden. EAD stammt aus EBA Transparency Item 2520522.'
+    '<br><br>'
     '<strong>Stichtag · einheitlich 31.12.2024</strong> für alle 10 Banken. '
     'EBA-Stress-Test-2025-Standard: ein uniformer Snapshot ist der '
     'Forward-Stress-Startpunkt. Backtest-Annahme über die 5-Jahres-Periode '
@@ -85,20 +159,10 @@ st.markdown(
     'Macro-Dynamik in den β-Sensitivitäten sitzt.<br><br>'
     f'<strong style="color:#1E7A4E;">Pillar-3-verifiziert '
     f'({_kb_n_verified}/10):</strong> {" · ".join(_kb_verified)}<br>'
-    f'<strong style="color:'
-    f'{("#A52F4D" if _kb_pending else "#1E7A4E")};">'
-    f'Vollständig auf Country-Aggregat: '
-    f'{len(_kb_pending)}/10 Banken</strong> — '
-    f'{(", ".join(_kb_pending) if _kb_pending else "keine, alle 10 Banken sind Pillar-3-verifiziert")}'
-    '<br>'
-    '<span style="color:#6E6E6E;">Einzelne Klassen-Zellen können auch '
-    'bei Pillar-3-verifizierten Banken auf das EBA-Country-Aggregat '
-    '(Q4 2024) bzw. den Basel-F-IRB-Default fallen, wenn die Bank '
-    'diese Klasse nicht als IRB-Sub-total publiziert (z.B. Santander '
-    'reportet Sovereign unter Standardised Approach). 93 % der 70 '
-    'Zellen sind direkt bank-spezifisch Pillar-3-verifiziert. Der '
-    'Status pro Zeile steht im CSV <code>data/pillar3_bank_pd_lgd.csv</code> '
-    'in der Spalte <code>status</code>.</span>'
+    '<span style="color:#6E6E6E;">93 % der 70 Bank-Klasse-Zellen sind '
+    'direkt bank-spezifisch Pillar-3-verifiziert. Der Status pro Zeile '
+    'steht im CSV <code>data/pillar3_bank_pd_lgd.csv</code> in der '
+    'Spalte <code>status</code>.</span>'
     '</div>',
     unsafe_allow_html=True,
 )
@@ -178,8 +242,8 @@ _lgd_cal        = 1.0
 _stress_exp     = 1.0
 _cap_mode       = "hard"
 
-# === Macro-Schock-Diagnose-Strip =======================================
-eyebrow("Macro-Schock — Brent + 10y-Zins (live aus Sidebar)")
+# === Macro-Schock-Kurzstatus ===========================================
+eyebrow("Live-Szenario aus der Sidebar")
 m1, m2, m3 = st.columns(3, gap="small")
 m1.metric("ΔBrent (log)", f"{_d_brent:+.2f}",
           f"{(np.exp(_d_brent)-1)*100:+.0f}% Preisänderung",
@@ -192,30 +256,11 @@ m3.metric("Schock-Magnitude",
           "≈ 0 = baseline, > 1 = signifikant",
           delta_color="off")
 
-source_tag = "Pillar-3 EU-CR6 bank-spezifisch (31.12.2024) · 10 Top-IRB-Banken"
-if abs(_d_brent) < 1e-3 and abs(_d_r_10y_pp) < 1e-3:
-    insight(
-        f"<strong>Kein Macro-Schock aktiv.</strong> Alle Kennzahlen unten "
-        f"zeigen die regulatorische Baseline auf Basis {source_tag}. "
-        f"Slider in der Sidebar bewegen, um die 2-Faktor-Stress-"
-        f"Transmission live zu sehen — ΔPD und ΔLGD werden pro "
-        f"Exposure-Klasse mit unterschiedlichen β-Koeffizienten "
-        f"angewandt (Sektor-Differenzierung)."
-    )
-else:
-    insight(
-        f"<strong>2-Faktor-Stress aktiv.</strong> ΔBrent = "
-        f"{_d_brent:+.2f} und Δr = {_d_r_10y_pp:+.2f} pp werden "
-        f"sektor-differenziert auf PD und LGD jeder Exposure-Klasse "
-        f"angewandt: <code>ΔPD = β_oil · ΔBrent + β_rate · Δr</code>. "
-        f"Beispiel: Mortgage reagiert primär auf Zinsen "
-        f"(Floating-Rate-Affordability), Corporate auf beide Faktoren, "
-        f"Bank-Klasse hat <em>negative</em> Zinssensitivität "
-        f"(NIM-Effekt — adressiert Professor-Kritik Punkt 7). "
-        f"Quelle: β kalibriert nach EBA-2025-Methodik §2.4.2 ¶123, "
-        f"ECB WP 2897/3207 (Corporate/KMU), ECB WP 3112 (Mortgage) "
-        f"und ECB FSR 2024 + EBA Results Fig. 22 (Retail)."
-    )
+st.caption(
+    "Alle folgenden Tabellen und Grafiken reagieren auf diese Sidebar-Werte. "
+    "Baseline bedeutet: ΔBrent = 0 und Δr_10y = 0; Stress verändert PD und "
+    "LGD je Exposure-Klasse über die dokumentierten β/γ-Sensitivitäten."
+)
 
 st.divider()
 
@@ -509,14 +554,15 @@ with st.expander("④ EL · Expected Loss · Erwarteter Verlust",
     st.markdown(
         "EL und Capital sind komplementär:  \n"
         "- **EL** = Provisionsaufwendung (P&L-Belastung, sicher erwartet)  \n"
-        "- **K = L₀.₉₉₉ − EL** = Unexpected-Loss-Komponente bei 99.9 % "
-        "Konfidenz (Eigenkapital-Charge nach Basel III)  \n"
-        "- **L₀.₉₉₉** = 99.9-%-Verlust-Quantil aus der Basel-IRB-Formel aus der Vasicek-Formel"
+        "- **K** = unerwartete Verlustkomponente pro EAD-Einheit: "
+        "`(L_0.999 − PD × LGD) × Maturity Adjustment`  \n"
+        "- **K_EUR = K × EAD** = Kapitalanforderung in Euro  \n"
+        "- **L_0.999** = 99,9-%-Verlustquantil aus der Basel-IRB/Vasicek-Formel"
     )
     st.markdown(
         "Beide werden in der Capital-Bridge nebeneinander gezeigt. Die "
         "CET1-Quote reagiert auf beide: ΔEL reduziert direkt den Zähler, "
-        "ΔK · 12.5 · EAD = ΔRWA verdünnt den Nenner."
+        "ΔK_EUR · 12,5 = ΔRWA verdünnt den Nenner."
     )
 
 st.divider()
@@ -579,88 +625,6 @@ st.caption(
     "Dashboard Q4 2025, COREP C 9.02 (Counterparty-Land = "
     "Heimatland der Bank)."
 )
-
-# =====================================================================
-# Worked Example · wie ein Schock konkret PD und LGD ändert
-# =====================================================================
-st.markdown(" ")
-eyebrow("Worked Example · ein Schock von +50% Brent und +200 bp "
-        "Δr_10y konkret durchgerechnet")
-
-st.markdown(
-    '<div style="background:#F4F4F4;border-radius:6px;'
-    'padding:0.85rem 1.1rem;margin:0.4rem 0 1rem 0;color:#051C2C;'
-    'font-size:0.88rem;line-height:1.65;">'
-    'Wir wenden die 2-Faktor-Formel auf vier illustrative Bank-Klasse-'
-    'Kombinationen an. Schock-Vektor: '
-    '<strong>ΔBrent = +0.50 (≈ +65% Ölpreis), Δr_10y = +2.0 pp '
-    '(+200 bp)</strong>.<br><br>'
-    'Formel: <code>ΔPD = β_oil · ΔBrent + β_rate · Δr_10y</code>, '
-    'analog für LGD. Werte aus der oben gezeigten Matrix.'
-    '</div>',
-    unsafe_allow_html=True,
-)
-
-from two_factor_stress import SENSITIVITY_MATRIX, stress_pd, stress_lgd
-
-_d_brent_ex = 0.50
-_d_r_ex     = 2.0
-_worked_examples = [
-    ("UniCredit", "IT", "corporate"),
-    ("Deutsche Bank", "DE", "mortgage"),
-    ("BNP Paribas", "FR", "qrre"),
-    ("Banco Santander", "ES", "bank"),
-]
-_worked_rows = []
-for bank, country, cls in _worked_examples:
-    bank_row = _pd_table[(_pd_table["bank_name"].str.contains(bank, case=False)) &
-                         (_pd_table["vasicek_class"] == cls)]
-    if len(bank_row) == 0:
-        continue
-    pd_base  = float(bank_row["pd_pct"].iloc[0])  / 100.0
-    lgd_base = float(bank_row["lgd_pct"].iloc[0]) / 100.0
-    pd_str   = stress_pd(pd_base,  _d_brent_ex, _d_r_ex, cls)
-    lgd_str  = stress_lgd(lgd_base, _d_brent_ex, _d_r_ex, cls)
-    sens     = SENSITIVITY_MATRIX.get(cls, {})
-    bo = sens.get("pd_oil", 0); br = sens.get("pd_rate", 0)
-    delta_pd_pp  = (bo * _d_brent_ex + br * _d_r_ex)
-    delta_lgd_pp = (sens.get("lgd_oil", 0)  * _d_brent_ex +
-                    sens.get("lgd_rate", 0) * _d_r_ex)
-    _worked_rows.append({
-        "Bank · Klasse":          f"{bank} ({country}) · {cls}",
-        "β_oil PD":               f"{bo:+.2f}",
-        "β_rate PD":              f"{br:+.2f}",
-        "Rechnung ΔPD":           (f"{bo:+.2f}·0.50 + {br:+.2f}·2.00 = "
-                                   f"{delta_pd_pp:+.3f} pp"),
-        "PD baseline →  stress":  f"{pd_base*100:.2f}% → {pd_str*100:.2f}%",
-        "ΔLGD":                   f"{delta_lgd_pp:+.2f} pp",
-        "LGD baseline →  stress": f"{lgd_base*100:.1f}% → {lgd_str*100:.1f}%",
-    })
-_worked_df = pd.DataFrame(_worked_rows)
-st.dataframe(_worked_df, hide_index=True, use_container_width=True,
-             height=180)
-st.markdown(
-    '<div style="background:#FFFFFF;border-left:4px solid #A52F4D;'
-    'padding:0.7rem 1.0rem;margin:0.4rem 0 0.6rem 0;color:#051C2C;'
-    'font-size:0.86rem;line-height:1.55;">'
-    '<strong>Drei Lehren aus dem Worked Example:</strong><br>'
-    '• <strong>UniCredit Corporate</strong> reagiert auf beide '
-    'Faktoren (β_oil und β_rate beide positiv) — Italien-Corporate-'
-    'PD steigt um <strong>0.55&nbsp;pp</strong>.<br>'
-    '• <strong>Deutsche Bank Mortgage</strong> wird primär vom '
-    'Zinsschock getrieben (β_rate &gt;&gt; β_oil) — typische Floating-'
-    'Rate-Hypotheken-Dynamik.<br>'
-    '• <strong>BNP Paribas QRRE</strong> reagiert primär auf Brent '
-    '(β_oil = +0.40) — Konsumkredite vs. Energie-Inflation.<br>'
-    '• <strong>Banco Santander Bank-Klasse</strong> erlebt eine '
-    '<em>Reduktion</em> der PD um <strong>0.075&nbsp;pp</strong> — '
-    'NIM-Uplift kompensiert das Credit-Risk-Up. Adressiert direkt '
-    'die Professor-Kritik: „steigende Zinsen ≠ allgemein schlecht".'
-    '</div>',
-    unsafe_allow_html=True,
-)
-
-st.divider()
 
 # === Compute baseline + stressed metrics across all banks =============
 # Snapshot-Pattern: erst Baseline auf ungestresstem Universum erfassen,
@@ -796,9 +760,36 @@ st.divider()
 # === Bank-by-bank EL bar (baseline vs stressed) =======================
 eyebrow("Expected Loss pro Bank · Baseline vs. Stress")
 
-st.caption(
-    f"Alle {len(league)} Banken der kuratierten Datenbasis, absteigend "
-    f"nach Stress-Expected-Loss sortiert (größte Risiko-Träger oben)."
+_class_labels = {
+    "corporate": "Corporate",
+    "sme_corporate": "SME Corporate",
+    "mortgage": "Residential Mortgage",
+    "qrre": "QRRE",
+    "other_retail": "Other Retail",
+    "bank": "Bank",
+    "sovereign": "Sovereign",
+}
+_classes_in_el = sorted({
+    s.exposure_class
+    for p in universe.banks.values()
+    for s in p.segments
+})
+_classes_txt = " · ".join(_class_labels.get(c, c) for c in _classes_in_el)
+st.markdown(
+    '<div style="background:#F6FAFC;border:1px solid #D8E6ED;'
+    'border-left:4px solid #034B6F;padding:0.75rem 0.95rem;'
+    'margin:0.35rem 0 0.8rem 0;color:#051C2C;font-size:0.86rem;'
+    'line-height:1.55;">'
+    '<strong>Was zeigt die Grafik?</strong> Für jede Bank wird der '
+    '<strong>Expected Loss</strong> über alle geladenen IRB-Segmente '
+    'aggregiert: '
+    f'{_classes_txt}. '
+    'Pro Segment gilt <code>EL = PD × LGD × EAD</code>; die Bank-Summe ist '
+    'die Addition über alle Segmente. Die blaue Serie ist die Pillar-3-'
+    'Baseline, die rote Serie die gestresste Sicht nach dem aktiven '
+    'Öl-/Zins-Szenario aus der Sidebar.'
+    '</div>',
+    unsafe_allow_html=True,
 )
 
 # Feste Datenbasis: alle 10 kuratierten Banken, keine Top-N-Auswahl.
@@ -831,8 +822,7 @@ fig.add_trace(go.Bar(
 _shock_label = (f"ΔBrent = {_d_brent:+.2f} · Δr_10y = {_d_r_10y_pp:+.1f} pp"
                 if _is_stressed else "kein Schock")
 fig.update_layout(
-    title=(f"Expected Loss · alle {len(ranked)} Banken · "
-           f"Baseline (blau) vs. Stress (crimson) · {_shock_label}"),
+    title=(f"Expected Loss je Bank · Baseline vs. Stress · {_shock_label}"),
     xaxis_title="Expected Loss [Mrd. EUR]",
     yaxis=dict(automargin=True, tickfont=dict(size=10)),
     height=chart_height,
@@ -845,13 +835,21 @@ st.plotly_chart(fig, use_container_width=True)
 st.divider()
 
 # === Capital Bridge · Wirkungskette pro Bank ==========================
-eyebrow("Wirkungskette · Capital Bridge per bank")
-st.caption(
-    "End-to-end Transmission Chain · Macro-Schock → 2-Faktor-Stress auf "
-    "PD und LGD (sektor-differenzierte β-Sensitivitäten) → IRB-Capital. "
-    "Sequentielle Aktivierung: erst der PD-Shift (LGD bleibt auf Baseline), "
-    "dann der LGD-Shift (PD bereits gestresst). Beide Beiträge summieren "
-    "sich per Konstruktion exakt zu ΔK."
+eyebrow("Wirkungskette · Capital Bridge pro Bank")
+st.markdown(
+    '<div style="background:#FFFDF8;border:1px solid #E4D8C2;'
+    'border-left:4px solid #B8860B;padding:0.75rem 0.95rem;'
+    'margin:0.35rem 0 0.8rem 0;color:#051C2C;font-size:0.86rem;'
+    'line-height:1.55;">'
+    '<strong>Wie liest man die Bridge?</strong> Der Makro-Schock verändert '
+    'zuerst PD und danach LGD. Daraus berechnet die Basel-IRB/Vasicek-Formel '
+    'die Kapitalanforderung <strong>K</strong>. In diesem Tab ist '
+    '<strong>K</strong> die unerwartete Verlustkomponente in Euro '
+    '(<code>K_EUR = k_rate × EAD</code>). Daraus folgt '
+    '<strong>RWA = K_EUR × 12,5</strong>. Die drei Tabs zeigen dieselbe '
+    'Wirkungskette für Capital, RWA und Expected Loss.'
+    '</div>',
+    unsafe_allow_html=True,
 )
 
 _bank_ranking_bridge = sorted(
@@ -952,14 +950,17 @@ if _is_stressed:
         with bcol_r:
             st.markdown("**K · Capital Requirement**")
             st.markdown(
-                "Die regulatorische Eigenkapital-Anforderung (in EUR) "
-                "auf einen Kredit unter Basel III IRB. Deckt die "
-                "**Unexpected-Loss-Komponente** ab — also den Verlust "
-                "oberhalb des durchschnittlich erwarteten Verlusts (EL)."
+                "K ist die regulatorische Kapitalanforderung in Euro. "
+                "Sie deckt die **Unexpected-Loss-Komponente** ab — also "
+                "den Verlust oberhalb des durchschnittlich erwarteten "
+                "Verlusts (EL). Technisch berechnet das Modell zuerst "
+                "eine Kapitalrate pro EAD-Einheit und multipliziert sie "
+                "anschließend mit dem Segment-EAD."
             )
             st.markdown("**Formel**")
-            st.latex(r"K = \bigl(L_{0.999} - \text{PD} \cdot \text{LGD}\bigr) "
-                     r"\cdot \text{MA}(M_{\text{eff}}) \cdot \text{EAD}")
+            st.latex(r"k_{\text{rate}} = \bigl(L_{0.999} - \text{PD} \cdot "
+                     r"\text{LGD}\bigr) \cdot \text{MA}(M_{\text{eff}})")
+            st.latex(r"K_{\text{EUR}} = k_{\text{rate}} \cdot \text{EAD}")
             st.markdown(
                 "mit $L_{0.999}$ = 99.9-%-Verlust-Quantil aus der Basel-IRB-Formel bei 99.9 % Konfidenz "
                 "(Vasicek 2002), MA = Maturity-Adjustment (Basel BCBS 2017)."
@@ -992,14 +993,14 @@ if _is_stressed:
             st.markdown("**RWA · Risk-Weighted Assets**")
             st.markdown(
                 "Die **risikogewichteten Aktiva** in EUR. Ergebnis der "
-                "Capital-Anforderung K, hochskaliert mit dem Basel-Faktor "
-                "12.5 (= 1 / 8 % Mindest-Eigenkapitalquote) und der EAD. "
+                "Capital-Anforderung K_EUR, hochskaliert mit dem Basel-Faktor "
+                "12.5 (= 1 / 8 % Mindest-Eigenkapitalquote). "
                 "RWA steht im **Nenner der CET1-Quote** — je höher die "
                 "RWA, desto stärker verdünnt die regulatorische "
                 "Eigenkapitalquote."
             )
             st.markdown("**Formel**")
-            st.latex(r"\text{RWA} = K \cdot 12.5 \cdot \text{EAD}")
+            st.latex(r"\text{RWA} = K_{\text{EUR}} \cdot 12.5")
             st.markdown("**Datenquelle**")
             st.markdown(
                 "Berechnet aus K (Vasicek/IRB) × 12.5 × EAD-Stichtagswert "
@@ -1094,9 +1095,14 @@ st.caption(
 with st.expander("Was bedeuten die Segment-Namen? · Exposure-Klassen-Glossar",
                  expanded=False):
     st.markdown(
-        "Basel-III IRB unterscheidet sieben Exposure-Klassen — jede hat "
-        "eine eigene Risiko-Korrelation ρ und Maturity-Behandlung. So "
-        "liest du die Klassen in den Charts und Tabellen unten:"
+        "Basel-III IRB unterscheidet sieben Exposure-Klassen. Diese "
+        "Klassen bestimmen nicht nur die Datenaggregation, sondern auch "
+        "die regulatorische Asset-Korrelation **ρ** in der IRB-Formel. "
+        "ρ misst hier **nicht** die Korrelation zwischen Öl und Zins, "
+        "sondern wie stark Schuldner einer Klasse am gemeinsamen "
+        "systematischen Kreditrisikofaktor hängen. Je höher ρ, desto "
+        "stärker reagiert das 99,9-%-Verlustquantil und damit K/RWA auf "
+        "eine Verschlechterung der PD."
     )
     segment_glossary = pd.DataFrame([
         ("Corporate",
@@ -1130,11 +1136,27 @@ with st.expander("Was bedeuten die Segment-Namen? · Exposure-Klassen-Glossar",
     ], columns=["Exposure-Klasse", "Was steckt drin?", "Asset-Korrelation ρ"])
     st.dataframe(segment_glossary, use_container_width=True,
                  hide_index=True, height=280)
+    st.markdown(
+        '<div style="background:#F6FAFC;border:1px solid #D8E6ED;'
+        'border-left:4px solid #034B6F;padding:0.65rem 0.85rem;'
+        'margin-top:0.45rem;color:#051C2C;font-size:0.82rem;'
+        'line-height:1.5;">'
+        '<strong>Sind die Asset-Korrelationen noch gültig?</strong> Ja, '
+        'für unsere Modelllogik sind sie weiterhin die passenden '
+        'Basel-IRB-Parameter. Sie stammen aus der Basel-III/IRB-'
+        'Risikogewichtsfunktion, umgesetzt in CRR Art. 153 für Corporate, '
+        'Bank und Sovereign sowie CRR Art. 154 für Retail-Klassen. '
+        'Sie sind keine neu geschätzten Markt-Korrelationen und werden '
+        'nicht aus unserer Öl-/Zins-Zeitreihe abgeleitet. Ihr Zweck ist '
+        'ausschließlich die Übersetzung von PD/LGD/EAD in K und RWA.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
     st.caption(
-        "**Datenquelle.** Klassen-Zuordnung pro Bank-Segment aus dem "
-        "EBA Transparency Exercise 2025 (Exposure-Class-Code in `tr_cre.csv`). "
-        "ρ-Werte aus der Basel-III-IRB-Formel (BCBS 2017, CRR Art. 153). "
-        "Höhere ρ → stärkere Reaktion der bedingten PD auf einen Schock in M."
+        "Klassen-Zuordnung pro Bank-Segment aus dem EBA Transparency "
+        "Exercise 2025 (Exposure-Class-Code in `tr_cre.csv`). ρ-Logik aus "
+        "Basel Framework CRE31 bzw. CRR Art. 153/154; im Code umgesetzt "
+        "in `backend/vasicek.py::asset_correlation`."
     )
 
 sel_bank = bridge_bank  # konsolidierter Filter — same selection als Bridge

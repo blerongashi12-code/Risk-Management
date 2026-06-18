@@ -29,7 +29,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from components.theme import (tab_breadcrumb, apply_theme, hero, eyebrow, insight, footer,
+from components.theme import (tab_breadcrumb, apply_theme, eyebrow, insight, footer,
                               COLORS)
 from components.sidebar import render_sidebar
 from components.data_loader import load_data_layer
@@ -59,18 +59,42 @@ st.set_page_config(page_title="Eigenkapital · CET1-Wirkung", layout="wide")
 apply_theme()
 config = render_sidebar()
 
-hero(
-    "Eigenkapital-Wirkung · CET1-Quote",
-    eyebrow="Tab 4 · 2-Kanal CET1-Stress · 2-Faktor-Modell · 10 IRB-Banken",
-    deck="Die zwei Macro-Faktoren (ΔBrent + Δr_10y) treiben zwei "
-         "Risiko-Kanäle simultan: Loan-Book-Provisions (sektor-"
-         "differenzierte ΔPD und ΔLGD pro Exposure-Klasse) und Sovereign-"
-         "Mark-to-Market (Modified-Duration · Δr_10y). Beide wirken auf Zähler "
-         "(CET1) und Nenner (RWA) der regulatorischen Headline-"
-         "Kennzahl. Daten: bank-spezifische Pillar-3 EU-CR6 (31.12.2024) "
-         "für PDs/LGDs (CRR Art. 180-konform, 10/10 Banken Pillar-3-"
-         "verifiziert). Inklusive Threshold-Analyse "
-         "(Pillar-1 4.5% / CCB 7% / SREP 8%) und Bank-Drilldown.",
+st.markdown(
+    '<div style="margin:0.35rem 0 0.75rem 0;padding:0.95rem 1.1rem;'
+    'background:#FFFFFF;border:1px solid #E6E6E6;border-left:4px solid #051C2C;'
+    'border-top:4px solid #2251FF;color:#051C2C;">'
+    '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.12em;'
+    'text-transform:uppercase;color:#6E6E6E;margin-bottom:0.25rem;">'
+    'Tab 4 · Eigenkapital-Stressmodell · CET1-Bridge</div>'
+    '<div style="font-size:1.28rem;font-weight:800;line-height:1.2;'
+    'font-family:Inter,-apple-system,Segoe UI,sans-serif;'
+    'letter-spacing:0.005em;margin-bottom:0.35rem;">'
+    'Eigenkapital: CET1-Quote, RWA-Effekt und regulatorische Schwellen</div>'
+    '<div style="font-size:0.90rem;line-height:1.55;color:#3A4A57;'
+    'max-width:1080px;">'
+    'Dieser Tab führt Kreditbuch und Marktbuch in einer Kapitalrechnung '
+    'zusammen. Der Kreditbuch-Stress reduziert CET1 über zusätzliche '
+    'Expected-Loss-Vorsorge und erhöht Risk-Weighted Assets; der Sovereign-'
+    'Zinskanal reduziert CET1 über marktwertgeführte IFRS-9-Bestände. '
+    'Die resultierende CET1-Quote wird gegen Pillar 1, Kapitalerhaltungs-'
+    'puffer und typische SREP-Zielmarke gelesen.'
+    '</div>'
+    '<div style="display:flex;gap:0.45rem;flex-wrap:wrap;margin-top:0.65rem;">'
+    '<span style="font-size:0.70rem;font-weight:700;color:#034B6F;'
+    'background:#EEF6FA;border:1px solid #D8E6ED;padding:0.25rem 0.45rem;">'
+    'Kreditbuch EL/RWA</span>'
+    '<span style="font-size:0.70rem;font-weight:700;color:#034B6F;'
+    'background:#EEF6FA;border:1px solid #D8E6ED;padding:0.25rem 0.45rem;">'
+    'Sovereign MtM</span>'
+    '<span style="font-size:0.70rem;font-weight:700;color:#034B6F;'
+    'background:#EEF6FA;border:1px solid #D8E6ED;padding:0.25rem 0.45rem;">'
+    'CET1 / RWA</span>'
+    '<span style="font-size:0.70rem;font-weight:700;color:#051C2C;'
+    'background:#F4F4F4;border:1px solid #E0E0E0;padding:0.25rem 0.45rem;">'
+    'Schwellen</span>'
+    '</div>'
+    '</div>',
+    unsafe_allow_html=True,
 )
 
 tab_breadcrumb(4)
@@ -200,7 +224,60 @@ bridge_df = bridge_df.merge(bank_dir[["lei", "bank_name"]],
 
 
 # === Aggregate KPI strip =============================================
-eyebrow(f"EU top-{universe.n_banks} aggregate · CET1 adequacy")
+eyebrow("Tab-Übersicht · was in der Eigenkapital-Bridge gezeigt wird")
+
+st.markdown(
+    '<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));'
+    'gap:0.75rem;margin:0.25rem 0 1.0rem 0;">'
+    '<div style="background:#FFFFFF;border:1px solid #E1E6EA;'
+    'border-top:3px solid #034B6F;border-radius:6px;padding:0.85rem;">'
+    '<div style="font-size:0.72rem;font-weight:800;color:#6E6E6E;'
+    'letter-spacing:0.08em;text-transform:uppercase;">Input · Kreditbuch</div>'
+    '<div style="font-weight:760;color:#051C2C;margin-top:0.2rem;">EL und Kredit-RWA</div>'
+    '<div style="font-size:0.78rem;color:#536774;line-height:1.45;'
+    'margin-top:0.25rem;">Gestresste PD/LGD erhöhen Expected Loss und Kredit-RWA.</div>'
+    '</div>'
+    '<div style="background:#FFFFFF;border:1px solid #E1E6EA;'
+    'border-top:3px solid #2251FF;border-radius:6px;padding:0.85rem;">'
+    '<div style="font-size:0.72rem;font-weight:800;color:#6E6E6E;'
+    'letter-spacing:0.08em;text-transform:uppercase;">Input · Marktbuch</div>'
+    '<div style="font-weight:760;color:#051C2C;margin-top:0.2rem;">Sovereign MtM</div>'
+    '<div style="font-size:0.78rem;color:#536774;line-height:1.45;'
+    'margin-top:0.25rem;">Zinsschock erzeugt MtM-Verlust auf CET1-wirksame IFRS-9-Bestände.</div>'
+    '</div>'
+    '<div style="background:#FFFFFF;border:1px solid #E1E6EA;'
+    'border-top:3px solid #051C2C;border-radius:6px;padding:0.85rem;">'
+    '<div style="font-size:0.72rem;font-weight:800;color:#6E6E6E;'
+    'letter-spacing:0.08em;text-transform:uppercase;">Analyse · Quote</div>'
+    '<div style="font-weight:760;color:#051C2C;margin-top:0.2rem;">CET1 / RWA</div>'
+    '<div style="font-size:0.78rem;color:#536774;line-height:1.45;'
+    'margin-top:0.25rem;">Zähler- und Nennereffekte werden zur CET1-Quote verdichtet.</div>'
+    '</div>'
+    '<div style="background:#FFFFFF;border:1px solid #E1E6EA;'
+    'border-top:3px solid #6E6E6E;border-radius:6px;padding:0.85rem;">'
+    '<div style="font-size:0.72rem;font-weight:800;color:#6E6E6E;'
+    'letter-spacing:0.08em;text-transform:uppercase;">Output · Aufsicht</div>'
+    '<div style="font-weight:760;color:#051C2C;margin-top:0.2rem;">Schwellen & Drilldown</div>'
+    '<div style="font-size:0.78rem;color:#536774;line-height:1.45;'
+    'margin-top:0.25rem;">Systemansicht, Bank-Bridge und regulatorische Zonen.</div>'
+    '</div>'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    '<div style="background:#F4F4F4;border-left:3px solid #034B6F;'
+    'padding:0.7rem 0.9rem;margin:0.2rem 0 1.0rem 0;color:#051C2C;'
+    'font-size:0.86rem;line-height:1.55;">'
+    '<strong>Formel.</strong> CET1-Quote = CET1-Kapital / RWA. '
+    'Im Stress sinkt der Zähler durch Kreditvorsorge und Sovereign-MtM; '
+    'der Nenner steigt durch zusätzliche Kredit-RWA. Genau diese beiden '
+    'Effekte werden unten für System und Einzelbank getrennt gezeigt.'
+    '</div>',
+    unsafe_allow_html=True,
+)
+
+eyebrow(f"System Snapshot · CET1-Ausstattung der {universe.n_banks} Banken")
 
 n_banks = len(bridge_df)
 cet1_total_base   = bridge_df["cet1_base"].sum()
@@ -214,35 +291,35 @@ ratio_stress = cet1_total_stress / rwa_total_stress if rwa_total_stress > 0 else
 breaches = bridge_df[bridge_df["cet1_ratio_stress"] < PILLAR1_MIN_CET1]
 
 a1, a2, a3, a4, a5 = st.columns(5, gap="small")
-a1.metric("Σ CET1 base", f"€{cet1_total_base/1e9:.0f} bn",
-          f"{n_banks} banks", delta_color="off")
-a2.metric("Σ Total RWA base", f"€{rwa_total_base/1e9:.0f} bn",
-          f"density {rwa_total_base/sum(p.total_ead for p in universe.banks.values())*100:.0f}%",
+a1.metric("Σ CET1 vor Stress", f"€{cet1_total_base/1e9:.0f} bn",
+          f"{n_banks} Banken", delta_color="off")
+a2.metric("Σ RWA vor Stress", f"€{rwa_total_base/1e9:.0f} bn",
+          f"RWA-Dichte {rwa_total_base/sum(p.total_ead for p in universe.banks.values())*100:.0f}%",
           delta_color="off")
-a3.metric("Aggregate CET1 ratio · base",
+a3.metric("Quote vorher",
           f"{ratio_base*100:.2f}%",
-          f"vs SREP target {SREP_TARGET*100:.1f}%",
+          f"SREP-Ziel {SREP_TARGET*100:.1f}%",
           delta_color="off")
 if _is_stressed:
-    a4.metric("Aggregate CET1 ratio · stress",
+    a4.metric("Quote nachher",
               f"{ratio_stress*100:.2f}%",
               f"{(ratio_stress-ratio_base)*100:+.2f} pp")
-    a5.metric("Banks below 4.5% Pillar 1",
+    a5.metric("unter 4,5%",
               f"{len(breaches)} / {n_banks}",
-              "post-stress" if len(breaches) > 0 else "all banks adequate",
+              "nach Stress" if len(breaches) > 0 else "alle über Minimum",
               delta_color="off")
 else:
-    a4.metric("Aggregate CET1 ratio · stress", "—",
-              "no shock applied", delta_color="off")
-    a5.metric("Banks below 4.5% Pillar 1", "—",
-              "no shock applied", delta_color="off")
+    a4.metric("Quote nachher", "—",
+              "kein Schock aktiv", delta_color="off")
+    a5.metric("unter 4,5%", "—",
+              "kein Schock aktiv", delta_color="off")
 
 # === Insight box =====================================================
 if not _is_stressed:
     insight(
-        "<strong>Kein Macro-Schock aktiv.</strong> Bewege die zwei "
+        "<strong>Kein Makro-Schock aktiv.</strong> Bewege die zwei "
         "Slider in der Sidebar (ΔBrent + Δr_10y), um zu sehen, wie die "
-        "zwei Transmissions-Kanäle — Loan-Book-Provisions (sektor-"
+        "zwei Transmissions-Kanäle — Kreditbuch-Vorsorge (sektor-"
         "differenzierte ΔPD und ΔLGD) und Sovereign-Mark-to-Market "
         "(Duration · Δr) — zur regulatorischen CET1-Quote zusammenwirken."
     )
@@ -260,20 +337,16 @@ else:
 
 # Methodology disclaimer
 st.caption(
-    "**Methodik-Hinweis.** Loan-Book ΔRWA wird über die Basel-III-"
-    "IRB-Capital-Formel auf das 99.9%-Quantil berechnet — mit den "
-    "**bereits 2-Faktor-gestressten PD/LGD-Werten** als Inputs. Das "
-    "entspricht regulatorischer Pillar-1-Capital-under-Stress (BCBS "
-    "2017), nicht EBA-Stress-Test-realisierten P&L-Pfaden über 3 Jahre. "
-    "Erwartung: ΔRatio in dieser Sicht ist konservativer (höher) als in "
-    "EBA-Methodology, weil Tail-Quantile auf bereits gestresste "
-    "Parameter angewandt werden. Siehe MODEL_ASSUMPTIONS.md, A-04/A-05."
+    "**Methodik-Hinweis.** Kredit-RWA werden mit der Basel-III-IRB-Formel "
+    "auf Basis der bereits gestressten PD/LGD-Werte berechnet. Das ist "
+    "eine regulatorische Kapital-under-Stress-Sicht und kein dreijähriger "
+    "EBA-P&L-Pfad. Details: MODEL_ASSUMPTIONS.md, A-04/A-05."
 )
 
 st.divider()
 
 # === League table ====================================================
-eyebrow(f"League table · CET1 ratio movement (top-{n_banks} EU banks)")
+eyebrow(f"Bankenübersicht · CET1-Bewegung im Stress ({n_banks} Banken)")
 
 if _is_stressed:
     league = bridge_df.sort_values("cet1_ratio_stress").copy()
@@ -282,22 +355,22 @@ if _is_stressed:
         if pd.isna(row["cet1_ratio_stress"]):
             return "—"
         if row["cet1_ratio_stress"] < PILLAR1_MIN_CET1:
-            return "● breach P1"
+            return "Pillar 1 verletzt"
         if row["cet1_ratio_stress"] < TARGET_CET1_RATIO:
-            return "◐ below CCB"
+            return "unter Kapitalpuffer"
         if row["cet1_ratio_stress"] < SREP_TARGET:
-            return "○ below SREP"
-        return "✓ adequate"
+            return "unter SREP-Ziel"
+        return "komfortabel"
 
     league["Status"] = league.apply(_flag, axis=1)
     display_l = pd.DataFrame({
         "Bank":             league["bank_name"],
-        "CET1 base bn":     (league["cet1_base"] / 1e9).round(1),
-        "CET1 stress bn":   (league["cet1_stress"] / 1e9).round(1),
-        "RWA base bn":      (league["rwa_total_base"] / 1e9).round(0).astype(int),
-        "RWA stress bn":    (league["rwa_total_stress"] / 1e9).round(0).astype(int),
-        "Ratio base %":     (league["cet1_ratio_base"] * 100).round(2),
-        "Ratio stress %":   (league["cet1_ratio_stress"] * 100).round(2),
+        "CET1 vorher bn":   (league["cet1_base"] / 1e9).round(1),
+        "CET1 nachher bn":  (league["cet1_stress"] / 1e9).round(1),
+        "RWA vorher bn":    (league["rwa_total_base"] / 1e9).round(0).astype(int),
+        "RWA nachher bn":   (league["rwa_total_stress"] / 1e9).round(0).astype(int),
+        "Quote vorher %":   (league["cet1_ratio_base"] * 100).round(2),
+        "Quote nachher %":  (league["cet1_ratio_stress"] * 100).round(2),
         "Δ Ratio pp":       league["delta_cet1_ratio_pp"].round(2),
         "Status":           league["Status"],
     })
@@ -330,7 +403,7 @@ else:
 st.divider()
 
 # === Per-bank CET1 ratio waterfall ====================================
-eyebrow("CET1 ratio waterfall · per bank")
+eyebrow("Bank-Drilldown · CET1-Bridge pro Bank")
 
 bank_options = sorted(bridge_df["bank_name"].dropna().tolist())
 sel_bank_name = st.selectbox(
@@ -338,7 +411,7 @@ sel_bank_name = st.selectbox(
     bank_options,
     index=0,
     format_func=lambda n: (
-        f"{n}  (CET1 ratio base "
+        f"{n}  (CET1-Quote vorher "
         f"{bridge_df[bridge_df['bank_name']==n]['cet1_ratio_base'].iloc[0]*100:.2f}%)"
     ),
     label_visibility="collapsed",
@@ -369,11 +442,11 @@ if _is_stressed:
     wf = go.Figure(go.Waterfall(
         orientation="v",
         measure=["absolute", "relative", "relative", "relative", "total"],
-        x=["CET1 Ratio base",
-           "− Loan-Book Δ (Provisions)",
-           "+ Sovereign Δ (OCI)",
-           "Δ from RWA expansion",
-           "CET1 Ratio stress"],
+        x=["CET1-Quote vorher",
+           "Kreditbuch · Vorsorge",
+           "Sovereign · MtM",
+           "RWA-Ausweitung",
+           "CET1-Quote nachher"],
         text=[f"{base_ratio*100:.2f}%",
               f"{d_loan_pp:+.2f} pp",
               f"{d_sov_pp:+.2f} pp",
@@ -407,8 +480,8 @@ if _is_stressed:
                  annotation_font=dict(size=10, color=COLORS["mid_blue"]))
 
     wf.update_layout(
-        title=f"{sel_bank_name} · CET1 Ratio decomposition",
-        yaxis_title="CET1 Ratio [%]",
+        title=f"{sel_bank_name} · Zerlegung der CET1-Quote",
+        yaxis_title="CET1-Quote [%]",
         height=460,
         showlegend=False,
     )
@@ -418,25 +491,25 @@ if _is_stressed:
     detail_l, detail_r = st.columns(2, gap="medium")
 
     with detail_l:
-        eyebrow("Numerator (CET1 Capital) · in EUR")
+        eyebrow("Zähler · CET1-Kapital")
         num_table = pd.DataFrame([
-            ("CET1 base",                   sel_row["cet1_base"]/1e9),
-            ("Loan-Book Provisions impact", sel_row["delta_cet1_loan"]/1e9),
-            ("Sovereign MtM (via OCI)",     sel_row["delta_cet1_sovereign"]/1e9),
-            ("CET1 stress",                 sel_row["cet1_stress"]/1e9),
-        ], columns=["Channel", "EUR bn"])
+            ("CET1 vor Stress",             sel_row["cet1_base"]/1e9),
+            ("Kreditbuch-Vorsorge",         sel_row["delta_cet1_loan"]/1e9),
+            ("Sovereign MtM",               sel_row["delta_cet1_sovereign"]/1e9),
+            ("CET1 nach Stress",            sel_row["cet1_stress"]/1e9),
+        ], columns=["Baustein", "EUR bn"])
         num_table["EUR bn"] = num_table["EUR bn"].map(lambda v: f"{v:+.2f}")
         st.dataframe(num_table, use_container_width=True, hide_index=True,
                      height=210)
 
     with detail_r:
-        eyebrow("Denominator (Total RWA) · in EUR")
+        eyebrow("Nenner · Risk-Weighted Assets")
         den_table = pd.DataFrame([
-            ("RWA base (Credit + Market + Op)", sel_row["rwa_total_base"]/1e9),
-            ("ΔRWA Credit (Vasicek IRB stress)", sel_row["delta_rwa_credit"]/1e9),
-            ("RWA Market + Operational (unchanged)", 0.0),
-            ("RWA stress",                       sel_row["rwa_total_stress"]/1e9),
-        ], columns=["Component", "EUR bn"])
+            ("RWA vor Stress",                sel_row["rwa_total_base"]/1e9),
+            ("Δ Kredit-RWA",                  sel_row["delta_rwa_credit"]/1e9),
+            ("Markt-/Op-RWA unverändert",     0.0),
+            ("RWA nach Stress",               sel_row["rwa_total_stress"]/1e9),
+        ], columns=["Baustein", "EUR bn"])
         den_table["EUR bn"] = den_table["EUR bn"].map(lambda v: f"{v:+.2f}" if abs(v) < 50 else f"{v:+.0f}")
         st.dataframe(den_table, use_container_width=True, hide_index=True,
                      height=210)
@@ -445,21 +518,20 @@ if _is_stressed:
     delta_pp = sel_row["delta_cet1_ratio_pp"]
     breach_msg = ""
     if sel_row["cet1_ratio_stress"] < PILLAR1_MIN_CET1:
-        breach_msg = (f" — **breach** of the {PILLAR1_MIN_CET1*100:.1f}% Pillar 1 "
-                      "minimum under stress")
+        breach_msg = (f" — unter dem Pillar-1-Minimum von "
+                      f"{PILLAR1_MIN_CET1*100:.1f}%")
     elif sel_row["cet1_ratio_stress"] < TARGET_CET1_RATIO:
-        breach_msg = (f" — **below** the {TARGET_CET1_RATIO*100:.1f}% Pillar 1 + CCB "
-                      "guidance")
+        breach_msg = (f" — unter Pillar 1 plus Kapitalerhaltungspuffer "
+                      f"({TARGET_CET1_RATIO*100:.1f}%)")
     st.markdown(
-        f"**Outcome.** CET1 ratio moves from "
+        f"**Ergebnis.** Die CET1-Quote bewegt sich von "
         f"<strong>{sel_row['cet1_ratio_base']*100:.2f}%</strong> "
-        f"to <strong>{sel_row['cet1_ratio_stress']*100:.2f}%</strong> "
+        f"auf <strong>{sel_row['cet1_ratio_stress']*100:.2f}%</strong> "
         f"({delta_pp:+.2f} pp){breach_msg}.",
         unsafe_allow_html=True,
     )
 else:
-    st.info("Apply a macro shock in the sidebar to view the CET1 "
-            "ratio waterfall.")
+    st.info("Setze einen Makro-Schock in der Sidebar, um die CET1-Bridge zu sehen.")
 
 st.divider()
 
@@ -468,13 +540,15 @@ st.divider()
 # =====================================================================
 eyebrow("Threshold-Analyse · regulatorische CET1-Mindestquoten")
 
-st.caption(
-    "Alle Banken im Aggregat, sortiert nach **Post-Stress-CET1-Quote**. "
-    "Farb-Code zeigt Threshold-Breaches: "
-    "<span style='color:#A52F4D;font-weight:600;'>● rot = unter 4.5% (Pillar-1-Minimum)</span> · "
-    "<span style='color:#C9A227;font-weight:600;'>● gelb = unter 7.0% (inkl. CCB)</span> · "
-    "<span style='color:#034B6F;font-weight:600;'>● blau = unter 8.0% (typischer SREP)</span> · "
-    "<span style='color:#00A9A5;font-weight:600;'>● grün = über 8.0% (komfortabel)</span>",
+st.markdown(
+    '<div style="background:#F4F4F4;border-left:3px solid #051C2C;'
+    'padding:0.7rem 0.9rem;margin:0.2rem 0 0.85rem 0;color:#051C2C;'
+    'font-size:0.86rem;line-height:1.55;">'
+    '<strong>Wie liest man die Tabelle?</strong> Die Banken sind nach '
+    'CET1-Quote nach Stress sortiert. Der Status ordnet jede Bank einer '
+    'regulatorischen Zone zu: unter Pillar 1, unter Kapitalpuffer, unter '
+    'typischer SREP-Zielmarke oder komfortabel oberhalb von 8,0%.'
+    '</div>',
     unsafe_allow_html=True,
 )
 
@@ -482,13 +556,13 @@ st.caption(
 def _classify_threshold(ratio: float) -> tuple[str, str]:
     """Return (label, hex-color) based on CET1 ratio post-stress."""
     if ratio < PILLAR1_MIN_CET1:
-        return "Pillar-1 Breach (< 4.5%)", "#A52F4D"
+        return "Pillar 1 verletzt (< 4,5%)", COLORS["crimson"]
     elif ratio < TARGET_CET1_RATIO:
-        return "CCB Breach (< 7.0%)", "#C9A227"
+        return "unter Kapitalpuffer (< 7,0%)", COLORS["amber"]
     elif ratio < SREP_TARGET:
-        return "SREP Breach (< 8.0%)", "#034B6F"
+        return "unter SREP-Ziel (< 8,0%)", COLORS["mid_blue"]
     else:
-        return "Komfortabel (> 8.0%)", "#00A9A5"
+        return "komfortabel (> 8,0%)", COLORS["stone"]
 
 
 # Build threshold table
@@ -500,7 +574,7 @@ for _, row in bridge_df.iterrows():
         "CET1 vorher":     f"{row['cet1_ratio_base']*100:.2f}%",
         "CET1 nachher":    f"{row['cet1_ratio_stress']*100:.2f}%",
         "Δ pp":            f"{row['delta_cet1_ratio_pp']:+.2f}",
-        "CET1 Capital bn": round(row["cet1_base"]/1e9, 1),
+        "CET1-Kapital bn": round(row["cet1_base"]/1e9, 1),
         "RWA bn":          round(row["rwa_total_base"]/1e9, 1),
         "Status":          label,
         "_color":          color,
@@ -513,21 +587,21 @@ thr_df = pd.DataFrame(thr_rows).sort_values(
 # Threshold summary KPIs (count per category)
 status_counts = thr_df["Status"].value_counts()
 ts1, ts2, ts3, ts4 = st.columns(4, gap="small")
-ts1.metric("Pillar-1 Breach (< 4.5%)",
-           int(status_counts.get("Pillar-1 Breach (< 4.5%)", 0)),
-           "Banken unter regulatorischem Minimum",
+ts1.metric("Pillar 1 verletzt",
+           int(status_counts.get("Pillar 1 verletzt (< 4,5%)", 0)),
+           "< 4,5%",
            delta_color="off")
-ts2.metric("CCB Breach (< 7.0%)",
-           int(status_counts.get("CCB Breach (< 7.0%)", 0)),
-           "Capital-Conservation-Buffer verletzt",
+ts2.metric("unter Kapitalpuffer",
+           int(status_counts.get("unter Kapitalpuffer (< 7,0%)", 0)),
+           "< 7,0%",
            delta_color="off")
-ts3.metric("SREP Breach (< 8.0%)",
-           int(status_counts.get("SREP Breach (< 8.0%)", 0)),
-           "typischer Supervisor-Target verletzt",
+ts3.metric("unter SREP-Ziel",
+           int(status_counts.get("unter SREP-Ziel (< 8,0%)", 0)),
+           "< 8,0%",
            delta_color="off")
-ts4.metric("Komfortabel (> 8.0%)",
-           int(status_counts.get("Komfortabel (> 8.0%)", 0)),
-           "über SREP-Target", delta_color="off")
+ts4.metric("komfortabel",
+           int(status_counts.get("komfortabel (> 8,0%)", 0)),
+           "> 8,0%", delta_color="off")
 
 # Display the threshold table (drop helper color column)
 disp_thr = thr_df.drop(columns="_color")
@@ -543,21 +617,13 @@ eyebrow("Sensitivitäts-Analyse · wie reagiert die CET1-Quote auf "
         "den Zinsschock?")
 
 st.markdown(
-    '<div style="background:#FAFAFA;border:1px solid #E6E6E6;'
-    'border-left:2px solid #051C2C;padding:0.95rem 1.2rem;'
-    'border-radius:4px;margin:0.4rem 0 1.0rem 0;color:#051C2C;'
-    'font-size:0.88rem;line-height:1.65;">'
-    '<strong>Was diese Kurve zeigt:</strong> Wir scannen den 10y-Zins-Schock '
-    'von −1 bis +5 Prozentpunkten und rechnen für jeden Punkt das volle '
-    '2-Faktor-Modell durch (beide Stress-Kanäle, alle 10 Banken '
-    'aggregiert). Der Brent-Schock bleibt auf dem aktuellen Sidebar-Wert. '
-    '<br><br>'
-    '<strong>Wozu?</strong> Du siehst auf einen Blick: ab welchem '
-    'Δr-Schock fällt die CET1-Quote unter die regulatorischen Schwellen '
-    '4.5 % (Pillar 1), 7.0 % (inkl. Kapitalerhaltungs-Puffer CCB) und '
-    '8.0 % (typische SREP-Zielmarke)? Das sind die sogenannten '
-    '<em>Breaking Points</em> — bei welchem Stress-Niveau die Bank '
-    'erstmals in Aufsichts-Reichweite kommt.'
+    '<div style="background:#F4F4F4;border-left:3px solid #034B6F;'
+    'padding:0.75rem 0.9rem;margin:0.25rem 0 1.0rem 0;color:#051C2C;'
+    'font-size:0.86rem;line-height:1.55;">'
+    '<strong>Was zeigt die Kurve?</strong> Der Zinsschock wird von -1 bis '
+    '+5 Prozentpunkten gescannt; der Ölpreisschock bleibt auf dem aktuellen '
+    'Sidebar-Wert. Die Linie zeigt, wie nah die aggregierte CET1-Quote an '
+    'die Aufsichtsschwellen rückt.'
     '</div>',
     unsafe_allow_html=True,
 )
@@ -719,7 +785,7 @@ bp_80 = _find_breach_dr(ratio_sens, dr_grid_sens, 8.0)
 bp_l, bp_r = st.columns([1, 1], gap="medium")
 with bp_l:
     st.markdown(
-        "**Breaking Points** — bei welchem Δr_10y-Schock die CET1-Quote "
+        "**Kritische Zinsschocks** — bei welchem Δr_10y-Schock die CET1-Quote "
         "erstmals unter die jeweilige Aufsichtsschwelle fällt:"
     )
     def _fmt_bp(x):
@@ -730,7 +796,7 @@ with bp_l:
         ("4.5 % · Pillar 1",    _fmt_bp(bp_45)),
         ("7.0 % · inkl. CCB",   _fmt_bp(bp_70)),
         ("8.0 % · SREP-Ziel",   _fmt_bp(bp_80)),
-    ], columns=["Aufsichtsschwelle", "Breaking Point Δr_10y"])
+    ], columns=["Aufsichtsschwelle", "kritischer Δr_10y"])
     st.dataframe(bp_table, use_container_width=True, hide_index=True,
                  height=140)
 
@@ -752,65 +818,67 @@ st.divider()
 # === Methodology footer =============================================
 with st.expander("Methodik · CET1-Zwei-Kanal-Architektur",
                  expanded=False):
-    st.markdown(r"""
-**Ökonomische Logik.** Ein Macro-Schock (Ölpreis, Zins) trifft die
-CET1-Quote = CET1-Kapital / RWA über **zwei** Bilanz-Kanäle: das
-**Kreditbuch** (höhere Ausfallvorsorge senkt das Kapital, höhere
-Risikogewichte erhöhen die RWA) und das **Sovereign-Buch** (Zinsanstieg
-drückt den Marktwert der Staatsanleihen, der FVOCI-Anteil mindert über die
-OCI-Reserve das Kapital). Der frühere Trading-Book-Kanal ist in V1
-**entfernt** — siehe „Was nicht modelliert wird".
+    st.markdown(
+        '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+        'border-left:3px solid #051C2C;padding:0.85rem 1.0rem;'
+        'color:#051C2C;font-size:0.88rem;line-height:1.6;">'
+        '<strong>Ökonomische Logik.</strong> Die CET1-Quote ist '
+        '<code>CET1-Kapital / RWA</code>. Der Makro-Schock trifft diese '
+        'Quote über zwei Bilanzkanäle: Das Kreditbuch erhöht Vorsorge und '
+        'Kredit-RWA; das Sovereign-Buch erzeugt marktwertgeführte Verluste '
+        'auf IFRS-9-Beständen, die über P&L oder OCI in CET1 sichtbar werden.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
-**Numerator (CET1-Kapital):**
+    st.markdown(
+        """
+| Baustein | Modellierte Wirkung | Quelle / Datenbasis |
+|---|---|---|
+| **CET1-Zähler** | `CET1_stress = CET1_base - ΔEL_loan + ΔMtM_sovereign` | CET1 aus EBA `tr_oth.csv`; Kreditbuch aus Pillar-3 PD/LGD; Sovereign-IFRS-9-Split aus EBA `tr_sov.csv` |
+| **Kreditbuch** | Gestresste PD/LGD erhöhen Expected Loss und Kredit-RWA | Basel-IRB / CRR Art. 153; bank-spezifische Pillar-3 EU-CR6-Werte |
+| **Sovereign MtM** | `ΔMtM = - Duration × Δr × Exposure`; CET1-wirksam nur HfT, FVTPL und FVOCI | EBA `tr_sov.csv` Items 2520812-2520815; Duration-Approximation siehe Marktbuch |
+| **RWA-Nenner** | `RWA_stress = RWA_base + ΔRWA_credit` | EBA `tr_oth.csv`; Kredit-RWA aus IRB-Capital-Charge |
+""",
+    )
 
-$$\text{CET1}^{\text{stress}} = \text{CET1}^{\text{base}}
-- \Delta\text{EL}_{\text{loan}}
-+ \Delta\text{MtM}_{\text{sov}}$$
+    st.markdown(
+        '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));'
+        'gap:0.65rem;margin:0.85rem 0;">'
+        '<div style="background:#F4F4F4;border-left:3px solid #051C2C;'
+        'padding:0.65rem 0.75rem;">'
+        '<div style="font-size:0.72rem;font-weight:800;color:#6E6E6E;'
+        'letter-spacing:0.08em;text-transform:uppercase;">4,5%</div>'
+        '<div style="font-weight:760;">Pillar-1-Minimum</div>'
+        '<div style="font-size:0.78rem;color:#536774;line-height:1.4;">'
+        'Harte CET1-Mindestanforderung nach CRR Art. 92.</div></div>'
+        '<div style="background:#F4F4F4;border-left:3px solid #034B6F;'
+        'padding:0.65rem 0.75rem;">'
+        '<div style="font-size:0.72rem;font-weight:800;color:#6E6E6E;'
+        'letter-spacing:0.08em;text-transform:uppercase;">7,0%</div>'
+        '<div style="font-weight:760;">Pillar 1 + Kapitalpuffer</div>'
+        '<div style="font-size:0.78rem;color:#536774;line-height:1.4;">'
+        'Pillar 1 plus 2,5% Capital Conservation Buffer.</div></div>'
+        '<div style="background:#F4F4F4;border-left:3px solid #6E6E6E;'
+        'padding:0.65rem 0.75rem;">'
+        '<div style="font-size:0.72rem;font-weight:800;color:#6E6E6E;'
+        'letter-spacing:0.08em;text-transform:uppercase;">8,0%</div>'
+        '<div style="font-weight:760;">typische SREP-Zielmarke</div>'
+        '<div style="font-size:0.78rem;color:#536774;line-height:1.4;">'
+        'Orientierungswert inklusive zusätzlichem SII-/SREP-Puffer.</div></div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
-- $\Delta\text{EL}_{\text{loan}}$ — Vasicek-Capital-Bridge ΔEL pro Bank
-  (PD-Channel + LGD-Channel via downturn-LGD), reduziert CET1 als
-  zusätzliche Provisions-Aufwendung. Quelle: BCBS 2017 / CRR Art. 153.
-- $\Delta\text{MtM}_{\text{sov}}$ — signiert; bei Rate-Up negativ.
-  $\Delta\text{MtM} = -D_{\text{mod}} \cdot \Delta y \cdot \text{Exposure}$
-  pro Laufzeit-Bucket (Modified Duration; Tuckman/Serrat 2012, Kap. 4).
-  **CET1-wirksam ist nur der bank-individuell gemeldete, zum Marktwert
-  geführte Teil** des Sovereign-Buchs: HfT + FVTPL (via GuV) und FVOCI
-  (via OCI-Reserve) — der AC-Bestand bleibt zu fortgeführten
-  Anschaffungskosten und erzeugt keinen CET1-Effekt (latenter Verlust,
-  vgl. SVB 2023). Der IFRS-9-Split ist **keine Annahme**, sondern wird
-  pro Bank × Land × Laufzeit aus der EBA Transparency gelesen
-  (`tr_sov.csv`, Items 2520812 HfT / 2520813 FVTPL / 2520814 FVOCI /
-  2520815 AC). Über die 10 Banken sind duration-gewichtet ≈ 51 % des
-  Brutto-MtM CET1-wirksam (Juni 2025) — bank-individuell stark
-  unterschiedlich, siehe Marktbuch → „Erkannt vs. verborgen".
-  Damit rechnen Tab 3 (Marktbuch) und diese Bridge auf identischer
-  Datenbasis; die frühere V1-Vereinfachung („gesamte Ladder
-  FVOCI-ähnlich", 100 % Durchleitung) ist ersetzt.
-
-**Denominator (Total RWA):**
-
-$$\text{RWA}^{\text{stress}} = \text{RWA}^{\text{base}} + \Delta\text{RWA}_{\text{cr}}$$
-
-- $\Delta\text{RWA}_{\text{cr}}$ — Vasicek-Capital-Bridge ΔRWA (= K · 12.5 · EAD,
-  K via IRB-Formel mit gestressten PD/LGD). Quelle: CRR Art. 153.
-- Market- und Operational-RWA bleiben konstant (out-of-stress in V1).
-
-**Was nicht modelliert wird (bewusste V1-Grenzen):**
-- **Trading-Book / Markt-Risiko-Kanal** — entfernt: die Handelsbücher der
-  zehn überwiegend Retail-/Corporate-lastigen Banken sind klein, und eine
-  belastbare FRTB-Sensitivität ließe sich aus den EBA-Aggregaten nicht
-  sauber kalibrieren. Das Markt-Risiko bleibt im Marktbuch-Tab deskriptiv.
-- Banking-Book-Securities-FVOCI-Channel separat von Sovereign
-- Equity-Holdings (kleine Position, < 3 % bei Top-EU-Banken)
-- Operational-Risk-Stress (Pillar 2)
-- Sovereign-Spread-Risiko separat von Rate-Shift
-- IFRS-9-Lifetime-EL-Migration (Stage 2 / 3)
-
-**Threshold-Linien im Waterfall:**
-- $\textcolor{#A52F4D}{4{,}5\%}$ — Pillar-1-CET1-Minimum (CRR Art. 92)
-- $\textcolor{#C9A227}{7{,}0\%}$ — Pillar 1 + Capital Conservation Buffer
-- $\textcolor{#034B6F}{8{,}0\%}$ — typischer SREP-Target (mit SII-Aufschlag)
-""")
+    st.markdown(
+        """
+**Bewusste Modellgrenzen in V1.** Kein separater Trading-Book-Kanal,
+keine Hedging-Rekonstruktion, keine Sovereign-Spread-Komponente neben dem
+Zinsshift, keine IFRS-9-Stage-Migration und kein erzwungener Verkauf von
+Amortised-Cost-Beständen. Diese Abgrenzung hält die CET1-Bridge eng bei
+den öffentlich verfügbaren EBA- und Pillar-3-Daten.
+"""
+    )
 
 footer(
     f"Zwei-Kanal-CET1-Architektur · Vasicek IRB (CRR Art. 153) + Sovereign "

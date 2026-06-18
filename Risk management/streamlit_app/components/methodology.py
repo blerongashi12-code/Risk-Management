@@ -212,7 +212,14 @@ um ca. 7.5%.
 **Wie schätzen wir sie?**
 Die EBA gibt für jede Position nur den **Laufzeit-Bucket** an
 (z.B. "5-10 Jahre"), nicht das exakte Restalter. Wir nehmen den
-Mittelpunkt jedes Buckets als Approximation:
+Mittelpunkt jedes geschlossenen Buckets als Approximation. Das ist
+keine freie Setzung: Der IRRBB-Standardansatz von BCBS/EBA arbeitet
+bei aggregierten Zinsrisiko-Daten ebenfalls mit Zeitbändern und deren
+Midpoints, wenn keine exakten Cashflows vorliegen. Für den offenen
+Bucket "> 10 Jahre" setzen wir 15 Jahre an. Das entspricht dem ersten
+langen Basel-/EBA-Zeitband nach 10 Jahren ("10-15 Jahre") und ist
+bewusst konservativ einfacher als eine nicht beobachtbare
+Bank-spezifische Cashflow-Schätzung:
 """)
         st.dataframe(
             {
@@ -224,10 +231,24 @@ Mittelpunkt jedes Buckets als Approximation:
                                           "1.5 Jahre", "2.5 Jahre",
                                           "4.0 Jahre", "7.5 Jahre",
                                           "15.0 Jahre"],
+                "Begründung": ["Midpoint des Buckets",
+                               "Midpoint des Buckets",
+                               "Midpoint des Buckets",
+                               "Midpoint des Buckets",
+                               "Midpoint des Buckets",
+                               "Midpoint des Buckets",
+                               "offener Bucket; konservativer langer Tenor"],
             },
             hide_index=True, use_container_width=True,
         )
         st.markdown("""
+**Quelle / Leitlinie.**
+BCBS 368 "Interest rate risk in the banking book" und die EBA RTS zum
+standardisierten IRRBB-Ansatz nutzen Zeitbänder bzw. Bucket-Midpoints
+zur Slotting-Logik bei aggregierten Zinsrisikodaten. Wir übertragen
+diese Logik auf die EBA-Transparency-Sovereign-Buckets, weil dort keine
+bondgenauen Cashflows öffentlich vorliegen.
+
 **Warum ist das für unser Modell wichtig?**
 Ohne Duration könnten wir den Zinsschock nicht in einen
 EUR-Verlust übersetzen. Genau hier verbindet das Modell den

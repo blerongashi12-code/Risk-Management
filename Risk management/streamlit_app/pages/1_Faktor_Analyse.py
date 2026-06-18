@@ -3,7 +3,7 @@
 Diese Page liefert zwei Dinge auf einer Seite:
 
   A. die <em>empirische Validierung</em> der zwei gewählten Macro-Faktoren —
-     5-Jahres-Korrelations-Analyse Brent vs. Δr_10y mit R-Style-lm()-Output;
+     5-Jahres-Korrelations-Analyse Brent vs. Δr_10y (Kennzahlen-Karten + Diagnostik);
   B. die <em>sequentielle Stress-Bridge</em> ΔBrent + Δr_10y → ΔPD → ΔLGD →
      IRB-Capital → CET1, durchgerechnet auf dem Top-10-EU-IRB-Universe.
 
@@ -53,7 +53,7 @@ hero(
     eyebrow="Tab 1 · empirische Faktor-Validierung + sequentielle "
             "Stress-Bridge",
     deck="Zwei Bausteine auf einer Seite. Oben: die <strong>empirische "
-         "Korrelations-Analyse</strong> (5 Jahre, R-Style-lm-Output) — "
+         "Korrelations-Analyse</strong> (5 Jahre tägliche Daten) — "
          "sie belegt, dass Brent und der 10-Jahres-Zins zwei "
          "unabhängige Risiko-Faktoren sind und deshalb nicht zu einem "
          "Einzelfaktor aggregiert werden dürfen. Unten: die "
@@ -320,7 +320,7 @@ _seg_stress = _snapshot_segments_df(universe)
 # M-Shift. Die Stress-Wirkung sitzt bereits in segment.pd / segment.lgd.
 m_used = 0.0
 
-# Anchor + corr_hat bleiben für die Korrelations-Sektion oben (R-lm-Output)
+# Anchor + corr_hat bleiben für die Korrelations-Sektion oben (Beweis-Block)
 # und potentielle zukünftige Diagnostik erhalten.
 anchor = anchor_from_eba("2025")
 
@@ -397,8 +397,9 @@ st.markdown(
     'betreuenden Professors:</strong> '
     'Punkt 5 (Faktor-Konstruktion), Punkt 8 (separate Modellierung) '
     'und Punkt 9 (empirische Korrelations-Analyse). Wir prüfen sie '
-    'mit drei komplementären Tests über die letzten 5 Jahre (1242 '
-    'Handelstage):'
+    'mit drei komplementären Tests über die letzten 5 Jahre täglicher '
+    'Daten (die genaue Zahl der Handelstage steht oben im '
+    'Kennzahlen-Streifen):'
     '<ul style="margin:0.5rem 0 0 1.2rem;padding:0;">'
     '<li><strong>Test 1:</strong> Pearson-Korrelation über das volle '
     'Sample (5 Jahre) — wie stark hängen Tagesveränderungen linear '
@@ -462,44 +463,80 @@ else:
     cc5.metric("OLS R²", f"{_summary['ols_r2']:.3f}",
                "erklärte Varianz", delta_color="off")
 
-    # ----- R-Style lm() output box --------------------------------
-    def _sig_stars(p_val):
-        """R-Convention: '***' p<0.001, '**' p<0.01, '*' p<0.05, '.' p<0.1."""
-        if p_val < 0.001: return "***"
-        if p_val < 0.01:  return "** "
-        if p_val < 0.05:  return "*  "
-        if p_val < 0.1:   return ".  "
-        return "   "
-
+    # ----- Beweis-Block · drei Kennzahlen-Karten (ersetzt R-lm-Output) ----
     def _p_fmt(p):
         if p < 2e-16: return "<2e-16"
         if p < 0.001: return f"{p:.2e}"
         return f"{p:.4f}"
 
-    _lm_output = (
-        f"Call:\n"
-        f"lm(formula = Δr_10y_pp ~ ΔBrent_log)\n\n"
-        f"Residuals:\n"
-        f"    Min      1Q   Median      3Q     Max\n"
-        f"{_summary['res_min']:7.4f}{_summary['res_q1']:7.4f}{_summary['res_median']:8.4f}{_summary['res_q3']:8.4f}{_summary['res_max']:8.4f}\n\n"
-        f"Coefficients:\n"
-        f"              Estimate Std. Error   t value   Pr(>|t|)\n"
-        f"(Intercept)  {_summary['ols_alpha']:+8.4f}    {_summary['ols_se_alpha']:6.4f}  {_summary['ols_t_alpha']:+8.3f}   {_p_fmt(_summary['ols_p_alpha']):>8s}  {_sig_stars(_summary['ols_p_alpha'])}\n"
-        f"ΔBrent_log   {_summary['ols_beta']:+8.4f}    {_summary['ols_se_beta']:6.4f}  {_summary['ols_t_beta']:+8.3f}   {_p_fmt(_summary['ols_p_beta']):>8s}  {_sig_stars(_summary['ols_p_beta'])}\n"
-        f"---\n"
-        f"Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n\n"
-        f"Residual standard error: {_summary['ols_rse']:.4f} on {_summary['df_residual']} degrees of freedom\n"
-        f"Multiple R-squared:  {_summary['ols_r2']:.4f},  Adjusted R-squared:  {_summary['ols_r2_adj']:.4f}\n"
-        f"F-statistic: {_summary['ols_f_stat']:.2f} on 1 and {_summary['df_residual']} DF,  p-value: {_p_fmt(_summary['ols_p_f'])}"
-    )
+    _acc = (COLORS["teal"] if abs(_summary["pearson_rho"]) < 0.10
+            else COLORS["mid_blue"] if abs(_summary["pearson_rho"]) < 0.30
+            else COLORS["amber"])
+    _ci_lo, _ci_hi = (_summary["pearson_rho_ci_lo"],
+                      _summary["pearson_rho_ci_hi"])
+    _ci_excl0 = (_ci_lo > 0) or (_ci_hi < 0)
+    _ci_txt = ("schließt die Null aus — die (schwache) Korrelation ist "
+               "statistisch belegt." if _ci_excl0 else
+               "schließt die Null ein — die Korrelation ist statistisch "
+               "nicht von null unterscheidbar.")
+    _sig_word = ("hoch signifikant" if _summary["ols_p_beta"] < 0.001 else
+                 "signifikant" if _summary["ols_p_beta"] < 0.05 else
+                 "nicht signifikant")
+    _r2_pct = _summary["ols_r2"] * 100.0
 
-    st.markdown(
-        "**Regressions-Output (R-Style)** — wer mit R/SAS/Stata vertraut "
-        "ist, kennt dieses Format. Die zentrale Zeile ist die "
-        "`ΔBrent_log`-Koeffizienten-Zeile: ihr **p-Wert** sagt, ob der "
-        "Brent-Schock die Zinsbewegung statistisch erklärt."
+    def _proof_card(kicker, big, unit, body):
+        return (
+            f'<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+            f'border-top:4px solid {_acc};border-radius:8px;'
+            f'padding:0.8rem 0.95rem;height:100%;">'
+            f'<div style="font-size:0.64rem;font-weight:700;'
+            f'letter-spacing:0.08em;text-transform:uppercase;'
+            f'color:#6E6E6E;margin-bottom:0.15rem;">{kicker}</div>'
+            f'<div style="font-family:Source Serif Pro,Georgia,serif;'
+            f'font-size:1.5rem;font-weight:700;color:#051C2C;'
+            f'line-height:1.1;margin-bottom:0.2rem;">{big}'
+            f'<span style="font-size:0.85rem;color:#6E6E6E;font-weight:600;">'
+            f' {unit}</span></div>'
+            f'<div style="font-size:0.78rem;color:#3A4A57;line-height:1.45;">'
+            f'{body}</div></div>'
+        )
+
+    _pc1, _pc2, _pc3 = st.columns(3, gap="small")
+    with _pc1:
+        st.markdown(_proof_card(
+            "Test 1 · lineare Korrelation",
+            f'{_summary["pearson_rho"]:+.3f}', "ρ",
+            f'95%-Konfidenzintervall (Fisher r-to-z): '
+            f'[{_ci_lo:+.3f}, {_ci_hi:+.3f}]. Das Intervall {_ci_txt}'),
+            unsafe_allow_html=True)
+    with _pc2:
+        st.markdown(_proof_card(
+            "Test 3 · OLS-Steigung β",
+            f'{_summary["ols_beta"]:+.3f}', "pp je Δlog",
+            f't = {_summary["ols_t_beta"]:+.2f}, p = '
+            f'{_p_fmt(_summary["ols_p_beta"])} ({_sig_word}). β misst, um '
+            f'wie viele Prozentpunkte sich Δr_10y je Brent-log-Return '
+            f'verschiebt — hier praktisch flach.'),
+            unsafe_allow_html=True)
+    with _pc3:
+        st.markdown(_proof_card(
+            "Test 3 · erklärte Varianz R²",
+            f'{_r2_pct:.2f}', "%",
+            f'So viel der täglichen Zinsbewegung erklärt der Brent-Schock. '
+            f'Der Rest ({100.0 - _r2_pct:.2f} %) ist unabhängige Information '
+            f'— beide Faktoren tragen eigenständigen Gehalt.'),
+            unsafe_allow_html=True)
+
+    st.caption(
+        "Diese drei Größen tragen den gesamten Unabhängigkeits-Schluss: "
+        "ρ misst, wie stark sich Brent- und Zins-Tagesbewegungen linear "
+        "gemeinsam bewegen (0 = unabhängig, ±1 = Gleichlauf); β ist die "
+        "Steigung der Regression Δr_10y ~ α + β·ΔBrent und sagt, um wie "
+        "viele Prozentpunkte sich der Zins je Brent-Schock verschiebt; "
+        "R² ist der Anteil der Zinsbewegung, den der Brent-Faktor überhaupt "
+        "erklärt. Die ausführliche Regressions-Diagnostik (t-, F-, "
+        "RSE-Werte) steht unten im aufklappbaren Detail-Block."
     )
-    st.code(_lm_output, language="text")
 
     # Interpretation der Regression in einer Tabelle (sehr verständlich)
     p_brent = _summary['ols_p_beta']
@@ -531,13 +568,15 @@ else:
         ("Residual Std. Error",
          f"{_summary['ols_rse']:.4f} pp",
          "Typische Abweichung der Vorhersage von der Realität (1-Sigma)."),
-        ("n Observations", f"{_summary['n_obs']:,}",
+        ("Beobachtungen (n)", f"{_summary['n_obs']:,}",
          f"Tagesbeobachtungen über {_summary['years']} Jahre."),
-    ], columns=["Statistik", "Wert", "Was sie bedeutet"])
+    ], columns=["Kennzahl", "Wert", "Was sie bedeutet"])
 
-    st.markdown("**Was die einzelnen Statistiken bedeuten**")
-    st.dataframe(reg_summary_table, hide_index=True,
-                 use_container_width=True, height=395)
+    with st.expander("Alle Kennzahlen im Detail · Regressions-Diagnostik",
+                     expanded=False):
+        st.caption("So lesen Sie jede Kennzahl:")
+        st.dataframe(reg_summary_table, hide_index=True,
+                     use_container_width=True)
 
     # ----- Auto-Interpretation ------------------------------------
     _rho_abs = abs(_summary["pearson_rho"])
@@ -607,18 +646,22 @@ else:
                             annotation_position="top right",
                             annotation_font=dict(color=COLORS["crimson"], size=10))
         fig_roll.update_layout(
-            xaxis_title="Datum", yaxis_title="ρ (rolling 252 trading days)",
+            xaxis_title="Datum",
+            yaxis_title="ρ — rollierende Korrelation [252 Handelstage]",
             height=340, showlegend=False, margin=dict(l=20, r=20, t=30, b=40),
         )
         st.plotly_chart(fig_roll, use_container_width=True)
 
     with cv_r:
-        st.markdown("**Test 3 · OLS-Regression (Scatter mit 45°-Linie)**")
+        st.markdown("**Test 3 · Streudiagramm mit OLS-Regressionsgerade**")
         st.caption(
-            "Jeder Punkt = ein Handelstag. X-Achse: Brent-log-Return. "
-            "Y-Achse: Δr_10y in Prozentpunkten. Wenn die Punkte eine "
-            "klare Linie bilden, hängen die Faktoren zusammen. Eine "
-            "wolkenartige Verteilung ohne Trend = Unabhängigkeit."
+            "Jeder Punkt ist ein Handelstag. X-Achse: Brent-log-Return, "
+            "Y-Achse: Δr_10y in Prozentpunkten. Die rote Linie ist die "
+            "OLS-Regressionsgerade (nicht die 45°-Linie — die Achsen haben "
+            "verschiedene Einheiten): ihre nahezu flache Steigung (β ≈ 0) "
+            "zeigt, dass Brent-Schocks die Zinsbewegung kaum vorhersagen. "
+            "Eine wolkenartige Punktverteilung ohne Trend ist genau das "
+            "Bild zweier unabhängiger Faktoren."
         )
         # Build scatter data
         from factor_correlation import _build_daily_factors  # type: ignore
@@ -647,8 +690,8 @@ else:
         fig_sc.add_hline(y=0, line_color=COLORS["hairline"], line_width=1)
         fig_sc.add_vline(x=0, line_color=COLORS["hairline"], line_width=1)
         fig_sc.update_layout(
-            xaxis_title="ΔBrent log-Return",
-            yaxis_title="Δr_10y (Prozentpunkte)",
+            xaxis_title="ΔBrent — täglicher log-Return",
+            yaxis_title="Δr_10y — Tagesänderung [pp]",
             height=340, showlegend=True,
             legend=dict(orientation="h", yanchor="bottom", y=1.02,
                         xanchor="left", x=0),
@@ -804,6 +847,9 @@ class_view = class_base.merge(
         .rename(columns={"pd_avg": "pd_stress", "lgd_avg": "lgd_stress"}),
     on="exposure_class",
 )
+# ΔPD / ΔLGD in Prozentpunkten — Single Source fuer Charts (Hover) + Metriken
+class_view["pd_delta_pp"]  = (class_view["pd_stress"]  - class_view["pd_avg"])  * 100
+class_view["lgd_delta_pp"] = (class_view["lgd_stress"] - class_view["lgd_avg"]) * 100
 
 pd_col_l, pd_col_r = st.columns([3, 2], gap="medium")
 
@@ -811,10 +857,12 @@ with pd_col_l:
     fig_pd = go.Figure()
     fig_pd.add_trace(go.Bar(
         x=class_view["exposure_class"], y=class_view["pd_avg"] * 100,
-        name="PD baseline (EBA Q4 2025)", marker_color=COLORS["mid_blue"],
+        name="PD Baseline (A-IRB · Pillar-3, 31.12.2024)",
+        marker_color=COLORS["mid_blue"],
         text=[f"{v*100:.2f}%" for v in class_view["pd_avg"]],
         textposition="outside",
         textfont=dict(size=10, color=COLORS["navy"]),
+        hovertemplate="<b>%{x}</b><br>PD Baseline: %{y:.2f}%<extra></extra>",
     ))
     fig_pd.add_trace(go.Bar(
         x=class_view["exposure_class"], y=class_view["pd_stress"] * 100,
@@ -822,13 +870,16 @@ with pd_col_l:
         text=[f"{v*100:.2f}%" for v in class_view["pd_stress"]],
         textposition="outside",
         textfont=dict(size=10, color=COLORS["crimson"]),
+        customdata=class_view["pd_delta_pp"],
+        hovertemplate=("<b>%{x}</b><br>PD nach Stress: %{y:.2f}%"
+                       "<br>ΔPD: %{customdata:+.2f} pp<extra></extra>"),
     ))
     _ttl_shock = (f"ΔBrent = {delta_brent_log:+.2f} log · "
                    f"Δr_10y = {delta_r_pp:+.1f} pp"
                    if _is_stressed else "kein Schock angelegt")
     fig_pd.update_layout(
         title=dict(
-            text=f"PD pro Exposure-Klasse — Baseline (EBA) vs. "
+            text=f"PD pro Exposure-Klasse — Baseline (Pillar-3) vs. "
                   f"2-Faktor-Stress<br>"
                   f"<span style='font-size:0.85em;color:#6E6E6E'>"
                   f"{_ttl_shock}</span>",
@@ -851,15 +902,19 @@ with pd_col_r:
         r"+ \beta_{\text{rate}} \cdot \Delta r_{10y,\text{pp}}"
     )
     st.markdown(
-        "Die β-Werte sind auf aktuelle Quellen zum Modell-Stichtag "
-        "31.12.2024 kalibriert: ECB WP 2897/3207 (Corporate/KMU), "
-        "ECB WP 3112 (Mortgage), ECB FSR 2024 + EBA Results Fig. 22 "
-        "(Retail) — im EBA-Methodik-Rahmen §2.4.2 ¶123. Vollständige "
-        "Tabelle im Intro-Tab · "
-        "Schritt 3b. **Mortgage** "
+        "**Woher kommen die β?** Pro Exposure-Klasse aus publizierten "
+        "Quellen zum Modell-Stichtag 31.12.2024: ECB WP 2897/3207 "
+        "(Corporate/KMU), ECB WP 3112 (Mortgage), ECB FSR 2024 + "
+        "EBA Results Fig. 22 (Retail) — im EBA-Methodik-Rahmen §2.4.2 "
+        "¶123 [published]. Vollständige β-Tabelle: Intro-Tab, Schritt 3b."
+    )
+    st.markdown(
+        "**Wie liest man den Balken?** Blau = publizierte Baseline-PD, "
+        "Rot = PD nach Schock; die Balkenhöhe ist das PD-Level, der "
+        "Abstand Blau→Rot ist die ΔPD (siehe Hover, in pp). **Mortgage** "
         "reagiert primär auf Zinsen (β_rate hoch), **QRRE** auf Brent "
         "(β_oil hoch), **Bank** hat β_rate < 0 (NIM-Effekt: steigende "
-        "Zinsen erhöhen die Marge und reduzieren die PD)."
+        "Zinsen erhöhen die Marge und senken die PD)."
     )
     class_view["pd_delta_pp"] = (class_view["pd_stress"] - class_view["pd_avg"]) * 100
     if _is_stressed:
@@ -895,17 +950,22 @@ with lgd_col_l:
     fig_lgd_class = go.Figure()
     fig_lgd_class.add_trace(go.Bar(
         x=class_view["exposure_class"], y=class_view["lgd_avg"] * 100,
-        name="LGD baseline (EBA F-IRB)", marker_color=COLORS["mid_blue"],
-        text=[f"{v*100:.0f}%" for v in class_view["lgd_avg"]],
+        name="LGD Baseline (F-IRB-Konvention, 31.12.2024)",
+        marker_color=COLORS["mid_blue"],
+        text=[f"{v*100:.2f}%" for v in class_view["lgd_avg"]],
         textposition="outside",
         textfont=dict(size=10, color=COLORS["navy"]),
+        hovertemplate="<b>%{x}</b><br>LGD Baseline: %{y:.2f}%<extra></extra>",
     ))
     fig_lgd_class.add_trace(go.Bar(
         x=class_view["exposure_class"], y=class_view["lgd_stress"] * 100,
         name="LGD nach 2-Faktor-Stress", marker_color=COLORS["crimson"],
-        text=[f"{v*100:.0f}%" for v in class_view["lgd_stress"]],
+        text=[f"{v*100:.2f}%" for v in class_view["lgd_stress"]],
         textposition="outside",
         textfont=dict(size=10, color=COLORS["crimson"]),
+        customdata=class_view["lgd_delta_pp"],
+        hovertemplate=("<b>%{x}</b><br>LGD nach Stress: %{y:.2f}%"
+                       "<br>ΔLGD: %{customdata:+.2f} pp<extra></extra>"),
     ))
     _ttl_shock = (f"ΔBrent = {delta_brent_log:+.2f} log · "
                    f"Δr_10y = {delta_r_pp:+.1f} pp"
@@ -935,13 +995,17 @@ with lgd_col_r:
         r"+ \gamma_{\text{rate}} \cdot \Delta r_{10y,\text{pp}}"
     )
     st.markdown(
-        "Werte gefloort bei 5 % und gecappt bei 100 %. Die γ-Werte sind "
-        "nach EBA-2025-Methodik §2.4.2 ¶130 (LGD spiegelt den Sicherheiten-"
-        "Fair-Value-Verfall) kalibriert (CRR Art. 181 für Downturn-LGD-"
-        "Konvention). Mortgage "
-        "hat das größte γ_rate, weil steigende Zinsen direkt den "
-        "Immobilien-Sicherheitenwert reduzieren — die Bank bekommt im "
-        "Default weniger zurück."
+        "**Woher kommt γ?** Nach EBA-2025-Methodik §2.4.2 ¶130 — die LGD "
+        "spiegelt den Fair-Value-Verfall der Sicherheiten — kalibriert, in "
+        "Downturn-Konvention nach CRR Art. 181 [published]. Werte gefloort "
+        "bei 5 % und gecappt bei 100 %."
+    )
+    st.markdown(
+        "**Wie liest man den Balken?** Blau = Baseline-LGD, Rot = LGD nach "
+        "Schock; Abstand Blau→Rot = ΔLGD (Hover, in pp). **Mortgage** hat "
+        "das größte γ_rate: steigende Zinsen senken direkt den Immobilien-"
+        "Sicherheitenwert, also bekommt die Bank im Default weniger zurück; "
+        "Corporate reagiert moderat über den Sicherheiten-Wertverlust."
     )
     class_view["lgd_delta_pp"] = (class_view["lgd_stress"]
                                    - class_view["lgd_avg"]) * 100
@@ -976,6 +1040,26 @@ st.caption(
     "IRB-Banken** · konsolidiert in ein virtuelles Aggregat-Portfolio "
     "(Summe aller Segmente). Capital-Bridge zeigt PD-Effekt + LGD-Effekt "
     "additiv."
+)
+
+st.markdown(
+    '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
+    'border-left:4px solid #034B6F;border-radius:6px;'
+    'padding:0.8rem 1.1rem;margin:0.4rem 0 1rem 0;color:#051C2C;'
+    'font-size:0.88rem;line-height:1.6;">'
+    '<strong>Was ist die Capital-Bridge?</strong> Eine Brücke vom '
+    'Kapitalbedarf <em>vor</em> dem Schock (Baseline) zum Kapitalbedarf '
+    '<em>nach</em> dem Schock (Stress) — Säule für Säule. Jede Säule zeigt, '
+    'wie viel ein einzelner Treiber zur Veränderung beiträgt.<br><br>'
+    '<strong>Die drei Stufen:</strong> dieselbe Basel-III-IRB-Formel '
+    '(CRR Art. 153–155), dreimal pro Segment gerechnet — nur die '
+    'Eingangswerte wechseln: (1) Baseline = PD &amp; LGD wie gemeldet; '
+    '(2) + PD-Stress = nur die gestresste PD aus Stufe 2, LGD noch '
+    'unverändert; (3) + LGD-Stress = zusätzlich die gestresste LGD aus '
+    'Stufe 3. Asset-Korrelation ρ und Maturity-Adjustment bleiben dabei '
+    'konstant (klassenabhängig).'
+    '</div>',
+    unsafe_allow_html=True,
 )
 
 if _is_stressed:
@@ -1037,10 +1121,10 @@ if _is_stressed:
         wf = go.Figure(go.Waterfall(
             orientation="v",
             measure=["absolute", "relative", "relative", "total"],
-            x=["K Baseline<br>(Capital Requirement)",
-               "+ Δ aus PD-Verschiebung<br>(LGD noch unverändert)",
-               "+ Δ aus LGD-Verschiebung<br>(PD bereits gestresst)",
-               "K Stress<br>(Capital Requirement)"],
+            x=["K Baseline",
+               "+ ΔK aus PD-Stress<br>(LGD noch unverändert)",
+               "+ ΔK aus LGD-Stress<br>(PD bereits gestresst)",
+               "K Stress"],
             text=[f"€{bridge['K_base']/1e9:.1f} bn",
                   f"€{bridge['delta_K_pd']/1e9:+.1f} bn",
                   f"€{bridge['delta_K_lgd']/1e9:+.1f} bn",
@@ -1057,29 +1141,38 @@ if _is_stressed:
             totals    ={"marker": {"color": COLORS["navy"]}},
         ))
         wf.update_layout(
-            title=f"Aggregat-Bank (Top-{universe.n_banks} EU-Banken) · "
-                  "sequentielle Capital-Bridge · PD-Effekt + LGD-Effekt",
+            title=dict(text=(
+                f"Aggregat-Bank (Top-{universe.n_banks} EU-Banken) · "
+                "sequentielle Capital-Bridge<br>"
+                "<span style='font-size:0.85em;color:#6E6E6E'>"
+                f"{_ttl_shock}</span>"),
+                y=0.97, yanchor="top"),
             yaxis_title="K — IRB Capital Requirement [Mrd. EUR]",
-            height=400, showlegend=False,
+            height=420, showlegend=False,
+            margin=dict(t=96, b=40, l=60, r=20),
         )
         st.plotly_chart(wf, use_container_width=True)
 
     with cb_col_r:
-        st.markdown("**IRB Capital Charge** (Basel III · CRR Art. 153–155):")
+        st.markdown("**IRB-Kapitalanforderung K** "
+                    "(Basel III · CRR Art. 153–155):")
         st.latex(
             r"K = \text{LGD} \cdot \left[\,N\!\left("
             r"\tfrac{N^{-1}(\text{PD}) + \sqrt{\rho}\,N^{-1}(0.999)}"
             r"{\sqrt{1-\rho}}\right) - \text{PD}\right] \cdot \text{MA}"
         )
         st.markdown(
-            "mit Asset-Korrelation ρ (klassen-abhängig) und "
-            "Maturity-Adjustment MA.\n\n"
-            "**Sequentielle Decomposition** (im Waterfall sichtbar):\n\n"
-            "1. nur PD gestresst (LGD bleibt baseline) → **ΔK_PD**\n"
+            "mit Asset-Korrelation ρ (klassenabhängig) und "
+            "Maturity-Adjustment MA. K ist der Kapitalbedarf je Euro "
+            "Exposure; multipliziert mit EAD ergibt sich der absolute "
+            "Kapitalbedarf.\n\n"
+            "**Die zwei mittleren Säulen des Waterfalls** zerlegen die "
+            "Gesamtveränderung ΔK in genau zwei Beiträge:\n\n"
+            "1. nur PD gestresst (LGD bleibt Baseline) → **ΔK_PD**\n"
             "2. zusätzlich LGD gestresst (PD bereits gestresst) → "
             "**ΔK_LGD**\n\n"
-            "Die zwei Beiträge sind **exakt additiv** zu ΔK — keine "
-            "Kreuz-Effekte."
+            "Weil die Stufen nacheinander gerechnet werden, sind die zwei "
+            "Beiträge **exakt additiv** zu ΔK — es gibt keine Kreuz-Effekte."
         )
         total = bridge["delta_K"]
         if abs(total) > 1.0:
@@ -1235,7 +1328,7 @@ if _is_stressed:
                "Loan-Book<br>ΔEL (Expected Loss)",
                "Loan-Book<br>ΔRWA (Vasicek)",
                "Sovereign-Bonds<br>ΔFV (Duration-MtM)",
-               "Second-Order-<br>Korrektur",
+               "Kreuzterm /<br>Rundung",
                "CET1-Quote<br>nach Stress"],
             text=[f"{ratio_b*100:.2f}%",
                   f"{ch_loan_el:+.2f} pp",
@@ -1262,10 +1355,14 @@ if _is_stressed:
                      annotation_position="left",
                      annotation_font=dict(size=9, color=COLORS["amber"]))
         wf.update_layout(
-            title=f"CET1-Quote (Common Equity Tier 1) · 2-Kanal-Decomposition · "
-                  f"Aggregat Top-{universe.n_banks} EU-Banken",
+            title=dict(text=(
+                "CET1-Quote (Common Equity Tier 1) · 2-Kanal-Bridge · "
+                f"Aggregat Top-{universe.n_banks} EU-Banken<br>"
+                "<span style='font-size:0.85em;color:#6E6E6E'>"
+                f"{_ttl_shock}</span>"),
+                y=0.97, yanchor="top"),
             yaxis_title="CET1-Quote [%] = Hartes Kernkapital ÷ Risk-Weighted Assets",
-            height=460, showlegend=False,
+            height=480, showlegend=False, margin=dict(t=96, b=40, l=60, r=20),
         )
         st.plotly_chart(wf, use_container_width=True)
 
@@ -1310,11 +1407,12 @@ Marktbuch-Tab.)*
     )
     insight(
         f"<strong>Dominanter Kanal:</strong> {biggest_drop[0]} "
-        f"({biggest_drop[1]:+.2f} pp). "
-        f"Loan-Book trägt {(ch_loan_el+ch_loan_rwa):+.2f} pp · "
-        f"Sovereign-FV {ch_sov_fv:+.2f} pp. "
-        f"Full bank-by-bank-Decomposition auf der "
-        f"<em>Capital Adequacy</em>-Page."
+        f"({biggest_drop[1]:+.2f} pp) — der Kanal mit dem stärksten "
+        f"(negativsten) Beitrag zur CET1-Quote. Der Loan-Book trägt "
+        f"insgesamt {(ch_loan_el+ch_loan_rwa):+.2f} pp bei, der "
+        f"Sovereign-Kanal {ch_sov_fv:+.2f} pp. Die vollständige "
+        f"Aufschlüsselung Bank für Bank steht auf der "
+        f"<em>Capital-Adequacy</em>-Page."
     )
 
     # =================================================================
@@ -1323,16 +1421,17 @@ Marktbuch-Tab.)*
     st.markdown(" ")
     st.markdown(
         '<div style="font-size:0.85rem;color:#034B6F;font-weight:600;'
-        'letter-spacing:0.05em;text-transform:uppercase;'
-        'margin:0.6rem 0 0.4rem 0;">'
-        'Info-Ribbon · klicke auf eine Bridge-Position für Definition + Berechnung'
+        'margin:0.6rem 0 0.4rem 0;line-height:1.5;">'
+        'Info-Ribbon — jede Kachel erklärt genau eine Säule des Waterfalls '
+        'darüber: Definition, Formel, EBA-Quelle und der aktuelle Beitrag '
+        'zur CET1-Quote.'
         '</div>',
         unsafe_allow_html=True,
     )
 
     info_cols = st.columns(5, gap="small")
     with info_cols[0]:
-        with st.expander("ⓘ CET1 base", expanded=False):
+        with st.expander("CET1 Baseline", expanded=False):
             st.markdown(
                 "**Definition.** Hartes Kernkapital (CET1) der "
                 "Aggregat-Bank vor jedem Schock.\n\n**Berechnung.**"
@@ -1346,7 +1445,7 @@ Marktbuch-Tab.)*
                 "(Common Equity Tier 1 Capital, regulatorisch)."
             )
     with info_cols[1]:
-        with st.expander("ⓘ Loan-Book ΔEL", expanded=False):
+        with st.expander("Loan-Book · ΔEL", expanded=False):
             st.markdown(
                 "**Definition.** Veränderung des Expected Loss im "
                 "Loan-Book durch höhere gestresste PD und LGD aus dem "
@@ -1368,7 +1467,7 @@ Marktbuch-Tab.)*
                 "**Wirkung.** Reduziert CET1-Zähler."
             )
     with info_cols[2]:
-        with st.expander("ⓘ Loan-Book ΔRWA", expanded=False):
+        with st.expander("Loan-Book · ΔRWA", expanded=False):
             st.markdown(
                 "**Definition.** Veränderung der Credit-RWA durch "
                 "IRB-Capital-Bridge — gestresste PD + LGD ergeben "
@@ -1388,7 +1487,7 @@ Marktbuch-Tab.)*
                 "**Wirkung.** Erhöht RWA-Nenner → Quote sinkt."
             )
     with info_cols[3]:
-        with st.expander("ⓘ Sovereign ΔFV", expanded=False):
+        with st.expander("Sovereign · ΔFV", expanded=False):
             st.markdown(
                 "**Definition.** Mark-to-Market-Verlust auf Sovereign-"
                 "Anleihen durch Zinsanstieg. CET1-wirksam ist nur der "
@@ -1414,7 +1513,7 @@ Marktbuch-Tab.)*
                 "Klassifizierung."
             )
     with info_cols[4]:
-        with st.expander("ⓘ CET1 stress", expanded=False):
+        with st.expander("CET1 nach Stress", expanded=False):
             st.markdown(
                 "**Definition.** CET1-Quote nach Stress = "
                 "aggregierte Eigenkapital-Quote über beide "
@@ -1499,39 +1598,125 @@ def _strongest_delta(view: pd.DataFrame, col: str, label: str,
             f"{top[col]:+.{digits}f} pp {label}")
 
 
+# --- Live-Ergebnis pro Stufe (identische Ausdrücke wie zuvor, nur Darstellung neu) ---
+_base_txt = "Baseline · kein Schock angelegt"
+row1_live = (f"ΔBrent = {delta_brent_log:+.2f} log&nbsp;&nbsp;·&nbsp;&nbsp;"
+             f"Δr_10y = {delta_r_pp:+.1f} pp")
+row2_live = _strongest_delta(class_view, "pd_delta_pp", "PD")
+row3_live = (_strongest_delta(class_view, "lgd_delta_pp", "LGD", 2)
+             if "lgd_delta_pp" in class_view.columns else _base_txt)
+row4_live = (f"ΔK = €{bridge['delta_K']/1e9:+.1f} Mrd.&nbsp;&nbsp;·&nbsp;&nbsp;"
+             f"ΔRWA = €{bridge['delta_rwa']/1e9:+.0f} Mrd."
+             if _is_stressed else _base_txt)
+row5_live = (f"CET1-Quote {ratio_b*100:.2f}&nbsp;% → {ratio_s*100:.2f}&nbsp;% "
+             f"({(ratio_s-ratio_b)*100:+.2f} pp)"
+             if _is_stressed else _base_txt)
+
+_C_INFO, _C_ADVERSE, _C_NEUTRAL = COLORS["mid_blue"], COLORS["crimson"], "#6E6E6E"
+
+
+def _acc(adverse):
+    """Live-Ergebnis-Farbe: adverse=rot, neutral-info=blau, Baseline=grau."""
+    return (_C_ADVERSE if adverse else _C_INFO) if _is_stressed else _C_NEUTRAL
+
+
 summary_rows = [
-    ("1. Eingangs-Schock",
-     "ΔBrent (Ölpreis-Schock, log-Return) + Δr_10y "
-     "(10-Jahres-Zins-Schock, in Prozentpunkten)",
-     f"ΔBrent = {delta_brent_log:+.2f} log  ·  "
-     f"Δr_10y = {delta_r_pp:+.1f} pp"),
-    ("2. ΔBrent + Δr → ΔPD pro Klasse",
-     "2-Faktor-Sensitivität β_oil · ΔBrent + β_rate · Δr_10y "
-     "(klassen-spezifisch, EBA ST 2025 + Literatur kalibriert)",
-     _strongest_delta(class_view, "pd_delta_pp", "PD")),
-    ("3. ΔBrent + Δr → ΔLGD pro Klasse",
-     "2-Faktor-LGD-Stress γ_oil · ΔBrent + γ_rate · Δr_10y "
-     "(Mortgage besonders rate-sensitiv; CRR Art. 181)",
-     (_strongest_delta(class_view, "lgd_delta_pp", "LGD", 2)
-       if "lgd_delta_pp" in class_view.columns
-       else "Baseline (kein Schock angelegt)")),
-    ("4. PD + LGD → IRB-Capital K",
-     "Sequentielle Capital-Bridge (PD-Effekt + LGD-Effekt, exakt additiv) "
-     "· Basel-III-IRB (BCBS 2017, CRR Art. 153–155)",
-     (f"ΔK = €{bridge['delta_K']/1e9:+.1f} Mrd. · "
-      f"ΔRWA = €{bridge['delta_rwa']/1e9:+.0f} Mrd."
-      if _is_stressed else "Baseline (kein Schock angelegt)")),
-    ("5. Zwei Kanäle → CET1-Quote",
-     "Loan-Book (ΔRWA + ΔEL) + Sovereign (ΔFair-Value · IFRS-9-Filter)",
-     (f"CET1-Quote: {ratio_b*100:.2f} % → {ratio_s*100:.2f} % "
-      f"({(ratio_s-ratio_b)*100:+.2f} pp)"
-      if _is_stressed else "Baseline (kein Schock angelegt)")),
+    ("1",
+     "Eingangs-Schock: die zwei Macro-Faktoren aus der Sidebar gehen in "
+     "die Bridge.",
+     "ΔBrent (log-Return) &nbsp;+&nbsp; Δr_10y (pp)",
+     "Sidebar-Slider · einheitlicher Forward-Stress (EBA-2025-Logik)",
+     row1_live, _acc(False)),
+    ("2",
+     "Beide Faktoren verschieben die Ausfallwahrscheinlichkeit — je "
+     "Exposure-Klasse unterschiedlich stark.",
+     "ΔPD = β_oil · ΔBrent &nbsp;+&nbsp; β_rate · Δr_10y",
+     "2-Faktor-Sensitivität · ECB WP 2897/3207/3112 + FSR 2024 · "
+     "EBA §2.4.2 ¶123",
+     row2_live, _acc(True)),
+    ("3",
+     "Dieselben Faktoren heben die Verlustquote bei Ausfall an (Mortgage "
+     "besonders zins-sensitiv).",
+     "ΔLGD = γ_oil · ΔBrent &nbsp;+&nbsp; γ_rate · Δr_10y",
+     "2-Faktor-LGD-Stress (Downturn) · EBA §2.4.2 ¶130 · CRR Art. 181",
+     row3_live, _acc(True)),
+    ("4",
+     "Gestresste PD und LGD fließen sequentiell in den IRB-Kapitalbedarf "
+     "(PD-Effekt + LGD-Effekt, exakt additiv).",
+     "K(PD, LGD) &nbsp;→&nbsp; ΔK = ΔK_PD + ΔK_LGD",
+     "Basel-III-IRB-Capital-Bridge · BCBS 2017 · CRR Art. 153–155",
+     row4_live, _acc(True)),
+    ("5",
+     "Zwei Kanäle treffen die harte Kernkapitalquote: das Kreditbuch "
+     "(ΔRWA + ΔEL) und das Staatsanleihe-Buch (ΔFair-Value).",
+     "ΔCET1 &nbsp;←&nbsp; Loan-Book (ΔRWA + ΔEL) &nbsp;+&nbsp; "
+     "Sovereign (ΔFV)",
+     "CET1-Bridge · Loan-Book + Sovereign mit IFRS-9-Filter",
+     row5_live, _acc(True)),
 ]
-summary_df = pd.DataFrame(summary_rows,
-                          columns=["Stufe",
-                                    "Methodik · Modell-Baustein",
-                                    "Ergebnis unter aktuellem Schock"])
-st.dataframe(summary_df, use_container_width=True, hide_index=True, height=230)
+
+if _is_stressed:
+    _status_color = COLORS["crimson"]
+    _status_txt = (f"Aktueller Schock angelegt — ΔBrent = "
+                   f"{delta_brent_log:+.2f} log, Δr_10y = "
+                   f"{delta_r_pp:+.1f} pp. Die Spalte „Live-Ergebnis“ zeigt "
+                   f"die Wirkung pro Stufe.")
+else:
+    _status_color = COLORS["mid_blue"]
+    _status_txt = ("Kein Schock angelegt — alle Stufen stehen auf Baseline. "
+                   "Stelle ΔBrent oder Δr_10y in der Sidebar, um die Bridge "
+                   "live durchzurechnen.")
+
+_th = ("padding:0.55rem 0.7rem;text-align:left;font-weight:600;color:#FFFFFF;"
+       "background:#051C2C;font-size:0.82rem;letter-spacing:0.02em;")
+_td = "padding:0.7rem;vertical-align:top;border-bottom:1px solid #E6E6E6;"
+
+_rows_html = ""
+for nr, was, formel, quelle, live, acc in summary_rows:
+    _rows_html += (
+        f'<tr>'
+        f'<td style="{_td}text-align:center;width:54px;">'
+        f'<span style="display:inline-flex;align-items:center;'
+        f'justify-content:center;width:1.7rem;height:1.7rem;border-radius:50%;'
+        f'background:#051C2C;color:#FFFFFF;font-weight:600;'
+        f'font-size:0.86rem;">{nr}</span></td>'
+        f'<td style="{_td}width:30%;color:#051C2C;font-size:0.86rem;'
+        f'line-height:1.5;">{was}</td>'
+        f'<td style="{_td}width:30%;">'
+        f'<code style="font-family:Consolas,monospace;font-size:0.82rem;'
+        f'color:#034B6F;">{formel}</code>'
+        f'<div style="color:#6E6E6E;font-size:0.78rem;margin-top:0.4rem;'
+        f'line-height:1.45;">Quelle: {quelle}</div></td>'
+        f'<td style="{_td}font-weight:600;color:{acc};font-size:0.86rem;'
+        f'line-height:1.5;">{live}</td>'
+        f'</tr>'
+    )
+
+st.markdown(
+    f'<div style="background:#FAFAFA;border-left:4px solid {_status_color};'
+    f'padding:0.6rem 1.0rem;border-radius:6px;margin:0.2rem 0 0.9rem 0;'
+    f'color:#051C2C;font-size:0.86rem;line-height:1.55;">{_status_txt}</div>',
+    unsafe_allow_html=True,
+)
+st.markdown(
+    f'<table style="width:100%;border-collapse:collapse;border:1px solid '
+    f'#E6E6E6;border-radius:8px;overflow:hidden;">'
+    f'<thead><tr>'
+    f'<th style="{_th}text-align:center;">Stufe</th>'
+    f'<th style="{_th}">Was passiert</th>'
+    f'<th style="{_th}">Formel &amp; Quelle</th>'
+    f'<th style="{_th}">Live-Ergebnis</th>'
+    f'</tr></thead><tbody>{_rows_html}</tbody></table>',
+    unsafe_allow_html=True,
+)
+insight(
+    "Das ist die ganze Kausalkette in fünf Schritten: <strong>zwei "
+    "Macro-Faktoren (ΔBrent, Δr_10y) → ΔPD → ΔLGD → IRB-Kapitalbedarf K → "
+    "CET1-Quote</strong>. Jede Zahl in der Spalte „Live-Ergebnis“ ist exakt "
+    "das, was die Charts oben zeigen — nur verdichtet. Die Spalte "
+    "„Formel &amp; Quelle“ macht transparent, woher jeder Schritt kommt "
+    "(keine Black-Box)."
+)
 
 
 footer(

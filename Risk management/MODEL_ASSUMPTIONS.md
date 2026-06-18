@@ -341,12 +341,25 @@ einem Vasicek-Single-Factor-M-Mapping.
 ```
 
 **Wo:**
-- D_bucket = Modified Duration (Bucket-Midpoint)
+- D_bucket = Modified Duration (Bucket-Midpoint; geschlossene Buckets
+  über den Laufzeitmittelpunkt, offener >10Y-Bucket konservativ mit
+  15 Jahren)
 - Δr = Δr_10y_pp / 100
 - EAD_bucket = EBA Item 2520810
 
 **Warum ökonomisch:** Bond-Preis ist invers zum Zins. Längere Laufzeit
 = höhere Duration = stärkere Preisreaktion auf Zinsschock.
+
+**Warum diese Duration-Annahmen:** Die EBA-Transparency-Daten melden
+keine bondgenauen Cashflows, sondern Laufzeit-Buckets. Deshalb wird der
+Bucket-Midpoint als Cashflow-/Duration-Proxy verwendet. Diese Logik ist
+konsistent mit BCBS 368 "Interest rate risk in the banking book" und den
+EBA RTS zum standardisierten IRRBB-Ansatz, die bei aggregierten
+Zinsrisiko-Daten ebenfalls Zeitbänder bzw. Midpoints für das Slotting
+verwenden. Für den offenen >10Y-Bucket wird 15 Jahre gewählt: einfacher
+konservativer langer Tenor, angelehnt an das erste lange Basel-/EBA-
+Zeitband nach 10 Jahren ("10-15 Jahre"), statt eine nicht beobachtbare
+bankindividuelle Cashflow-Verteilung zu erfinden.
 
 **IFRS-9-Filter (Daten, keine Annahme):** Nur HfT, FVTPL und FVOCI
 sind CET1-wirksam (via P&L bzw. OCI). AC trägt keinen direkten
