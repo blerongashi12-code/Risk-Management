@@ -79,18 +79,24 @@ def _period_label(period: int) -> str:
 
 
 def vintage_for_period(period: int,
-                       available: list[str] | None = None) -> str:
-    """Mappt ein EBA-Quartal (YYYYMM) auf den zu verwendenden Pillar-3-
-    Jahresend-Stichtag (hold-flat-Regel, MODEL_ASSUMPTIONS A-02c).
+                       available: list[str] | None = None,
+                       *, lag_years: int = 1) -> str:
+    """Mappt ein EBA-Quartal (YYYYMM) auf den Pillar-3-Jahresend-Stichtag,
+    der zum Forward-Stress an diesem T0 verwendet wird (MODEL_ASSUMPTIONS A-02c).
 
-    Der jährliche Jahresend-Pillar-3-Wert gilt flach über die vier
-    Transparency-Quartale desselben Jahres → vintage = '<YYYY>-12-31'.
+    **No-look-ahead (Default ``lag_years=1``):** Zum Stichtag eines Quartals im
+    Jahr Y ist das jüngste *veröffentlichte* Pillar-3-Jahresende 31.12.(Y−1)
+    (FY_Y wird erst ~Q1 von Y+1 publiziert). Das eingefrorene Portfolio nutzt
+    also nur Information, die zu T0 real verfügbar war — kein Look-ahead.
+    Der gewählte Jahresend-Wert gilt flach über alle vier Quartale des Jahres.
+    ``lag_years=0`` liefert die (looking-ahead) Same-Year-Variante zum Vergleich.
+
     Liegt ``available`` vor, wird auf den jüngsten *vorhandenen* Stichtag
-    ≤ Jahresende geclippt (Banken ohne den exakten Jahrgang fallen auf den
-    letzten verfügbaren zurück; dokumentierte Limitation bis zum Backfill).
+    ≤ Ziel geclippt (Banken ohne den exakten Jahrgang fallen auf den ältesten
+    verfügbaren zurück; dokumentierte Limitation bis zum Backfill).
     """
     yr = period // 100
-    target = f"{yr}-12-31"
+    target = f"{yr - int(lag_years)}-12-31"
     if not available:
         return target
     le = [v for v in sorted(available) if v <= target]
@@ -267,6 +273,184 @@ def m_to_credit_rwa_scale(m: float) -> float:
     df = _build_scale_curve()
     # Linear interp
     return float(np.interp(m, df["M"].to_numpy(), df["scale"].to_numpy()))
+
+
+# ============================================================================
+# 3b. PD/LGD-Zeitreihe → frozen-portfolio prediction (faithful core)
+# ============================================================================
+# Statt des EU-aggregierten Einheits-Skalierungsfaktors (m_to_credit_rwa_scale)
+# friert dieser Pfad das Portfolio je Bank an jedem historischen T0 mit den
+# *damals gültigen* Pillar-3-PD/LGD UND -EAD ein (alles aus derselben EU-CR6-
+# Vintage → input-seitig 100 % Pillar-3, MODEL_ASSUMPTIONS A-02c) und rechnet
+# die Stress-Wirkung durch das echte 2-Faktor-/IRB-K-Modell (vasicek.py).
+# Die bank- und vintage-spezifische RWA-Skalierung wird dann auf die *gemeldete*
+# RWA_credit der Bank angewandt — so bleibt die Prognose auf der realisierten
+# Skala vergleichbar (die rekonstruierte IRB-K trifft nicht 1:1 die bank-
+# gemeldete RWA, wohl aber die relative Stress-Reaktion).
+
+_PORTFOLIO_CSV = _ROOT / "data" / "pillar3_portfolio_timeseries.csv"
+
+
+def load_portfolio_timeseries(path=None) -> pd.DataFrame:
+    """EAD/Restlaufzeit je (LEI, vasicek_class, vintage_date) aus Pillar-3 EU-CR6
+    — die Frozen-Portfolio-Gewichte für den Walk-Forward (input-seitig
+    ausschließlich Pillar-3)."""
+    p = Path(path) if path else _PORTFOLIO_CSV
+    df = pd.read_csv(p)
+    df["ead_eur"] = pd.to_numeric(df["ead_eur_m"], errors="coerce") * 1e6
+    df["maturity_years"] = pd.to_numeric(df["maturity_years"], errors="coerce")
+    df["vintage_date"] = df["vintage_date"].astype(str)
+    return df
+
+
+def build_frozen_portfolio(lei: str, pd_vintage: str, *,
+                           port_df: pd.DataFrame | None = None,
+                           pd_path=None):
+    """Eingefrorenes BankPortfolio für (Bank, Stichtag): EAD aus Pillar-3 EU-CR6,
+    PD/LGD aus derselben Pillar-3-Vintage. None, wenn Daten fehlen."""
+    from eba_pd_loader import load_pd_table
+    from vasicek import PortfolioSegment, BankPortfolio
+    if port_df is None:
+        try:
+            port_df = load_portfolio_timeseries()
+        except FileNotFoundError:
+            return None
+    pdf = load_pd_table(path=pd_path, vintage=pd_vintage)
+    pdf = pdf[pdf["LEI"] == lei]
+    sub = port_df[(port_df["LEI"] == lei)
+                  & (port_df["vintage_date"] == pd_vintage)]
+    if sub.empty or pdf.empty:
+        return None
+    lk = pdf.set_index("vasicek_class")[["pd_pct", "lgd_pct", "status"]]
+    segs = []
+    for _, r in sub.iterrows():
+        vclass = str(r["vasicek_class"])
+        if vclass not in lk.index:
+            continue
+        if str(lk.loc[vclass, "status"]) == "standardised_not_applicable":
+            continue
+        pp = float(lk.loc[vclass, "pd_pct"]); ll = float(lk.loc[vclass, "lgd_pct"])
+        ead = float(r["ead_eur"])
+        mat = float(r["maturity_years"]) if r["maturity_years"] == r["maturity_years"] else 2.5
+        if not (ead > 0) or pp != pp or ll != ll:
+            continue
+        segs.append(PortfolioSegment(
+            name=f"{lei}:{vclass}", exposure_class=vclass,
+            ead=ead, pd=pp / 100.0, lgd=ll / 100.0,
+            maturity_years=(mat if mat > 0 else 2.5),
+            # Basel-SME-Größenanpassung: gleiche Konvention wie eba_loader
+            # (repräsentativer Jahresumsatz €20 Mio. für das aggregierte SME-Buch)
+            sales_m_eur=(20.0 if vclass == "sme_corporate" else None),
+        ))
+    if not segs:
+        return None
+    return BankPortfolio(name=f"{lei}@{pd_vintage}", segments=segs, lei=lei)
+
+
+def frozen_rwa_scale(frozen, m: float, *, kappa_lgd: float = 0.30):
+    """RWA-Skalierung = stressed_RWA / baseline_RWA des eingefrorenen
+    Portfolios unter Systemfaktor M. None bei leerem Portfolio."""
+    if frozen is None:
+        return None
+    base = frozen.portfolio_kpis()
+    if not base or base.get("rwa", 0) <= 0:
+        return None
+    st = frozen.stressed_kpis(z_factor=float(m), kappa_lgd=kappa_lgd)
+    return (base["rwa"] + st["delta_rwa"]) / base["rwa"]
+
+
+def build_pdlgd_walkforward(
+    lei: str,
+    macro_q_with_m: pd.DataFrame,
+    capital_wide: pd.DataFrame,
+    *,
+    port_df: pd.DataFrame | None = None,
+    kappa_lgd: float = 0.30,
+    lag_years: int = 1,
+    lag_quarters: int = 1,
+) -> pd.DataFrame:
+    """Walk-Forward für EINE Bank mit Pillar-3-PD/LGD-Zeitreihe.
+
+    Pro Quartal-Paar (t→t+1): Portfolio mit der no-look-ahead-Vintage einfrieren
+    → RWA-Skalierung unter realisiertem M(t→t+1) → Prognose
+    ΔRWA_credit = gemeldete RWA_credit(t) · (scale−1) → gegen die um Volumen
+    (Non-Credit-RWA-Wachstum) bereinigte Realität vergleichen.
+
+    Output-Schema kompatibel mit walkforward_error_stats / per_bank_summary.
+    """
+    from eba_pd_loader import available_vintages
+    if macro_q_with_m.empty or capital_wide.empty:
+        return pd.DataFrame()
+    if port_df is None:
+        try:
+            port_df = load_portfolio_timeseries()
+        except FileNotFoundError:
+            return pd.DataFrame()
+    vintages = available_vintages()
+
+    cw = capital_wide[capital_wide["LEI_Code"] == lei].copy()
+    if cw.empty:
+        return pd.DataFrame()
+    cw["rwa_op"] = cw.get("rwa_operational", pd.Series(0, index=cw.index))
+    cw["rwa_noncredit"] = cw["rwa_market"].fillna(0) + cw["rwa_op"].fillna(0)
+    g_idx = {int(r["Period"]): r for _, r in cw.iterrows()}
+    periods_sorted = sorted(g_idx.keys())
+    pidx = {p: i for i, p in enumerate(periods_sorted)}
+    macro_lookup = {(int(r["Period_start"]), int(r["Period_end"])): r
+                    for _, r in macro_q_with_m.iterrows()}
+
+    _frozen: dict[str, object] = {}
+    rows = []
+    for p_start in periods_sorted:
+        i_end = pidx[p_start] + lag_quarters
+        if i_end >= len(periods_sorted):
+            continue
+        p_end = periods_sorted[i_end]
+        macro = macro_lookup.get((p_start, p_end))
+        if macro is None:
+            continue
+        m_q = float(macro["m_hybrid"])
+        pd_vintage = vintage_for_period(p_start, vintages, lag_years=lag_years)
+        if pd_vintage not in _frozen:
+            _frozen[pd_vintage] = build_frozen_portfolio(lei, pd_vintage, port_df=port_df)
+        scale = frozen_rwa_scale(_frozen[pd_vintage], m_q, kappa_lgd=kappa_lgd)
+        if scale is None:
+            continue
+        rs, re_ = g_idx[p_start], g_idx[p_end]
+        rwa_c_s = rs.get("rwa_credit"); rwa_c_e = re_.get("rwa_credit")
+        rwa_nc_s = rs.get("rwa_noncredit"); rwa_nc_e = re_.get("rwa_noncredit")
+        if any(pd.isna(x) for x in (rwa_c_s, rwa_c_e, rwa_nc_s, rwa_nc_e)) or rwa_c_s <= 0:
+            continue
+        pred_d = float(rwa_c_s) * (scale - 1.0)
+        actual_d = float(rwa_c_e) - float(rwa_c_s)
+        vol_factor = (float(rwa_nc_e) / float(rwa_nc_s) - 1.0) if rwa_nc_s > 0 else 0.0
+        volume_d = float(rwa_c_s) * vol_factor
+        risk_driven_d = actual_d - volume_d
+        sign_match = ((pred_d >= 0 and risk_driven_d >= 0)
+                      or (pred_d < 0 and risk_driven_d < 0))
+        rows.append({
+            "LEI_Code":                   lei,
+            "Period_start":               int(p_start),
+            "Period_end":                 int(p_end),
+            "period_label_end":           _period_label(int(p_end)),
+            "pd_vintage":                 pd_vintage,
+            "m_quarter":                  m_q,
+            "brent_log_q":                float(macro["brent_log_q"]),
+            "dr_10y_pp_q":                float(macro["dr_10y_pp_q"]),
+            "rwa_scale":                  scale,
+            "rwa_credit_start":           float(rwa_c_s),
+            "rwa_credit_end":             float(rwa_c_e),
+            "rwa_noncredit_start":        float(rwa_nc_s),
+            "rwa_noncredit_end":          float(rwa_nc_e),
+            "pred_dRWA_credit_eur":       pred_d,
+            "actual_dRWA_credit_eur":     actual_d,
+            "volume_dRWA_credit_eur":     volume_d,
+            "risk_driven_dRWA_credit_eur": risk_driven_d,
+            "error_eur":                  pred_d - risk_driven_d,
+            "error_pct_of_start":         (pred_d - risk_driven_d) / float(rwa_c_s),
+            "sign_match":                 bool(sign_match),
+        })
+    return pd.DataFrame(rows)
 
 
 # ============================================================================
@@ -522,15 +706,38 @@ def _test_period_label():
 
 
 def _test_vintage_for_period():
-    # hold-flat: jedes Quartal eines Jahres → Jahresende desselben Jahres
-    assert vintage_for_period(202203) == "2022-12-31"
-    assert vintage_for_period(202209) == "2022-12-31"
-    assert vintage_for_period(202412) == "2024-12-31"
-    # mit available-Liste: clip auf jüngsten vorhandenen Stichtag ≤ Jahresende
+    # no-look-ahead (Default lag_years=1): Quartal in Jahr Y → 31.12.(Y−1)
+    assert vintage_for_period(202203) == "2021-12-31"
+    assert vintage_for_period(202209) == "2021-12-31"
+    assert vintage_for_period(202412) == "2023-12-31"
+    # look-ahead-Variante (lag_years=0) = Same-Year
+    assert vintage_for_period(202203, lag_years=0) == "2022-12-31"
+    # mit available-Liste: clip auf jüngsten vorhandenen Stichtag ≤ Ziel
     av = ["2021-12-31", "2022-12-31", "2023-12-31", "2024-12-31"]
-    assert vintage_for_period(202206, av) == "2022-12-31"
-    assert vintage_for_period(202506, av) == "2024-12-31"   # 2025 fehlt → 2024
-    assert vintage_for_period(202006, av) == "2021-12-31"   # vor erstem → ältester
+    assert vintage_for_period(202306, av) == "2022-12-31"   # 2023er Quartal → FY2022
+    assert vintage_for_period(202506, av) == "2024-12-31"   # 2025er Quartal → FY2024
+    assert vintage_for_period(202106, av) == "2021-12-31"   # FY2020 fehlt → ältester
+
+
+def _test_frozen_portfolio_pdlgd():
+    """Frozen-Portfolio aus der Pillar-3-Zeitreihe (DB): RWA-Skalierung unter
+    Adverse-M ist > 1 UND vintage-abhängig → die PD/LGD-Zeitreihe fließt
+    tatsächlich durch das IRB-K-Modell (Kern des Umbaus)."""
+    try:
+        port = load_portfolio_timeseries()
+    except FileNotFoundError:
+        print("  [SKIP] frozen-portfolio (kein pillar3_portfolio_timeseries.csv)")
+        return
+    DB = "7LTWFZYICNSX8D621K86"
+    scales = {}
+    for v in ("2022-12-31", "2023-12-31"):
+        fp = build_frozen_portfolio(DB, v, port_df=port)
+        assert fp is not None and len(fp.segments) == 7, f"frozen {v} unvollständig"
+        s = frozen_rwa_scale(fp, -2.0)
+        assert s is not None and s > 1.2, f"Adverse-Skalierung {v} zu klein: {s}"
+        scales[v] = s
+    assert abs(scales["2022-12-31"] - scales["2023-12-31"]) > 1e-3, \
+        "RWA-Skalierung muss vintage-abhängig sein (Zeitreihe wirkt)"
 
 
 def _test_randomwalk_benchmark():
@@ -567,6 +774,7 @@ if __name__ == "__main__":
     for label, fn in [
         ("period label",             _test_period_label),
         ("vintage_for_period map",   _test_vintage_for_period),
+        ("frozen-portfolio PD/LGD",  _test_frozen_portfolio_pdlgd),
         ("random-walk benchmark",    _test_randomwalk_benchmark),
         ("scale-curve monotonicity", _test_scale_curve_monotone),
     ]:

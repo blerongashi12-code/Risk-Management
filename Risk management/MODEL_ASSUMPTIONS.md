@@ -138,10 +138,31 @@ EBA-Transparency-Ausfallquoten, NPL-Quoten oder sonstigen Größen abgeleitet.
 EBA-Transparency dient im Backtest ausschließlich der *realisierten*
 Vergleichsseite (RWA, CET1, EAD), nie als PD/LGD-Input.
 
-**Stichtags-Zuordnung (hold-flat):** Der jährliche Jahresend-Pillar-3-Wert
-gilt flach über die vier Transparency-Quartale desselben Jahres
-(`vintage_for_period`). Begründung: EU-CR6-PD/LGD werden nur jährlich
-(Jahresende) publiziert; eine feinere Interpolation wäre nicht quellengestützt.
+**Stichtags-Zuordnung (no-look-ahead, hold-flat):** Zum Stichtag eines Quartals
+im Jahr Y nutzt der Walk-Forward das jüngste *bereits veröffentlichte*
+Pillar-3-Jahresende — das ist **31.12.(Y−1)** (FY_Y wird erst ~Q1 von Y+1
+publiziert). Das eingefrorene Portfolio verwendet damit nur Information, die zu
+T0 real verfügbar war (`vintage_for_period`, `lag_years=1`). Der gewählte
+Jahresend-Wert gilt flach über alle vier Quartale des Jahres; eine feinere
+Interpolation wäre nicht quellengestützt.
+
+**Frozen-Portfolio = vollständig Pillar-3:** Für den Backtest stammen **PD, LGD
+UND EAD je Klasse** aus derselben EU-CR6-Vintage (`data/pillar3_portfolio_
+timeseries.csv` liefert EAD/Restlaufzeit, A-02c die PD/LGD). Damit ist die
+gesamte *Input-Seite* des eingefrorenen Portfolios Pillar-3 (nichts aus
+Transparency); Transparency liefert nur die realisierte RWA_credit zum Vergleich
+und den Macro-Schock. Aus diesem Portfolio rechnet das echte 2-Faktor-/IRB-K-
+Modell (`vasicek.py`) die stress-bedingte RWA-Skalierung, die auf die
+*gemeldete* RWA_credit angewandt wird (`build_pdlgd_walkforward`).
+
+**Validierungs-Befund (DB, 19 Quartals-Paare):** Das Modell **überschätzt** die
+realisierten Quartals-RWA-Bewegungen deutlich (große positive Bias,
+`skill_vs_rw < 0`, Vorzeichen-Trefferquote ≈ 0,5). Das ist methodisch erwartet
+und **bestätigt §6 quantitativ**: realisierte Quartals-RWA wird von
+Nicht-Macro-Faktoren dominiert (IRB-Modell-Updates, Rating-Migrationen,
+Output-Floor, FX), die ein bewusst sauberes 2-Faktor-Stressmodell nicht
+abbildet. Der Backtest taugt daher als **Konservativitäts-/Frühwarn-Nachweis
+(obere Schranke)**, nicht als Beleg für Quartals-Punktprognosegüte.
 
 **Default-Band inklusive (geflaggt):** Die publizierte EU-CR6-Sub-total-Ø-PD
 **enthält das 100 %-(Default)-Band** — exakt dieselbe Definition wie der
