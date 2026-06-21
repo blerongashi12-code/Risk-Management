@@ -27,3 +27,9 @@ LEI,bank_name,vasicek_class,vintage_date,ead_eur_m,maturity_years,rwa_eur_m,dens
 7LTWFZYICNSX8D621K86,Deutsche Bank,mortgage,2024-12-31,166929,0.00,38316,22.95,"Deutsche Bank Pillar 3 EU CR6 AIRB (Dec 31, 2024) col d=EAD, h=maturity, i=RWA"
 7LTWFZYICNSX8D621K86,Deutsche Bank,qrre,2024-12-31,9248,0.00,1431,15.47,"Deutsche Bank Pillar 3 EU CR6 AIRB (Dec 31, 2024) col d=EAD, h=maturity, i=RWA"
 7LTWFZYICNSX8D621K86,Deutsche Bank,other_retail,2024-12-31,29688,0.00,18587,62.61,"Deutsche Bank Pillar 3 EU CR6 AIRB (Dec 31, 2024) col d=EAD, h=maturity, i=RWA"
+549300NYKK9MWM7GGW15,ING Groep,corporate,2021-12-31,316358,2.50,,,ING Group Additional Pillar III Report 2021 EU CR6 IRB col d=EAD (p41)
+549300NYKK9MWM7GGW15,ING Groep,sme_corporate,2021-12-31,27900,2.50,,,ING Group Additional Pillar III Report 2021 EU CR6 IRB col d=EAD (p40)
+549300NYKK9MWM7GGW15,ING Groep,qrre,2021-12-31,13509,2.50,,,ING Group Additional Pillar III Report 2021 EU CR6 IRB col d=EAD (p42)
+549300NYKK9MWM7GGW15,ING Groep,other_retail,2021-12-31,4852,2.50,,,ING Group Additional Pillar III Report 2021 EU CR6 IRB col d=EAD (p44)
+549300NYKK9MWM7GGW15,ING Groep,bank,2021-12-31,46027,2.50,,,ING Group Additional Pillar III Report 2021 EU CR6 IRB col d=EAD (p38)
+549300NYKK9MWM7GGW15,ING Groep,mortgage,2021-12-31,307236,2.50,,,ING Group Additional Pillar III Report 2021 EU CR6 IRB col d=EAD (p43)
