@@ -63,11 +63,14 @@ jeder einzelnen Bank. **Einheitlicher Stichtag 31.12.2024** für alle
 PD_(bank,class) = Pillar-3-EU-CR6-SubTotal_{bank, class, 31.12.2024}
 ```
 
-**Coverage:** 10 / 10 Banken Pillar-3-verifiziert. 65 von 70 CSV-Zellen
-direkt bank-spezifisch (93 %). 5 Zellen verbleiben auf EBA-Risk-
-Dashboard-Country-Aggregat bzw. F-IRB-Default, wo eine Bank eine
-bestimmte Klasse nicht als IRB-Sub-total publiziert (z. B. Santander
-Sovereign unter Standardised Approach).
+**Coverage:** 10 / 10 Banken und alle 69 IRB-fähigen
+Bank-Klassen-Kombinationen stammen direkt aus bank-spezifischen
+Pillar-3-EU-CR6-Tabellen. Pro
+Bank-Klasse werden PD und LGD gemeinsam aus derselben Sub-total-Zeile
+übernommen. Nur Santander Sovereign besitzt keinen IRB-CR6-Wert, weil
+Santander diese Exposures dauerhaft im Standardansatz führt. Die Position
+wird deshalb aus dem IRB-Kreditbuchkanal ausgeschlossen, bleibt aber im
+separaten Sovereign-Marktwertkanal vollständig enthalten.
 
 **Warum ökonomisch:** Diese PDs sind die bank-internen Schätzungen
 unter CRR Art. 180 — forward-looking 1-Jahres-Ausfallwahrscheinlichkeiten,
@@ -116,6 +119,62 @@ unter den F-IRB-Standardwerten von 45 %.
 
 **Quelle:** Pillar-3 EU-CR6 jeder Bank, dokumentiert pro Zeile in
 `data/pillar3_bank_pd_lgd.csv`.
+
+---
+
+### A-02c · PD/LGD-Zeitreihe für den Walk-Forward-Backtest (nur Pillar-3) [published]
+
+**Was:** Für die Out-of-Sample-Validierung (Walk-Forward) muss das
+Portfolio an jedem historischen Stichtag T0 mit den *damals gültigen*
+PD/LGD eingefroren werden — **kein Look-ahead** aus dem 2024-Snapshot.
+Dazu führt `data/pillar3_bank_pd_lgd.csv` zusätzlich zu 31.12.2024 ältere
+Jahresend-Stichtage (31.12.2021 / 2022 / 2023) im **Long-Format** (eine
+Zeile je `LEI × vasicek_class × vintage_date`).
+
+**Harte Quellen-Vorgabe:** Diese historischen PD/LGD stammen **ausschließlich
+aus den Pillar-3-EU-CR6-Tabellen** der jeweiligen Bank — identische Logik wie
+A-01/A-02, nur für frühere Stichtage. Es werden **keine** PD/LGD aus
+EBA-Transparency-Ausfallquoten, NPL-Quoten oder sonstigen Größen abgeleitet.
+EBA-Transparency dient im Backtest ausschließlich der *realisierten*
+Vergleichsseite (RWA, CET1, EAD), nie als PD/LGD-Input.
+
+**Stichtags-Zuordnung (hold-flat):** Der jährliche Jahresend-Pillar-3-Wert
+gilt flach über die vier Transparency-Quartale desselben Jahres
+(`vintage_for_period`). Begründung: EU-CR6-PD/LGD werden nur jährlich
+(Jahresende) publiziert; eine feinere Interpolation wäre nicht quellengestützt.
+
+**Default-Band inklusive (geflaggt):** Die publizierte EU-CR6-Sub-total-Ø-PD
+**enthält das 100 %-(Default)-Band** — exakt dieselbe Definition wie der
+2024-Baseline. In Stressjahren kann ein ausgefallenes Exposure die Ø-PD
+sichtbar anheben (z. B. Deutsche Bank *Institutions* FY2021/2022: PD ≈ 9–12 %
+durch ein voll wertberichtigtes Default-Exposure von ~€2,5 Mrd.; RWA-Dichte
+bleibt niedrig). Solche Werte werden **übernommen** (konsistent) und in der
+Spalte `note` mit `DEFAULT-BAND` markiert.
+
+**Datenintegrität / Extraktion:** Pro Bank wird der Parser gegen die
+hand-verifizierten 2024-Werte **kalibriert** (er muss alle sieben
+Klassen-PD/LGD exakt reproduzieren), erst dann werden Vorjahre extrahiert.
+Jede Zelle durchläuft einen **Dichte-Cross-Check** (RWA/EAD gegen die
+ausgewiesene Density-Spalte); jede Zeile trägt `source_page` und
+`source_url`. Kein Wert wird geschätzt — fehlt/scheitert eine Zelle, bleibt
+sie leer.
+
+**Format-Grenze (EU-CR6 seit ~2021):** Das EU-CR6-Template in heutiger Form
+existiert erst seit der CRR2-Offenlegungs-ITS (Stichtage ab ~Mitte 2021).
+Saubere, konsistente Reihen daher für **FY2021–FY2024**; FY2020 (Alt-Template)
+ist bewusst ausgeklammert.
+
+**Status:** Deutsche Bank vollständig (FY2021–2024, kalibrierungs- und
+dichte-verifiziert) als **Muster**. Die übrigen neun Banken werden
+schrittweise in dieselbe CSV nachgezogen (bespoke Report-Layouts: BNP
+„Table 39 IRBA by PD scale", Crédit Mutuel französisch, Rabobank
+bild-basierte Tabellen → ggf. OCR). Bis zum Backfill nutzt der Walk-Forward
+für noch nicht historisierte Banken den 2024-Wert (dokumentierte Limitation).
+
+**Loader:** `load_pd_table(vintage="YYYY-MM-DD")` bzw. `load_pd_panel()`
+(siehe `backend/eba_pd_loader.py`). Das Live-Modell ist unberührt: der Default
+`vintage="latest"` liefert weiterhin genau den 31.12.2024-Snapshot
+(eine Zeile je LEI×Klasse).
 
 ---
 

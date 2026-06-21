@@ -4,7 +4,14 @@
 ============================================================================
 
 Adaption des klassischen Walk-Forward-Konzepts auf unser Use-Case
-(Vasicek/ASRF + EBA Transparency 2025 + 3-Channel-CET1).
+(Vasicek/ASRF + EBA Transparency + 2-Kanal-CET1: Loan-Book ΔRWA+ΔEL und
+Sovereign ΔMtM; der frühere Trading-Book-Kanal wurde entfernt).
+
+Methodische Erweiterung (PD/LGD-Zeitreihe): Das Portfolio wird an jedem
+historischen T0 mit den *damals gültigen* Pillar-3-PD/LGD eingefroren
+(`vintage_for_period` → Jahresend-Vintage, hold-flat über die 4 Quartale
+des Jahres). Quelle der PD/LGD ist ausschließlich Pillar-3 (siehe
+MODEL_ASSUMPTIONS A-02c); kein Look-ahead aus dem 2024-Snapshot.
 
 Für jedes Quartal-Paar (t → t+1) in den historischen EBA-Vintages 2019-2025
 und für jede der 67 IRB-Banken:
@@ -69,6 +76,25 @@ def _period_label(period: int) -> str:
     mo = period % 100
     q = (mo - 1) // 3 + 1
     return f"Q{q} {yr}"
+
+
+def vintage_for_period(period: int,
+                       available: list[str] | None = None) -> str:
+    """Mappt ein EBA-Quartal (YYYYMM) auf den zu verwendenden Pillar-3-
+    Jahresend-Stichtag (hold-flat-Regel, MODEL_ASSUMPTIONS A-02c).
+
+    Der jährliche Jahresend-Pillar-3-Wert gilt flach über die vier
+    Transparency-Quartale desselben Jahres → vintage = '<YYYY>-12-31'.
+    Liegt ``available`` vor, wird auf den jüngsten *vorhandenen* Stichtag
+    ≤ Jahresende geclippt (Banken ohne den exakten Jahrgang fallen auf den
+    letzten verfügbaren zurück; dokumentierte Limitation bis zum Backfill).
+    """
+    yr = period // 100
+    target = f"{yr}-12-31"
+    if not available:
+        return target
+    le = [v for v in sorted(available) if v <= target]
+    return le[-1] if le else min(available)
 
 
 # ============================================================================
@@ -404,6 +430,18 @@ def walkforward_error_stats(panel: pd.DataFrame) -> dict:
     bias = float(np.mean(err))
     hit_rate = float(sub["sign_match"].mean())
 
+    # Random-Walk-Benchmark: naive "keine-Änderung"-Prognose (pred=0).
+    # Ein MAE ist nur RELATIV zu einer Baseline interpretierbar — schlägt
+    # das Modell den Random-Walk nicht, hat es keinen prognostischen Wert.
+    mae_rw = float(np.mean(np.abs(act)))                 # |0 − act|
+    skill_vs_rw = (1.0 - mae / mae_rw) if mae_rw > 0 else float("nan")
+
+    # Konservativ-Check (gerichtet): Anteil der Fälle, in denen das Modell
+    # den risk-driven Effekt betrags­mäßig NICHT unterschätzt (|pred| ≥ |act|
+    # bei gleichem Vorzeichen) — stützt die "obere-Schranke"-Erzählung.
+    same_sign = np.sign(pred) == np.sign(act)
+    conservative = float(np.mean(same_sign & (np.abs(pred) >= np.abs(act))))
+
     # Linear R²: pred vs act
     if np.var(act) > 0:
         corr = float(np.corrcoef(pred, act)[0, 1])
@@ -412,14 +450,17 @@ def walkforward_error_stats(panel: pd.DataFrame) -> dict:
         corr, r2 = float("nan"), float("nan")
 
     return {
-        "n":         int(len(sub)),
-        "mae_eur":   mae,
-        "rmse_eur":  rmse,
-        "bias_eur":  bias,
-        "hit_rate":  hit_rate,
-        "corr":      corr,
-        "r2_signed": r2,
-        "mae_pct":   float(np.mean(np.abs(sub["error_pct_of_start"]))),
+        "n":            int(len(sub)),
+        "mae_eur":      mae,
+        "rmse_eur":     rmse,
+        "bias_eur":     bias,
+        "hit_rate":     hit_rate,
+        "mae_randomwalk_eur": mae_rw,
+        "skill_vs_rw":  skill_vs_rw,
+        "conservative_share": conservative,
+        "corr":         corr,
+        "r2_signed":    r2,
+        "mae_pct":      float(np.mean(np.abs(sub["error_pct_of_start"]))),
     }
 
 
@@ -480,6 +521,33 @@ def _test_period_label():
     assert _period_label(202003) == "Q1 2020"
 
 
+def _test_vintage_for_period():
+    # hold-flat: jedes Quartal eines Jahres → Jahresende desselben Jahres
+    assert vintage_for_period(202203) == "2022-12-31"
+    assert vintage_for_period(202209) == "2022-12-31"
+    assert vintage_for_period(202412) == "2024-12-31"
+    # mit available-Liste: clip auf jüngsten vorhandenen Stichtag ≤ Jahresende
+    av = ["2021-12-31", "2022-12-31", "2023-12-31", "2024-12-31"]
+    assert vintage_for_period(202206, av) == "2022-12-31"
+    assert vintage_for_period(202506, av) == "2024-12-31"   # 2025 fehlt → 2024
+    assert vintage_for_period(202006, av) == "2021-12-31"   # vor erstem → ältester
+
+
+def _test_randomwalk_benchmark():
+    panel = pd.DataFrame({
+        "pred_dRWA_credit_eur":        [10.0, -5.0, 8.0, 2.0],
+        "risk_driven_dRWA_credit_eur": [12.0, -4.0, 6.0, 3.0],
+        "sign_match":                  [True, True, True, True],
+        "error_pct_of_start":          [0.01, -0.01, 0.02, -0.005],
+    })
+    stats = walkforward_error_stats(panel)
+    assert "mae_randomwalk_eur" in stats and "skill_vs_rw" in stats
+    # RW-MAE = mean(|act|) = mean(12,4,6,3) = 6.25 ; Modell-MAE = mean(2,1,2,1)=1.5
+    assert abs(stats["mae_randomwalk_eur"] - 6.25) < 1e-9
+    assert abs(stats["mae_eur"] - 1.5) < 1e-9
+    assert stats["skill_vs_rw"] > 0   # Modell schlägt Random-Walk
+
+
 def _test_scale_curve_monotone():
     """scale(M) should be a decreasing function of M (negative M = stress
     → larger RWA → scale > 1; positive M = benign → scale < 1)."""
@@ -498,6 +566,8 @@ if __name__ == "__main__":
     print("=" * 60)
     for label, fn in [
         ("period label",             _test_period_label),
+        ("vintage_for_period map",   _test_vintage_for_period),
+        ("random-walk benchmark",    _test_randomwalk_benchmark),
         ("scale-curve monotonicity", _test_scale_curve_monotone),
     ]:
         try:

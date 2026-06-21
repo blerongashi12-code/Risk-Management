@@ -14,14 +14,13 @@ Methodische Eckpunkte
   EAD-gewichtete Average-PD und Average-LGD direkt aus dem Pillar-3-Report
   der jeweiligen Bank. PD-Definition: regulatorisch publizierte 1-Jahres-
   PD aus internen Rating-Modellen (CRR Art. 180).
-- **Fallback bei nicht-extrahierbarer Pillar-3-Disclosure:** Country-
-  Aggregate aus dem EBA Risk Dashboard Credit Risk Parameters Annex
-  Q4 2025 (Source: COREP C 9.02 / Heimatland-Proxy). Diese Zeilen sind in
-  der Spalte `status` mit ``country_proxy_pending_pillar3`` markiert; der
-  Loader emittiert beim Laden eine sichtbare Warnung.
-- **Bank- und Sovereign-Klasse:** falls bank-spezifisch nicht verfügbar →
-  Basel III F-IRB-Defaults (0,20 % PD / 45 % LGD für Banken, 0,05 % PD /
-  45 % LGD für Sovereign) markiert als ``basel_default_pending_pillar3``.
+- **Aktuelle Abdeckung:** Alle 69 IRB-fähigen Bank-Klassen-Kombinationen
+  stammen direkt aus bankpublizierten EU-CR6-Sub-totals. Country-Proxies
+  sind nach erneuter Originalbericht-Extraktion nicht mehr erforderlich.
+- **Strukturelle Ausnahme:** Santander Sovereign wird vollständig im
+  Standardansatz geführt. Die Position wird daher aus dem IRB-
+  Kreditbuchkanal entfernt, bleibt aber im separaten Sovereign-
+  Marktwertkanal auf Basis der EBA-Bestände enthalten.
 
 Status-Werte in der CSV
 -----------------------
@@ -35,6 +34,10 @@ Status-Werte in der CSV
                                          Sovereign-Klasse, wo die meisten
                                          Banken keine separate IRB-PD
                                          publizieren
+- ``standardised_not_applicable``      — keine IRB-PD/LGD, da die Position
+                                         regulatorisch im Standardansatz
+                                         geführt wird; aus IRB-Kreditbuch
+                                         ausgeschlossen
 
 API
 ---
@@ -64,19 +67,19 @@ if str(_ROOT) not in sys.path:
 # ----------------------------------------------------------------------
 DEFAULT_CSV_PATH = _ROOT / "data" / "pillar3_bank_pd_lgd.csv"
 
-_CACHED: pd.DataFrame | None = None
+_CACHED_FULL: pd.DataFrame | None = None
 
 
-def load_pd_table(path: Path | str | None = None) -> pd.DataFrame:
-    """Lädt die bank-spezifische PD/LGD-Tabelle.
+def _load_full(path: Path | str | None = None) -> pd.DataFrame:
+    """Lädt das vollständige (potenziell multi-vintage) PD/LGD-Long-Panel.
 
-    Returns DataFrame mit Spalten
-      bank_name, LEI, bank_country, vasicek_class, pd_pct, lgd_pct,
-      status, source, source_period, source_table, source_page, source_url
+    Spalten: bank_name, LEI, bank_country, vasicek_class, pd_pct, lgd_pct,
+    vintage_date, status, source, source_period, source_table, source_page,
+    source_url. Eine Zeile pro (LEI, vasicek_class, vintage_date).
     """
-    global _CACHED
-    if _CACHED is not None and path is None:
-        return _CACHED.copy()
+    global _CACHED_FULL
+    if _CACHED_FULL is not None and path is None:
+        return _CACHED_FULL
     p = Path(path) if path else DEFAULT_CSV_PATH
     if not p.exists():
         raise FileNotFoundError(
@@ -93,11 +96,50 @@ def load_pd_table(path: Path | str | None = None) -> pd.DataFrame:
     if "status" not in df.columns:
         df["status"] = "country_proxy_pending_pillar3"
         df["source_url"] = ""
+    # Defensive: alte CSV ohne vintage_date → einheitlich 31.12.2024
+    if "vintage_date" not in df.columns:
+        df["vintage_date"] = "2024-12-31"
+    df["vintage_date"] = df["vintage_date"].astype(str)
 
     if path is None:
-        _CACHED = df.copy()
-        _emit_coverage_warning(df)
+        _CACHED_FULL = df
+        # Coverage-Banner bezieht sich auf den Live-Snapshot (jüngster Stichtag)
+        latest = df["vintage_date"].max()
+        _emit_coverage_warning(df[df["vintage_date"] == latest])
     return df
+
+
+def available_vintages(path: Path | str | None = None) -> list[str]:
+    """Sortierte Liste der vorhandenen Stichtage (vintage_date)."""
+    return sorted(_load_full(path)["vintage_date"].dropna().unique().tolist())
+
+
+def load_pd_table(path: Path | str | None = None,
+                  vintage: str = "latest") -> pd.DataFrame:
+    """Bank-spezifische PD/LGD-Tabelle, gefiltert auf EINEN Stichtag.
+
+    ``vintage``:
+      - ``"latest"`` (Default) → jüngster vintage_date. Das ist der
+        Live-Modell-Snapshot (31.12.2024); Verhalten identisch zum
+        früheren Single-Vintage-Loader (eine Zeile je LEI×Klasse).
+      - ``"all"`` → vollständiges Long-Panel über alle Stichtage.
+      - ``"YYYY-MM-DD"`` → genau dieser Stichtag (für den Walk-Forward-
+        Backtest, der das Portfolio mit den *damals gültigen* PD/LGD
+        einfriert — kein Look-ahead aus 2024).
+
+    Banken ohne den angefragten Stichtag liefern entsprechend keine Zeilen
+    (der Backtest überspringt sie für dieses Vintage).
+    """
+    full = _load_full(path)
+    if vintage == "all":
+        return full.copy()
+    target = full["vintage_date"].max() if vintage == "latest" else str(vintage)
+    return full[full["vintage_date"] == target].copy()
+
+
+def load_pd_panel(path: Path | str | None = None) -> pd.DataFrame:
+    """Vollständiges Multi-Vintage-Panel (= load_pd_table(vintage='all'))."""
+    return load_pd_table(path, vintage="all")
 
 
 # Backward-Kompat-Alias
@@ -117,7 +159,9 @@ def _emit_coverage_warning(df: pd.DataFrame) -> None:
     n_verified = by_status.get("pillar3_verified", 0)
     n_proxy    = by_status.get("country_proxy_pending_pillar3", 0)
     n_default  = by_status.get("basel_default_pending_pillar3", 0)
-    pct_verified = 100.0 * n_verified / n_total if n_total else 0.0
+    n_na       = by_status.get("standardised_not_applicable", 0)
+    n_eligible = n_total - n_na
+    pct_verified = 100.0 * n_verified / n_eligible if n_eligible else 0.0
 
     banks_verified = df.loc[df["status"] == "pillar3_verified",
                               "bank_name"].nunique()
@@ -126,9 +170,9 @@ def _emit_coverage_warning(df: pd.DataFrame) -> None:
     msg = (
         f"PD/LGD-Tabelle geladen · {n_total} Zeilen "
         f"({banks_verified}/{banks_total} Banken Pillar-3-verifiziert, "
-        f"{pct_verified:.0f} % der Zeilen verified) · "
+        f"{pct_verified:.0f} % der IRB-fähigen Kombinationen direkt) · "
         f"verified={n_verified}, country_proxy={n_proxy}, "
-        f"basel_default={n_default}"
+        f"basel_default={n_default}, standardised_na={n_na}"
     )
     print(f"[eba_pd_loader] {msg}", file=sys.stderr)
 
@@ -145,8 +189,14 @@ def coverage_report() -> dict:
         "n_banks_total":   df["bank_name"].nunique(),
         "by_status":       by_status,
         "banks_by_status": banks_by_status.to_dict(),
+        "n_irb_eligible":  n_total
+                            - by_status.get("standardised_not_applicable", 0),
         "pct_verified":    100.0 * by_status.get("pillar3_verified", 0)
-                            / n_total if n_total else 0.0,
+                            / (n_total
+                               - by_status.get("standardised_not_applicable", 0))
+                            if (n_total
+                                - by_status.get("standardised_not_applicable", 0))
+                            else 0.0,
         "verified_banks":  sorted(df.loc[df["status"] == "pillar3_verified",
                                           "bank_name"].unique().tolist()),
     }
@@ -256,40 +306,50 @@ def filter_universe_to_top10(universe):
 
     pd_lookup = df.set_index(["LEI", "vasicek_class"])[["pd_pct", "lgd_pct",
                                                           "status"]]
-    n_overrides, n_verified = 0, 0
+    n_overrides, n_verified, n_excluded = 0, 0, 0
     for bank_name, portfolio in filtered.items():
         lei = universe_to_lei[bank_name]
+        retained_segments = []
         for seg in portfolio.segments:
             v_class = seg.exposure_class
             key = (lei, v_class)
             if key in pd_lookup.index:
+                status = str(pd_lookup.loc[key, "status"])
+                if status == "standardised_not_applicable":
+                    n_excluded += 1
+                    continue
                 seg.pd  = float(pd_lookup.loc[key, "pd_pct"])  / 100.0
                 seg.lgd = float(pd_lookup.loc[key, "lgd_pct"]) / 100.0
                 n_overrides += 1
-                if pd_lookup.loc[key, "status"] == "pillar3_verified":
+                if status == "pillar3_verified":
                     n_verified += 1
+            retained_segments.append(seg)
+        portfolio.segments = retained_segments
 
     universe.banks = filtered
     universe.source = (f"{universe.source} | PDs/LGDs aus "
                        f"pillar3_bank_pd_lgd.csv ({len(filtered)} Banken, "
                        f"{n_overrides} Segmente, davon {n_verified} "
-                       f"Pillar-3-verifiziert)")
+                       f"Pillar-3-verifiziert; {n_excluded} SA-Segment "
+                       f"aus IRB-Kanal ausgeschlossen)")
     return universe
 
 
-def get_pd_for_bank(lei: str, vasicek_class: str) -> dict:
-    """Liefert PD% und LGD% (plus Source) für (LEI, Klasse).
+def get_pd_for_bank(lei: str, vasicek_class: str,
+                    vintage: str = "latest") -> dict:
+    """Liefert PD% und LGD% (plus Source) für (LEI, Klasse[, Stichtag]).
 
     Returns dict mit Keys: pd_pct, lgd_pct, pd_decimal, lgd_decimal,
                           status, source, source_period, source_url
-    Raises KeyError wenn Kombination nicht gefunden.
+    Raises KeyError wenn Kombination (für den Stichtag) nicht gefunden.
     """
-    df = load_pd_table()
+    df = load_pd_table(vintage=vintage)
     row = df[(df["LEI"] == lei) & (df["vasicek_class"] == vasicek_class)]
     if len(row) == 0:
         raise KeyError(
-            f"Keine PD/LGD-Daten für LEI={lei}, Klasse={vasicek_class}. "
-            f"Bank evtl. nicht in der Top-10-Universe."
+            f"Keine PD/LGD-Daten für LEI={lei}, Klasse={vasicek_class}, "
+            f"vintage={vintage}. Bank evtl. nicht in der Top-10-Universe "
+            f"oder dieser Stichtag noch nicht extrahiert."
         )
     r = row.iloc[0]
     return {
@@ -342,9 +402,9 @@ def enrich_segments(seg_df: pd.DataFrame) -> pd.DataFrame:
 # 5. Self-Tests
 # ----------------------------------------------------------------------
 def _test_load():
-    df = load_pd_table()
-    assert len(df) == 70, f"Erwartet 70 Zeilen, gefunden {len(df)}"
-    assert df["bank_name"].nunique() == 10, "Erwartet 10 Banken"
+    df = load_pd_table()   # Default "latest" = Live-Snapshot 31.12.2024
+    assert len(df) == 70, f"Erwartet 70 Zeilen (latest), gefunden {len(df)}"
+    assert df["bank_name"].nunique() == 10, "Erwartet 10 Banken (latest)"
     assert set(df["vasicek_class"].unique()) >= {
         "corporate", "sme_corporate", "mortgage", "qrre",
         "other_retail", "bank", "sovereign",
@@ -353,26 +413,34 @@ def _test_load():
     assert "vintage_date" in df.columns, "Spalte 'vintage_date' fehlt"
 
 
-def _test_vintage_consistency():
-    """Stichtag-Einheitlichkeit: ALLE Zeilen müssen denselben vintage_date haben.
+def _test_vintage_panel_integrity():
+    """Multi-Vintage-Panel-Integrität (löst die alte Single-Vintage-Annahme ab).
 
-    Methodische Anforderung: Stress-Modelle starten von einem definierten
-    "Heute"-Snapshot. Das ist EBA-ST-2025-Standard und unsere Konvention.
-    Bei Mix-Stichtag würde der Macro-Schock auf inkonsistente Baselines
-    angewendet (manche Banken hätten schon 6+ Monate Macro-Evolution
-    absorbiert) — methodisch unzulässig.
+    Das Live-Modell startet weiterhin von einem definierten Snapshot
+    (jüngster Stichtag = 31.12.2024); load_pd_table() liefert per Default
+    GENAU diesen Snapshot. Zusätzlich darf die CSV nun ältere Pillar-3-
+    Stichtage für die Walk-Forward-Validierung enthalten (eine Zeile je
+    LEI×Klasse×Stichtag). Geprüft wird:
+      1. jüngster Stichtag == 2024-12-31 und in sich konsistent,
+      2. jede (LEI, vasicek_class, vintage_date)-Kombination eindeutig,
+      3. der Live-Snapshot deckt 10 Banken ab.
     """
-    df = load_pd_table()
-    vintages = df["vintage_date"].unique()
-    assert len(vintages) == 1, (
-        f"Stichtag-Inkonsistenz! Gefundene Vintage-Daten: {sorted(vintages)} "
-        f"— alle Zeilen müssen denselben vintage_date haben "
-        f"(EBA-ST-2025-Standard, einheitlicher Snapshot für Forward-Stress)."
+    full = load_pd_panel()
+    vintages = sorted(full["vintage_date"].unique())
+    latest = max(vintages)
+    assert latest == "2024-12-31", (
+        f"Jüngster Stichtag muss 2024-12-31 sein (Live-Snapshot), "
+        f"gefunden: {latest}. Vorhandene Stichtage: {vintages}."
     )
-    assert vintages[0] == "2024-12-31", (
-        f"Erwartete Vintage 2024-12-31, gefunden: {vintages[0]}. "
-        f"Bei Vintage-Umstellung: alle Banken konsistent re-extrahieren."
+    dup = full.duplicated(subset=["LEI", "vasicek_class", "vintage_date"])
+    assert not dup.any(), (
+        f"Doppelte (LEI, Klasse, Stichtag)-Kombinationen: "
+        f"{full[dup][['LEI','vasicek_class','vintage_date']].values.tolist()}"
     )
+    snap = load_pd_table(vintage="latest")
+    assert snap["bank_name"].nunique() == 10, "Live-Snapshot ≠ 10 Banken"
+    assert (snap["vintage_date"] == "2024-12-31").all(), \
+        "Live-Snapshot enthält fremde Stichtage"
 
 
 def _test_lookup_pillar3_verified():
@@ -387,11 +455,32 @@ def _test_coverage():
     cov = coverage_report()
     assert cov["n_banks_total"] == 10
     assert cov["n_rows_total"] == 70
-    # Mindestens 5 Banken sollten Pillar-3-verifiziert sein
-    # (aktuelle Coverage: DB, ING, SocGen, Rabobank, UniCredit, CA, CM=partial)
-    assert len(cov["verified_banks"]) >= 5, \
-        f"Erwartet ≥ 5 verified Banken, gefunden {cov['verified_banks']}"
-    assert "Deutsche Bank" in cov["verified_banks"]
+    assert len(cov["verified_banks"]) == 10
+    assert cov["by_status"].get("pillar3_verified", 0) == 69
+    assert cov["by_status"].get("country_proxy_pending_pillar3", 0) == 0
+    assert cov["by_status"].get("basel_default_pending_pillar3", 0) == 0
+    assert cov["by_status"].get("standardised_not_applicable", 0) == 1
+    assert cov["n_irb_eligible"] == 69
+    assert abs(cov["pct_verified"] - 100.0) < 1e-9
+
+
+def _test_recovered_pillar3_values():
+    bpce_mortgage = get_pd_for_bank("FR9695005MSX1OYEMGDF", "mortgage")
+    assert bpce_mortgage["status"] == "pillar3_verified"
+    assert abs(bpce_mortgage["pd_pct"] - 14.68) < 0.01
+    assert abs(bpce_mortgage["lgd_pct"] - 10.70) < 0.01
+
+    bpce_qrre = get_pd_for_bank("FR9695005MSX1OYEMGDF", "qrre")
+    assert abs(bpce_qrre["pd_pct"] - 9.63) < 0.01
+    assert abs(bpce_qrre["lgd_pct"] - 33.85) < 0.01
+
+    cm_qrre = get_pd_for_bank("9695000CG7B84NLR5984", "qrre")
+    assert abs(cm_qrre["pd_pct"] - 3.13) < 0.01
+    assert abs(cm_qrre["lgd_pct"] - 33.00) < 0.01
+
+    cm_bank = get_pd_for_bank("9695000CG7B84NLR5984", "bank")
+    assert abs(cm_bank["pd_pct"] - 0.12) < 0.01
+    assert abs(cm_bank["lgd_pct"] - 34.00) < 0.01
 
 
 def _test_enrich():
@@ -415,9 +504,10 @@ if __name__ == "__main__":
     print("=" * 60)
     for label, fn in [
         ("CSV-Load + Schema",          _test_load),
-        ("Vintage-Date-Konsistenz",    _test_vintage_consistency),
+        ("Vintage-Panel-Integrität",   _test_vintage_panel_integrity),
         ("Pillar-3-verified-Lookup",   _test_lookup_pillar3_verified),
         ("Coverage-Report",            _test_coverage),
+        ("Recovered Pillar-3 values",  _test_recovered_pillar3_values),
         ("Segment-Anreicherung",       _test_enrich),
     ]:
         try:
