@@ -38,3 +38,6 @@ Risk management/data/transparency_*/
 .DS_Store
 Thumbs.db
 *.log
+
+# Pillar-3 source PDFs (large, ~210MB) — co-located with project, not committed
+Risk management/data/pillar3_reports/

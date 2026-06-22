@@ -1,0 +1,10 @@
+short,LEI,vasicek_class,pd_pct,lgd_pct,vintage_date,ead_eur_m,source_page,density_ok,note,ctx
+socgen,O2RNE8IBXP4R0TD8PU41,sme_corporate,3.80,17.07,2022-12-31,61970,146,True,,(InEURm) PDscale exposure pre CCF CCF po
+socgen,O2RNE8IBXP4R0TD8PU41,mortgage,1.51,15.92,2022-12-31,126745,147,False,DENSITY?,(InEURm) PDscale exposure pre CCF CCF po
+socgen,O2RNE8IBXP4R0TD8PU41,qrre,6.79,49.48,2022-12-31,5226,147,False,DENSITY?,Qualifying | revolving
+socgen,O2RNE8IBXP4R0TD8PU41,other_retail,6.43,29.29,2022-12-31,33307,148,False,DENSITY?,(InEURm) PDscale exposure pre CCF CCF po
+socgen,O2RNE8IBXP4R0TD8PU41,sme_corporate,3.50,18.66,2023-12-31,63059,144,True,,(In EURm) PD scale exposure pre CCF CCF 
+socgen,O2RNE8IBXP4R0TD8PU41,mortgage,1.22,16.27,2023-12-31,118757,145,True,,(In EURm) PD scale exposure pre CCF CCF 
+socgen,O2RNE8IBXP4R0TD8PU41,qrre,8.01,48.47,2023-12-31,4198,145,True,,Qualifying | revolving
+socgen,O2RNE8IBXP4R0TD8PU41,other_retail,7.32,31.41,2023-12-31,30441,146,True,,(In EURm) PD scale exposure pre CCF CCF 
+socgen,O2RNE8IBXP4R0TD8PU41,sovereign,0.10,1.41,2023-12-31,313574,143,True,,(In EURm) PD scale exposure pre CCF CCF 

@@ -1,0 +1,10 @@
+short,LEI,vasicek_class,pd_pct,lgd_pct,vintage_date,ead_eur_m,source_page,density_ok,note,ctx
+santander,5493006QMFDDMYWIAM13,corporate,3.15,43.14,2021-12-31,140832,63,True,,and provisions | exposures CCF | Corpora
+santander,5493006QMFDDMYWIAM13,sme_corporate,13.94,42.72,2021-12-31,29942,64,True,,and provisions | exposures CCF | Corpora
+santander,5493006QMFDDMYWIAM13,bank,0.09,44.93,2021-12-31,1294,70,True,,and provisions | exposures CCF | Institu
+santander,5493006QMFDDMYWIAM13,corporate,3.07,43.63,2022-12-31,152167,72,True,,exposures CCF | a b c d e f g h i j k l 
+santander,5493006QMFDDMYWIAM13,sme_corporate,10.60,42.97,2022-12-31,27368,73,True,,exposures CCF | a b c d e f g h i j k l 
+santander,5493006QMFDDMYWIAM13,bank,0.17,43.77,2022-12-31,1894,87,True,,exposures CCF | a b c d e f g h i j k l 
+santander,5493006QMFDDMYWIAM13,corporate,8.04,42.81,2023-12-31,28896,77,True,,exposures CCF | a b c d e f g h i j k l 
+santander,5493006QMFDDMYWIAM13,sme_corporate,8.04,42.81,2023-12-31,28896,77,True,,exposures CCF | a b c d e f g h i j k l 
+santander,5493006QMFDDMYWIAM13,bank,0.94,14.34,2023-12-31,2748,75,True,,exposures CCF | a b c d e f g h i j k l 
