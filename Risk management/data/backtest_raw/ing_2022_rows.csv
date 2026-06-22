@@ -1,0 +1,7 @@
+LEI,bank_name,vasicek_class,vintage_date,pd_pct,lgd_pct,ead_eur_m,rwa_eur_m,density,source,page
+549300NYKK9MWM7GGW15,ING Groep,corporate,2022-12-31,2.00,17.06,340892,88188,0.2600,"ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)",51
+549300NYKK9MWM7GGW15,ING Groep,sme_corporate,2022-12-31,5.15,25.32,26466,10971,0.4100,"ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)",50
+549300NYKK9MWM7GGW15,ING Groep,mortgage,2022-12-31,1.35,20.04,315731,39321,0.1200,"ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)",53
+549300NYKK9MWM7GGW15,ING Groep,qrre,2022-12-31,3.96,23.72,14958,3721,0.2500,"ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)",52
+549300NYKK9MWM7GGW15,ING Groep,other_retail,2022-12-31,6.35,43.90,4812,1898,0.3900,"ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)",54
+549300NYKK9MWM7GGW15,ING Groep,bank,2022-12-31,0.40,21.17,48914,8077,0.1700,"ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)",48

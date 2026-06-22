@@ -53,10 +53,10 @@ Authoritative Reihe: `data/pillar3_backtest_pdlgd.csv`.
 | Bank | Klassen | Jahre | Status |
 |---|---|---|---|
 | Deutsche Bank | 7/7 | 2021–2024 | ✅ komplett |
-| ING Groep | 6/7 | 2021, 2024 | 🟡 2022 (Doku-Layout), 2023 (Report fehlte) offen |
+| ING Groep | 6/7 | 2021, 2022, 2024 | 🟢 2022 ergänzt (unbeschriftete Klassen-Total-Zeile); 2023 offen (kein Voll-Report, nur 3Q/4Q-Updates) |
 | Société Générale | 6/7 (ohne corporate) | 2022–2024 | 🟡 corporate (CSV≠roh), bank-Vorjahre |
 | UniCredit | 6/7 (ohne mortgage) | 2021–2024 | 🟡 echte Retail-Mortgage (Header-Bleed) |
-| Groupe BPCE | 7/7 | 2024 | 🟡 2022/2023 (Multi-Block) offen |
+| Groupe BPCE | 7/7 | 2024 | 🔴 2022/2023 Multi-Block (3 Sub-Entity-Blöcke: Gruppe/BP/CE bzw. A-/F-IRB; Klassen-Labels zeilenumbrochen) → Vorjahres-Disambiguierung unzuverlässig (sme/qrre/sovereign mehrdeutig), nicht geschrieben |
 | Crédit Mutuel | 6/7 (2024) · 4/7 (2023) | 2023, 2024 | 🟡 FR-Format gelöst; qrre + 2023 bank/sov offen; 2021/2022-PDFs nicht auffindbar |
 | BNP Paribas | 7/7 | 2022–2024 | ✅ 3 Jahre komplett (alle 7 Klassen), anchor- + dichte- + EAD-verifiziert; 2023 doppelt validiert (2024-Doc-Komparativ == 2023-Doc-Primär) |
 | Crédit Agricole | – | – | 🔴 doku-blockiert: nur Halbjahres-`pdfPreview`-Viewer; Jahresend-IDs nicht auffindbar |
