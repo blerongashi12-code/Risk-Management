@@ -27,6 +27,16 @@ aus den offiziellen Pillar-3-Reports der Banken. Quelle ausschließlich Pillar-3
 - **SocGen**: value-matchbar (CSV=roh) außer corporate; Dichte als Bruch.
 - **BPCE**: Label **in** der Subtotal-Zeile, teils zeilen-umbrochen
   („… sub-" / „total …"), „-"-Platzhalter → positionserhaltend parsen.
+- **BNP Paribas**: „IRBA EXPOSURE BY PD SCALE" (Tab. 38/39/41/42), Spalten
+  idx3=EAD, 4=PD, 5=LGD, 7=RWA, 8=Dichte. Jedes Doc liefert Stichjahr **plus
+  Vorjahres-Komparativ** (2024-Doc → 2024+2023, 2023-Doc → 2023+2022). Gemischte
+  Zahlformate je Seite: Anglo (`375,110` / `2.87%`) vs. EU-Retail-Vorjahr
+  (`185 085` / `1,76 %`) — Lookahead `\d{3}(?!\s*%)` verhindert, dass die
+  CCF-100%-Spalte als Tausender-Gruppe verschluckt wird. **2021**: Primärseiten
+  runden PD auf ganze % (`0%`/`5%`) → ausgeschlossen (Präzisions-Inkonsistenz);
+  **2020**-Komparativ (p401/p407 im 2021-Doc) hat zwar Dezimalen, aber abweichendes
+  12-Spalten-Layout + fehlende SME → bei Bedarf nachziehbar, derzeit nicht
+  Teil der Reihe.
 
 ## Stand (Stand dieser Sitzung)
 Authoritative Reihe: `data/pillar3_backtest_pdlgd.csv`.
@@ -39,8 +49,8 @@ Authoritative Reihe: `data/pillar3_backtest_pdlgd.csv`.
 | UniCredit | 6/7 (ohne mortgage) | 2021–2024 | 🟡 echte Retail-Mortgage (Header-Bleed) |
 | Groupe BPCE | 7/7 | 2024 | 🟡 2022/2023 (Multi-Block) offen |
 | Crédit Mutuel | 6/7 (2024) · 4/7 (2023) | 2023, 2024 | 🟡 FR-Format gelöst; qrre + 2023 bank/sov offen; 2021/2022-PDFs nicht auffindbar |
+| BNP Paribas | 7/7 | 2022–2024 | ✅ 3 Jahre komplett (alle 7 Klassen), anchor- + dichte- + EAD-verifiziert; 2023 doppelt validiert (2024-Doc-Komparativ == 2023-Doc-Primär) |
 | Crédit Agricole | – | – | 🔴 doku-blockiert: nur Halbjahres-`pdfPreview`-Viewer; Jahresend-IDs nicht auffindbar |
-| BNP Paribas | – | – | ⏳ URD downloadbar, „Table 39 IRBA by PD scale"-Layout |
 | Rabobank | – | – | 🔴 PDF bild-basiert (Text-Extraktion scheitert → OCR) |
 | Banco Santander | – | – | ⏳ Multi-Geografie, forensisch (PDFs 2021–24 liegen vor) |
 

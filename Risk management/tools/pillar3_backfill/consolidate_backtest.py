@@ -73,6 +73,30 @@ if os.path.exists(DL + "bpce_raw_rows.csv"):
         add(BP, "Groupe BPCE", r["vasicek_class"], "2024-12-31", r["pd_pct"], r["lgd_pct"],
             r["ead_eur_m"], "BPCE Pillar III 2024 EU CR6 AIRB (raw subtotal)")
 
+# --- Credit Mutuel: FY2024 (6/7, no qrre) + FY2023 {corp,sme,mortgage,other_retail}.
+#     FY2023 bank/sovereign/qrre were mis-assigned (all grabbed the revolving row) -> dropped ---
+CM = "9695000CG7B84NLR5984"
+if os.path.exists(DL + "cm_raw_rows.csv"):
+    cm = pd.read_csv(DL + "cm_raw_rows.csv", dtype=str)
+    keep23 = {"corporate", "sme_corporate", "mortgage", "other_retail"}
+    for _, r in cm.iterrows():
+        v, c = r["vintage_date"], r["vasicek_class"]
+        if v == "2023-12-31" and c not in keep23:
+            continue
+        add(CM, "Credit Mutuel", c, v, r["pd_pct"], r["lgd_pct"], r["ead_eur_m"],
+            "Credit Mutuel Pilier 3 EU CR6 AIRB (raw subtotal)")
+
+# --- BNP Paribas: EU-CR6 IRBA-by-PD-scale subtotals, anchor+density+EAD-continuity
+#     verified. bnp_2024.pdf yields 2024 + the 2023 comparative; bnp_2023/2021 add
+#     2022/2021. Extractor class 'sme' -> canonical 'sme_corporate'. ---
+BNP = "R0MUWSFPU8MPRO8K5P83"
+if os.path.exists(DL + "bnp_raw_rows.csv"):
+    bnp = pd.read_csv(DL + "bnp_raw_rows.csv", dtype=str)
+    for _, r in bnp.iterrows():
+        c = "sme_corporate" if r["vasicek_class"] == "sme" else r["vasicek_class"]
+        add(BNP, "BNP Paribas", c, r["vintage_date"], r["pd_pct"], r["lgd_pct"],
+            r["ead_eur_m"], "BNP Paribas URD EU CR6 IRBA-by-PD-scale (raw subtotal)")
+
 df = pd.DataFrame(rows).drop_duplicates(subset=["LEI", "vasicek_class", "vintage_date"], keep="first")
 df = df.sort_values(["bank_name", "vintage_date", "vasicek_class"])
 out = RM + "pillar3_backtest_pdlgd.csv"
