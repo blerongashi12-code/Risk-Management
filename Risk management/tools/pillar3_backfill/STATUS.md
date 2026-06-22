@@ -61,7 +61,7 @@ Authoritative Reihe: `data/pillar3_backtest_pdlgd.csv`.
 | BNP Paribas | 7/7 | 2022–2024 | ✅ 3 Jahre, anchor-/dichte-/EAD-verifiziert; 2023 doppelt validiert. **`sme_corporate` korrigiert** (war fälschlich „Corporates – Specialised financing", jetzt echtes „SME corporates", Verifikation an Quell-PDF-Labels p441 bestätigt) |
 | Crédit Agricole | – | – | 🔴 doku-blockiert: nur Halbjahres-`pdfPreview`-Viewer; Jahresend-IDs nicht auffindbar |
 | Banco Santander | 6/6 IRB | 2021–2024 | ✅ 4 Jahre komplett (keine sovereign = Standardised); label+jahr-getrieben, Dichte-verifiziert. bank/corporate-AIRB-EAD schrumpft 2022→2023 (realer IRB-Rollback zu FIRB, verifiziert) |
-| Rabobank | – | – | 🔴 PDF bild-basiert (Text-Extraktion scheitert → OCR) |
+| Rabobank | 6/6 IRB (2022) · 4 (2024) | 2022, 2024 | ✅ entsperrt: NICHT der bild-basierte Jahresbericht, sondern der **dedizierte „Pillar 3 Year Report"** (text-basiert) von media.rabobank.com / storyblok. 2022 6/6 dichte-verifiziert; 2024 mortgage+sme stabil, sovereign/corporate = A-IRB-Residuum nach IRB-Rollback (EAD stark geschrumpft, dichte-verifiziert), other_retail-2024 verworfen (Parse). In Transparency-Panel ✓ |
 
 ## Adversariale Verifikation (8-Banken-Workflow, je 1 Prüf-Agent gegen Quell-PDFs)
 Ergebnis: **die Zahl-Extraktion ist durchgängig korrekt** (jeder stichprobenartig

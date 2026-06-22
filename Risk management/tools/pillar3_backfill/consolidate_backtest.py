@@ -131,6 +131,20 @@ if os.path.exists(DL + "santander_raw_rows.csv"):
         add(SAN, "Banco Santander", r["vasicek_class"], r["vintage_date"], r["pd_pct"], r["lgd_pct"],
             r["ead_eur_m"], "Banco Santander Pillar 3 EU CR6 AIRB (raw subtotal)", note)
 
+# --- Rabobank: EU-CR6 A-IRB from the dedicated text-based "Pillar 3 Year Report"
+#     (the annual-report PDF is image-only). 2022 = 6/6 clean; 2024 = mortgage+sme
+#     continuous, sovereign/corporate are post-rollback A-IRB residuals (A-IRB->F-IRB,
+#     density-verified, EAD shrank sharply -> note), other_retail-2024 dropped (parse). ---
+RABO = "DG3RU1DBUFHT4ZF9WN62"
+if os.path.exists(DL + "rabobank_raw_rows.csv"):
+    rb = pd.read_csv(DL + "rabobank_raw_rows.csv", dtype=str)
+    for _, r in rb.iterrows():
+        note = ("A-IRB-Residuum nach IRB-Rollback (A->F-IRB), EAD stark verkleinert, dichte-verifiziert"
+                if (r["vintage_date"] == "2024-12-31" and r["vasicek_class"] in ("sovereign", "corporate", "bank"))
+                else "")
+        add(RABO, "Rabobank", r["vasicek_class"], r["vintage_date"], r["pd_pct"], r["lgd_pct"],
+            r["ead_eur_m"], "Rabobank Pillar 3 Year Report EU CR6 AIRB (raw subtotal)", note)
+
 # --- Post-process: ING has NO Qualifying Revolving (QRRE) A-IRB block in any year;
 #     its 'qrre' rows are actually "Retail - Secured by immovable property SME"
 #     (verification finding). Relabel -> mortgage_sme so it does not contaminate the
