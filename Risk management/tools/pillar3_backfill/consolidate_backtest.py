@@ -74,7 +74,8 @@ sg = pd.read_csv(DL + "socgen_timeseries_rows.csv", dtype=str)
 for _, r in sg.iterrows():
     add(SG, "Societe Generale", r["vasicek_class"], r["vintage_date"], r["pd_pct"], r["lgd_pct"],
         r["ead_eur_m"], "SocGen Pillar 3 EU CR6 AIRB (raw subtotal)", r.get("note", ""))
-SG24 = {"sme_corporate": (3.57, 19.06, 67967), "mortgage": (1.18, 16.37, 116982),
+SG24 = {"corporate": (2.39, 32.30, 169993),  # large "Corporate - Other" (was missing)
+        "sme_corporate": (3.57, 19.06, 67967), "mortgage": (1.18, 16.37, 116982),
         "qrre": (7.89, 48.48, 4149), "other_retail": (8.06, 31.89, 28572),
         "bank": (0.36, 22.68, 40633), "sovereign": (0.09, 1.54, 310916)}
 for c, (p, l, e) in SG24.items():

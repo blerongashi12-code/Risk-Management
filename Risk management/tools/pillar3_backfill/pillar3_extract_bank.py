@@ -174,7 +174,9 @@ ING = {
 
 SOCGEN = {
     "short": "socgen", "lei": "O2RNE8IBXP4R0TD8PU41",
-    "knowns": {"corporate": (2.39, 30.18), "sme_corporate": (3.57, 19.06),
+    # corporate = large "Corporate - Other" subtotal (FY2024 2.39/32.30/EAD 169,993);
+    # the old (2.39,30.18) mixed FY2024-PD with FY2023-LGD -> never matched.
+    "knowns": {"corporate": (2.39, 32.30), "sme_corporate": (3.57, 19.06),
                "mortgage": (1.18, 16.37), "qrre": (7.89, 48.48),
                "other_retail": (8.06, 31.89), "bank": (0.36, 22.68),
                "sovereign": (0.09, 1.54)},
