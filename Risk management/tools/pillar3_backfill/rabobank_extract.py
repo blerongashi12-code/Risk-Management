@@ -36,15 +36,23 @@ def nums(s):
     return out
 
 def pick_layout(v):
-    """Layout drifts across years: some reports prefix each row with a row number
-    (EAD=idx4), others don't (EAD=idx3). Try both and keep the one whose
-    RWA/EAD reconciles with the reported density (cross-check)."""
-    for off in (1, 0):                       # off=1: row# present; off=0: none
-        if len(v) < off + 10:
+    """Layout drifts two ways: (a) some reports prefix each row with a row number
+    (EAD=idx4) vs not (EAD=idx3); (b) corporate/sovereign rows carry a maturity
+    column but retail rows do not (RWA/density shift by one). EAD/PD/LGD sit at the
+    same relative spots; only RWA/density move. Try all combinations and keep the
+    one whose RWA/EAD reconciles with the reported density (cross-check)."""
+    for base in (1, 0):                      # base=1: row# present; base=0: none
+        if len(v) < base + 9:
             continue
-        ead, pd, lgd, rwa, dens = v[off+3], v[off+4], v[off+6], v[off+8], v[off+9]
-        if ead > 100 and 0 < pd < 40 and 0 < lgd <= 100 and abs(rwa / ead * 100 - dens) < 3:
-            return ead, pd, lgd, rwa, dens
+        ead, pd, lgd = v[base+3], v[base+4], v[base+6]
+        if not (ead > 100 and 0 < pd < 40 and 0 < lgd <= 100):
+            continue
+        for rwa_i in (base + 7, base + 8):   # no-maturity / maturity present
+            if rwa_i + 1 >= len(v):
+                continue
+            rwa, dens = v[rwa_i], v[rwa_i + 1]
+            if dens >= 0 and abs(rwa / ead * 100 - dens) < 1.0:
+                return ead, pd, lgd, rwa, dens
     return None
 
 def classify(label):
