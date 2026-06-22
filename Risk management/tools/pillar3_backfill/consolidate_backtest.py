@@ -97,6 +97,20 @@ if os.path.exists(DL + "bnp_raw_rows.csv"):
         add(BNP, "BNP Paribas", c, r["vintage_date"], r["pd_pct"], r["lgd_pct"],
             r["ead_eur_m"], "BNP Paribas URD EU CR6 IRBA-by-PD-scale (raw subtotal)")
 
+# --- Banco Santander: EU-CR6 AIRB subtotals, label+year-driven, 6 classes
+#     (no sovereign = Standardised), 2021-2024. Each report gives reporting date +
+#     prior-year comparative; primary disclosure preferred, overlaps cross-validated.
+#     NB: bank/corporate AIRB-EAD shrinks sharply 2022->2023 (real IRB roll-back to
+#     FIRB), verified correct (density-checked); not an extraction error. ---
+SAN = "5493006QMFDDMYWIAM13"
+if os.path.exists(DL + "santander_raw_rows.csv"):
+    san = pd.read_csv(DL + "santander_raw_rows.csv", dtype=str)
+    for _, r in san.iterrows():
+        note = ("AIRB-Perimeter 2022->2023 verkleinert (IRB-Rollback zu FIRB), Werte verifiziert"
+                if r["vasicek_class"] in ("bank", "corporate") else "")
+        add(SAN, "Banco Santander", r["vasicek_class"], r["vintage_date"], r["pd_pct"], r["lgd_pct"],
+            r["ead_eur_m"], "Banco Santander Pillar 3 EU CR6 AIRB (raw subtotal)", note)
+
 df = pd.DataFrame(rows).drop_duplicates(subset=["LEI", "vasicek_class", "vintage_date"], keep="first")
 df = df.sort_values(["bank_name", "vintage_date", "vasicek_class"])
 out = RM + "pillar3_backtest_pdlgd.csv"

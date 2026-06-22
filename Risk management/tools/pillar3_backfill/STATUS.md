@@ -37,6 +37,15 @@ aus den offiziellen Pillar-3-Reports der Banken. Quelle ausschließlich Pillar-3
   **2020**-Komparativ (p401/p407 im 2021-Doc) hat zwar Dezimalen, aber abweichendes
   12-Spalten-Layout + fehlende SME → bei Bedarf nachziehbar, derzeit nicht
   Teil der Reihe.
+- **Banco Santander**: „Table NN.CR6 - AIRB approach" (+ „… Retail"), eine Klasse
+  pro Seite, jede Seite mit **Jahres-Marker** (`2024`/`2023`) + Klassen-Label;
+  Abschluss „Subtotal (exposure class)". Spalten idx3=EAD, 4=PD, **6=LGD** (eine
+  Schuldnerzahl-Spalte zwischen PD und LGD!), 8=RWA, 9=Dichte; `—` als
+  Maturity-Platzhalter positionserhaltend. Jedes Doc liefert Stichjahr +
+  Vorjahr; Primär-Disclosure bevorzugt, Überlappungen cross-validiert. Kein
+  sovereign (Standardisierter Ansatz). FIRB-Tabellen (Table 28.CR6 - FIRB)
+  ausgeschlossen. **Kuratierte Retail-Werte ≠ Roh-Subtotals** (abweichende
+  Schuldnerzahlen → andere Quelle); Roh-Reihe nutzt die Report-Subtotals.
 
 ## Stand (Stand dieser Sitzung)
 Authoritative Reihe: `data/pillar3_backtest_pdlgd.csv`.
@@ -51,8 +60,8 @@ Authoritative Reihe: `data/pillar3_backtest_pdlgd.csv`.
 | Crédit Mutuel | 6/7 (2024) · 4/7 (2023) | 2023, 2024 | 🟡 FR-Format gelöst; qrre + 2023 bank/sov offen; 2021/2022-PDFs nicht auffindbar |
 | BNP Paribas | 7/7 | 2022–2024 | ✅ 3 Jahre komplett (alle 7 Klassen), anchor- + dichte- + EAD-verifiziert; 2023 doppelt validiert (2024-Doc-Komparativ == 2023-Doc-Primär) |
 | Crédit Agricole | – | – | 🔴 doku-blockiert: nur Halbjahres-`pdfPreview`-Viewer; Jahresend-IDs nicht auffindbar |
+| Banco Santander | 6/6 IRB | 2021–2024 | ✅ 4 Jahre komplett (keine sovereign = Standardised); label+jahr-getrieben, Dichte-verifiziert. bank/corporate-AIRB-EAD schrumpft 2022→2023 (realer IRB-Rollback zu FIRB, verifiziert) |
 | Rabobank | – | – | 🔴 PDF bild-basiert (Text-Extraktion scheitert → OCR) |
-| Banco Santander | – | – | ⏳ Multi-Geografie, forensisch (PDFs 2021–24 liegen vor) |
 
 ## Wichtiger Befund
 Für etliche Banken (UniCredit, SocGen-corporate, …) sind die **kuratierten

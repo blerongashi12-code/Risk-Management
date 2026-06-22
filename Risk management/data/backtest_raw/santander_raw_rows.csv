@@ -1,0 +1,25 @@
+LEI,bank_name,vasicek_class,vintage_date,pd_pct,lgd_pct,ead_eur_m,rwa_eur_m,density,source,page
+5493006QMFDDMYWIAM13,Banco Santander,bank,2021-12-31,0.21,40.47,31443,6655,21.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2021)",62
+5493006QMFDDMYWIAM13,Banco Santander,bank,2022-12-31,0.21,38.88,38552,7945,21.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2022)",71
+5493006QMFDDMYWIAM13,Banco Santander,bank,2023-12-31,0.94,14.34,2748,908,33.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2023)",75
+5493006QMFDDMYWIAM13,Banco Santander,bank,2024-12-31,1.02,15.80,2548,904,35.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2024)",81
+5493006QMFDDMYWIAM13,Banco Santander,corporate,2021-12-31,3.15,43.14,140832,68918,49.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2021)",63
+5493006QMFDDMYWIAM13,Banco Santander,corporate,2022-12-31,3.07,43.63,152167,75966,50.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2022)",72
+5493006QMFDDMYWIAM13,Banco Santander,corporate,2023-12-31,4.14,46.08,43719,36250,83.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2024)",85
+5493006QMFDDMYWIAM13,Banco Santander,corporate,2024-12-31,4.01,44.88,43316,35293,81.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2024)",82
+5493006QMFDDMYWIAM13,Banco Santander,mortgage,2021-12-31,4.40,10.01,306592,45619,15.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2021)",66
+5493006QMFDDMYWIAM13,Banco Santander,mortgage,2022-12-31,3.97,12.09,296778,48059,16.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2022)",78
+5493006QMFDDMYWIAM13,Banco Santander,mortgage,2023-12-31,2.96,14.87,278141,44584,16.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2023)",82
+5493006QMFDDMYWIAM13,Banco Santander,mortgage,2024-12-31,2.89,15.11,286297,45643,15.940,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2024)",88
+5493006QMFDDMYWIAM13,Banco Santander,other_retail,2021-12-31,5.34,45.94,39778,19514,49.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2021)",68
+5493006QMFDDMYWIAM13,Banco Santander,other_retail,2022-12-31,5.12,47.10,40777,20816,51.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2022)",80
+5493006QMFDDMYWIAM13,Banco Santander,other_retail,2023-12-31,5.68,44.30,42389,20693,49.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2023)",84
+5493006QMFDDMYWIAM13,Banco Santander,other_retail,2024-12-31,6.63,42.48,40915,19241,47.030,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2024)",90
+5493006QMFDDMYWIAM13,Banco Santander,qrre,2021-12-31,3.59,59.07,15756,4659,30.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2021)",67
+5493006QMFDDMYWIAM13,Banco Santander,qrre,2022-12-31,3.62,64.68,13825,4547,33.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2022)",79
+5493006QMFDDMYWIAM13,Banco Santander,qrre,2023-12-31,3.62,69.82,13074,4528,35.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2023)",83
+5493006QMFDDMYWIAM13,Banco Santander,qrre,2024-12-31,3.71,70.04,13543,4630,34.190,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2024)",89
+5493006QMFDDMYWIAM13,Banco Santander,sme_corporate,2021-12-31,13.94,42.72,29942,18474,62.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2021)",64
+5493006QMFDDMYWIAM13,Banco Santander,sme_corporate,2022-12-31,10.60,42.97,27368,17817,65.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2022)",73
+5493006QMFDDMYWIAM13,Banco Santander,sme_corporate,2023-12-31,8.04,42.81,28896,18002,62.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2023)",77
+5493006QMFDDMYWIAM13,Banco Santander,sme_corporate,2024-12-31,7.68,42.53,25168,15365,61.000,"Banco Santander Pillar 3 CR6-AIRB (raw subtotal, report 2024)",83
