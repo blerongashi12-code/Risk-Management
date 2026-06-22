@@ -57,7 +57,7 @@ Authoritative Reihe: `data/pillar3_backtest_pdlgd.csv`.
 | Société Générale | 6/7 (ohne corporate) | 2021–2024 | 🟢 2021 ergänzt (Report nachgeladen); corporate (CSV≠roh) fehlt durchgängig, bank nur 2024, sovereign-2021-PD=1,00 (verifiziert, Level-Shift) |
 | UniCredit | 6/7 (ohne mortgage) | 2021–2024 | 🟡 echte Retail-Mortgage (Header-Bleed) |
 | Groupe BPCE | 7/7 | 2024 | 🔴 2022/2023 Multi-Block (3 Sub-Entity-Blöcke: Gruppe/BP/CE bzw. A-/F-IRB; Klassen-Labels zeilenumbrochen) → Vorjahres-Disambiguierung unzuverlässig (sme/qrre/sovereign mehrdeutig), nicht geschrieben |
-| Crédit Mutuel | 6/7 (2024) · 4/7 (2023) | 2023, 2024 | 🟡 FR-Format gelöst; qrre + 2023 bank/sov offen; 2021/2022-PDFs nicht auffindbar |
+| Crédit Mutuel | 6/7 (2024) · 4/7 (2023) | 2023, 2024 | 🔴 2021/2022-PDFs (Groupe CM) nachgeladen + Parser für Layout-Drift gefixt (LGD@idx5 vs idx6, Label-„-" entfernt), ABER degenerierte kuratierte Anker (bank==sovereign 0,12/34) + Mehrfach-Zeilen-Kollisionen → Vorjahres-Mapping unzuverlässig (other_retail-EAD springt 135k/36k/395k); nicht geschrieben |
 | BNP Paribas | 7/7 | 2022–2024 | ✅ 3 Jahre komplett (alle 7 Klassen), anchor- + dichte- + EAD-verifiziert; 2023 doppelt validiert (2024-Doc-Komparativ == 2023-Doc-Primär) |
 | Crédit Agricole | – | – | 🔴 doku-blockiert: nur Halbjahres-`pdfPreview`-Viewer; Jahresend-IDs nicht auffindbar |
 | Banco Santander | 6/6 IRB | 2021–2024 | ✅ 4 Jahre komplett (keine sovereign = Standardised); label+jahr-getrieben, Dichte-verifiziert. bank/corporate-AIRB-EAD schrumpft 2022→2023 (realer IRB-Rollback zu FIRB, verifiziert) |

@@ -9,12 +9,19 @@ import pdfplumber
 sys.stdout.reconfigure(encoding="utf-8")
 
 DIR = "C:/Users/blero/Downloads/RiskMgmt/Risk management/data/pillar3_reports/"
+# NB: cm_2021/cm_2022.pdf (Groupe CM Pilier 3, heruntergeladen) sind vorhanden, aber
+# NICHT in der Reihe: CM hat Spalten-Layout-Drift (2021/22 ohne Schuldnerzahl-Spalte,
+# LGD@idx5; 2023/24 mit, LGD@idx6) UND degenerierte kuratierte Anker (bank==sovereign
+# 0,12/34; corporate/other_retail kollidieren auf PD) -> Zeilen->Klasse-Mapping ueber
+# Jahre unzuverlaessig (other_retail-EAD springt 135k/36k/395k/396k). Nur 2023/24 vetted.
 FILES = {2023: "cm_2023.pdf", 2024: "cm_2024.pdf"}
 KN = {"corporate": (2.59, 45.00), "sme_corporate": (5.69, 25.00),
       "mortgage": (1.79, 16.00), "qrre": (3.13, 33.00),
       "other_retail": (2.59, 19.00), "bank": (0.12, 34.00),
       "sovereign": (0.12, 34.00)}
 FRNUM = re.compile(r"\d{1,3}(?:\s\d{3})*(?:,\d+)?")
+# position-preserving token: FR number OR a dash placeholder
+TOKEN = re.compile(r"\d{1,3}(?:\s\d{3})*(?:,\d+)?|[-–—]")
 
 def nums(s):
     out = []
@@ -24,6 +31,40 @@ def nums(s):
         except ValueError: pass
     return out
 
+def cols(s):
+    """Position-preserving parse + layout-robust column detection.
+    CM layout drifts: 2021/22 have NO obligor column (LGD at idx5), 2023/24 add an
+    obligor count (LGD at idx6); maturity is '2,5' or a dash. Returns
+    (ead, pd, lgd, rwa, dens) using: EAD=idx3, PD=idx4, LGD=first token<=100 after
+    PD, density=position d where RWA(d-1)/EAD ~= dens(d) (cross-check). None if unsure."""
+    body = re.sub(r"^\s*Sous-?total\s*", "", s, flags=re.I)  # drop label (its '-' is not a column)
+    toks = []
+    for m in TOKEN.findall(body):
+        if m in ("-", "–", "—"):
+            toks.append(None)
+        else:
+            try: toks.append(float(m.replace(" ", "").replace(",", ".")))
+            except ValueError: toks.append(None)
+    if len(toks) < 8 or toks[3] is None or toks[4] is None:
+        return None
+    ead, pd = toks[3], toks[4]
+    # LGD: first token after PD that is a percentage (0<v<=100), skipping an obligor count (>100)
+    lgd_i = None
+    for j in range(5, min(len(toks), 8)):
+        if toks[j] is not None and 0 < toks[j] <= 100:
+            lgd_i = j; break
+    if lgd_i is None:
+        return None
+    lgd = toks[lgd_i]
+    # density via RWA/EAD cross-check: scan positions after LGD
+    rwa = dens = None
+    for d in range(lgd_i + 1, len(toks)):
+        if toks[d] is None or toks[d - 1] is None or ead <= 0:
+            continue
+        if 0 < toks[d] <= 100 and abs(toks[d - 1] / ead * 100 - toks[d]) < 2.5:
+            rwa, dens = toks[d - 1], toks[d]; break
+    return (ead, pd, lgd, rwa, dens)
+
 def subrows(path):
     rows = []
     pdf = pdfplumber.open(path)
@@ -31,9 +72,9 @@ def subrows(path):
         for ln in (pg.extract_text() or "").split("\n"):
             s = ln.strip()
             if re.match(r"^Sous-?total", s, re.I):
-                n = nums(s)
-                if len(n) >= 10:        # main A-IRB block has 12 cols
-                    rows.append((i + 1, n))
+                c = cols(s)
+                if c and c[2] is not None:        # need at least EAD/PD/LGD
+                    rows.append((i + 1, c))
     pdf.close()
     return rows
 
@@ -50,23 +91,23 @@ for y in sorted(FILES):
         pdk, lgk = KN[c]
         pick = None
         if y == 2024:
-            for (pg, n) in rows:
-                if abs(n[4] - pdk) < 0.05 and abs(n[6] - lgk) < 0.05:
+            for (pg, n) in rows:                       # n = (ead, pd, lgd, rwa, dens)
+                if abs(n[1] - pdk) < 0.05 and abs(n[2] - lgk) < 0.05:
                     pick = (pg, n); break
             if pick:
-                anchors[c] = pick[1][3]
+                anchors[c] = pick[1][0]                 # ead anchor
         else:
             anc = anchors.get(c)
             cands = [(pg, n) for (pg, n) in rows
-                     if abs(n[6] - lgk) < 1.5 and (not anc or 0.5 <= n[3] / anc <= 2.0)]
+                     if abs(n[2] - lgk) < 2.0 and (not anc or 0.5 <= n[0] / anc <= 2.0)]
             if anc:
-                cands.sort(key=lambda x: abs(x[1][3] - anc))
+                cands.sort(key=lambda x: abs(x[1][0] - anc))
             pick = cands[0] if cands else None
         if not pick:
             print(f"  {c:14} MISS"); continue
         pg, n = pick
-        ead, pdv, lgd, rwa, dens = n[3], n[4], n[6], n[8], n[9]
-        dok = abs(rwa / ead * 100 - dens) < 3 if ead else False
+        ead, pdv, lgd, rwa, dens = n[0], n[1], n[2], n[3], n[4]
+        dok = (rwa is not None and dens is not None and ead and abs(rwa / ead * 100 - dens) < 3)
         tag = "RAW-OK" if y == 2024 else ""
         print(f"  {c:14} PD={pdv:6.2f} LGD={lgd:6.2f} ead={ead:>9,.0f} p{pg} {tag}{'' if dok else ' DENS?'}")
         out.append({"short": "cm", "LEI": "9695000CG7B84NLR5984", "vasicek_class": c,
