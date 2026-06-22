@@ -10,8 +10,13 @@ import pdfplumber
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 DIR = "C:/Users/blero/Downloads/RiskMgmt/Risk management/data/pillar3_reports/"
-PDF = DIR + "ing-group-additional-pillar-iii-report-2022.pdf"
-OUT = "C:/Users/blero/Downloads/RiskMgmt/Risk management/data/backtest_raw/ing_2022_rows.csv"
+YEAR = sys.argv[1] if len(sys.argv) > 1 else "2022"
+FILES = {"2021": "ing-group-additional-pillar-iii-report-2021-.pdf",
+         "2022": "ing-group-additional-pillar-iii-report-2022.pdf",
+         "2023": "ing-group-additional-pillar-iii-report-2023.pdf",
+         "2024": "ing_2024.pdf"}
+PDF = DIR + FILES[YEAR]
+OUT = f"C:/Users/blero/Downloads/RiskMgmt/Risk management/data/backtest_raw/ing_{YEAR}_rows.csv"
 LEI = "549300NYKK9MWM7GGW15"
 # 2021 and 2024 reference (PD,LGD) to sanity-bound 2022
 REF = {"corporate": (1.80, 16.0), "sme_corporate": (5.7, 26.0), "mortgage": (1.4, 22.0),
@@ -81,7 +86,7 @@ def extract():
 
 if __name__ == "__main__":
     rows = extract()
-    print(f"== ING FY2022 ({len(rows)}/6) ==")
+    print(f"== ING FY{YEAR} ({len(rows)}/6) ==")
     good = []
     for c in ["corporate", "sme_corporate", "mortgage", "qrre", "other_retail", "bank"]:
         if c not in rows:
@@ -101,7 +106,7 @@ if __name__ == "__main__":
         w.writerow(["LEI", "bank_name", "vasicek_class", "vintage_date", "pd_pct", "lgd_pct",
                     "ead_eur_m", "rwa_eur_m", "density", "source", "page"])
         for c, r in good:
-            w.writerow([LEI, "ING Groep", c, "2022-12-31", f"{r['pd']:.2f}", f"{r['lgd']:.2f}",
+            w.writerow([LEI, "ING Groep", c, f"{YEAR}-12-31", f"{r['pd']:.2f}", f"{r['lgd']:.2f}",
                         f"{r['ead']:.0f}", f"{r['rwa']:.0f}", f"{r['dens']:.4f}",
-                        "ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)", r["page"]])
+                        f"ING Additional Pillar III {YEAR} EU CR6 IRB (raw class-total)", r["page"]])
     print(f"wrote {OUT} ({len(good)} rows)")

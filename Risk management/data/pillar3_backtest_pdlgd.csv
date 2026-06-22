@@ -95,18 +95,29 @@ FR9695005MSX1OYEMGDF,Groupe BPCE,sovereign,2024-12-31,0.00,7.26,2523,BPCE Pillar
 549300NYKK9MWM7GGW15,ING Groep,other_retail,2021-12-31,6.66,50.91,4852,ING Additional Pillar III 2021 EU CR6 IRB (raw),
 549300NYKK9MWM7GGW15,ING Groep,qrre,2021-12-31,4.31,16.66,13509,ING Additional Pillar III 2021 EU CR6 IRB (raw),
 549300NYKK9MWM7GGW15,ING Groep,sme_corporate,2021-12-31,5.28,24.22,27900,ING Additional Pillar III 2021 EU CR6 IRB (raw),
-549300NYKK9MWM7GGW15,ING Groep,bank,2022-12-31,0.40,21.17,48914,"ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)",
-549300NYKK9MWM7GGW15,ING Groep,corporate,2022-12-31,2.00,17.06,340892,"ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)",
-549300NYKK9MWM7GGW15,ING Groep,mortgage,2022-12-31,1.35,20.04,315731,"ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)",
-549300NYKK9MWM7GGW15,ING Groep,other_retail,2022-12-31,6.35,43.90,4812,"ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)",
-549300NYKK9MWM7GGW15,ING Groep,qrre,2022-12-31,3.96,23.72,14958,"ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)",
-549300NYKK9MWM7GGW15,ING Groep,sme_corporate,2022-12-31,5.15,25.32,26466,"ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)",
+549300NYKK9MWM7GGW15,ING Groep,bank,2022-12-31,0.40,21.17,48914,ING Additional Pillar III 2022 EU CR6 IRB (raw class-total),
+549300NYKK9MWM7GGW15,ING Groep,corporate,2022-12-31,2.00,17.06,340892,ING Additional Pillar III 2022 EU CR6 IRB (raw class-total),
+549300NYKK9MWM7GGW15,ING Groep,mortgage,2022-12-31,1.35,20.04,315731,ING Additional Pillar III 2022 EU CR6 IRB (raw class-total),
+549300NYKK9MWM7GGW15,ING Groep,other_retail,2022-12-31,6.35,43.90,4812,ING Additional Pillar III 2022 EU CR6 IRB (raw class-total),
+549300NYKK9MWM7GGW15,ING Groep,qrre,2022-12-31,3.96,23.72,14958,ING Additional Pillar III 2022 EU CR6 IRB (raw class-total),
+549300NYKK9MWM7GGW15,ING Groep,sme_corporate,2022-12-31,5.15,25.32,26466,ING Additional Pillar III 2022 EU CR6 IRB (raw class-total),
+549300NYKK9MWM7GGW15,ING Groep,bank,2023-12-31,0.30,18.29,46115,ING Additional Pillar III 2023 EU CR6 IRB (raw class-total),
+549300NYKK9MWM7GGW15,ING Groep,corporate,2023-12-31,1.29,15.00,318707,ING Additional Pillar III 2023 EU CR6 IRB (raw class-total),
+549300NYKK9MWM7GGW15,ING Groep,mortgage,2023-12-31,1.38,24.66,320767,ING Additional Pillar III 2023 EU CR6 IRB (raw class-total),
+549300NYKK9MWM7GGW15,ING Groep,other_retail,2023-12-31,6.34,40.89,4233,ING Additional Pillar III 2023 EU CR6 IRB (raw class-total),
+549300NYKK9MWM7GGW15,ING Groep,qrre,2023-12-31,3.87,22.67,14514,ING Additional Pillar III 2023 EU CR6 IRB (raw class-total),
+549300NYKK9MWM7GGW15,ING Groep,sme_corporate,2023-12-31,6.23,26.02,49548,ING Additional Pillar III 2023 EU CR6 IRB (raw class-total),
 549300NYKK9MWM7GGW15,ING Groep,bank,2024-12-31,0.39,19.79,47295,ING Additional Pillar III 2024 EU CR6 IRB (raw),
 549300NYKK9MWM7GGW15,ING Groep,corporate,2024-12-31,1.81,14.43,327826,ING Additional Pillar III 2024 EU CR6 IRB (raw),
 549300NYKK9MWM7GGW15,ING Groep,mortgage,2024-12-31,1.46,22.61,336546,ING Additional Pillar III 2024 EU CR6 IRB (raw),
 549300NYKK9MWM7GGW15,ING Groep,other_retail,2024-12-31,6.39,39.90,4636,ING Additional Pillar III 2024 EU CR6 IRB (raw),
 549300NYKK9MWM7GGW15,ING Groep,qrre,2024-12-31,3.75,22.50,14592,ING Additional Pillar III 2024 EU CR6 IRB (raw),
 549300NYKK9MWM7GGW15,ING Groep,sme_corporate,2024-12-31,6.12,27.39,47644,ING Additional Pillar III 2024 EU CR6 IRB (raw),
+O2RNE8IBXP4R0TD8PU41,Societe Generale,mortgage,2021-12-31,1.74,13.65,108611,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),DENSITY?
+O2RNE8IBXP4R0TD8PU41,Societe Generale,other_retail,2021-12-31,6.63,28.44,34041,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),DENSITY?
+O2RNE8IBXP4R0TD8PU41,Societe Generale,qrre,2021-12-31,8.00,49.20,5398,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),DENSITY?
+O2RNE8IBXP4R0TD8PU41,Societe Generale,sme_corporate,2021-12-31,3.86,15.79,54516,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),
+O2RNE8IBXP4R0TD8PU41,Societe Generale,sovereign,2021-12-31,1.00,2.70,265428,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),
 O2RNE8IBXP4R0TD8PU41,Societe Generale,mortgage,2022-12-31,1.51,15.92,126745,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),DENSITY?
 O2RNE8IBXP4R0TD8PU41,Societe Generale,other_retail,2022-12-31,6.43,29.29,33307,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),DENSITY?
 O2RNE8IBXP4R0TD8PU41,Societe Generale,qrre,2022-12-31,6.79,49.48,5226,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),DENSITY?

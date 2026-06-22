@@ -40,12 +40,15 @@ ING24 = {"corporate": (1.81, 14.43, 327826), "sme_corporate": (6.12, 27.39, 4764
          "other_retail": (6.39, 39.90, 4636), "bank": (0.39, 19.79, 47295)}
 for c, (p, l, e) in ING24.items():
     add(INGL, "ING Groep", c, "2024-12-31", p, l, e, "ING Additional Pillar III 2024 EU CR6 IRB (raw)")
-# ING 2022: raw 6/6 from the unlabelled class-total rows (ing_2022.py)
-if os.path.exists(DL + "ing_2022_rows.csv"):
-    i22 = pd.read_csv(DL + "ing_2022_rows.csv", dtype=str)
-    for _, r in i22.iterrows():
-        add(INGL, "ING Groep", r["vasicek_class"], "2022-12-31", r["pd_pct"], r["lgd_pct"],
-            r["ead_eur_m"], "ING Additional Pillar III 2022 EU CR6 IRB (raw, unlabelled total)")
+# ING 2022 + 2023: raw 6/6 from the class-total rows (ing_2022.py, robust detector
+# calibrated to reproduce FY2024 exactly).
+for yr in ("2022", "2023"):
+    fp = DL + f"ing_{yr}_rows.csv"
+    if os.path.exists(fp):
+        iy = pd.read_csv(fp, dtype=str)
+        for _, r in iy.iterrows():
+            add(INGL, "ING Groep", r["vasicek_class"], f"{yr}-12-31", r["pd_pct"], r["lgd_pct"],
+                r["ead_eur_m"], f"ING Additional Pillar III {yr} EU CR6 IRB (raw class-total)")
 
 # --- UniCredit: relabel mortgage-slot -> sovereign; keep 5 header classes ---
 UC = "549300TRUWO2CD2G5692"

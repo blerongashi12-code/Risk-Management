@@ -178,7 +178,8 @@ SOCGEN = {
                "mortgage": (1.18, 16.37), "qrre": (7.89, 48.48),
                "other_retail": (8.06, 31.89), "bank": (0.36, 22.68),
                "sovereign": (0.09, 1.54)},
-    "years": {2022: "socgen_2022.pdf", 2023: "socgen_2023.pdf", 2024: "socgen_2024.pdf"},
+    "years": {2021: "socgen_2021.pdf", 2022: "socgen_2022.pdf",
+              2023: "socgen_2023.pdf", 2024: "socgen_2024.pdf"},
 }
 
 BANK = SOCGEN   # <- currently processing
