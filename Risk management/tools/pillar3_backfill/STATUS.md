@@ -38,11 +38,11 @@ Authoritative Reihe: `data/pillar3_backtest_pdlgd.csv`.
 | Société Générale | 6/7 (ohne corporate) | 2022–2024 | 🟡 corporate (CSV≠roh), bank-Vorjahre |
 | UniCredit | 6/7 (ohne mortgage) | 2021–2024 | 🟡 echte Retail-Mortgage (Header-Bleed) |
 | Groupe BPCE | 7/7 | 2024 | 🟡 2022/2023 (Multi-Block) offen |
-| Crédit Agricole | – | – | ⏳ Download + Extraktion offen |
-| BNP Paribas | – | – | ⏳ („Table 39 IRBA by PD scale"-Layout) |
-| Crédit Mutuel | – | – | ⏳ (FR-Format) |
-| Rabobank | – | – | ⏳ (PDF text-extraction problematisch) |
-| Banco Santander | – | – | ⏳ (Multi-Geografie, forensisch) |
+| Crédit Mutuel | 6/7 (2024) · 4/7 (2023) | 2023, 2024 | 🟡 FR-Format gelöst; qrre + 2023 bank/sov offen; 2021/2022-PDFs nicht auffindbar |
+| Crédit Agricole | – | – | 🔴 doku-blockiert: nur Halbjahres-`pdfPreview`-Viewer; Jahresend-IDs nicht auffindbar |
+| BNP Paribas | – | – | ⏳ URD downloadbar, „Table 39 IRBA by PD scale"-Layout |
+| Rabobank | – | – | 🔴 PDF bild-basiert (Text-Extraktion scheitert → OCR) |
+| Banco Santander | – | – | ⏳ Multi-Geografie, forensisch (PDFs 2021–24 liegen vor) |
 
 ## Wichtiger Befund
 Für etliche Banken (UniCredit, SocGen-corporate, …) sind die **kuratierten
