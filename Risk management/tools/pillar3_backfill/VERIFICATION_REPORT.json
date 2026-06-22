@@ -1,0 +1,434 @@
+{
+  "summary": "Adversarially verify the assembled Pillar-3 PD/LGD/EAD backtest time series, bank by bank, against source PDFs",
+  "agentCount": 9,
+  "logs": [],
+  "result": {
+    "report": "I'll consolidate these verification results into a concise report.\n\n# Pillar-3 PD/LGD/EAD Backtest — Verification Consolidation\n\n## 1. Overall Verdict\n**Numeric extraction is uniformly accurate; the integrity risk is class-labeling, not values.** Across all 8 banks (155 rows), every spot-checked PD/LGD/EAD matches the disclosed EU-CR6 A-IRB subtotal — but **3 banks carry must-fix class-mislabel/fabrication errors** (BNP, ING, Credit Mutuel) that would contaminate the Vasicek calibration for specific classes, plus coverage gaps in 2 banks.\n\n## 2. Must-Fix Findings (ERROR / likely_extraction_error)\n\n| Bank | Class (as labeled) | Vintage(s) | Issue |\n|------|-------------------|------------|-------|\n| **BNP Paribas** | `sme_corporate` | 2022, 2023, 2024 | Rows are the adjacent **\"Corporates – Specialised financing\"** subtotal (EAD ~71k, PD ~3.8–4.6%, LGD 14–25%), NOT the true SME book (EAD ~34–42k, PD ~6–7%, LGD 28–30%). Systematic mismatch understates SME PD. **Fix:** relabel to `specialised_financing` or re-extract true SME subtotal. |\n| **ING Groep** | `qrre` | 2021, 2022, 2023, 2024 (all 4) | Mislabeled. ING discloses **no QRRE A-IRB block** in any year. All 4 rows are actually **\"Retail – Secured by immovable property SME\"** (PD ~3.8–4.3%, LGD ~16–24%). Feeding a secured-RE-SME book in as unsecured revolving retail (true LGD ~40%+) misrepresents the risk profile. **Fix:** rename `qrre` → `mortgage_sme`. |\n| **Credit Mutuel** | `sovereign` | 2024 | **Fabricated row** — byte-for-byte duplicate of the `bank` 2024 row (PD=0.12, LGD=34.00, EAD=30,410). Credit Mutuel has **no IRB sovereign exposure** (central govts permanently on standard approach). **Fix:** drop the row before backtesting. |\n\nThree banks — **Deutsche Bank, Banco Santander, Groupe BPCE** — are fully clean (no must-fix issues).\n\n## 3. WARN-Severity / Documentation Items (benign, but should be noted)\n\n**Coverage gaps (real disclosed data omitted from CSV — uneven walk-forward panel, no bad value entered):**\n\n| Bank | What's missing | Detail |\n|------|---------------|--------|\n| **UniCredit** | `sovereign` 2021, `other_retail` 2021 | Both disclosed in 2021 report (sovereign EAD 24,824/PD 0.10/LGD 21.48; other_retail EAD 22,912/PD 4.98/LGD 42.84); series silently start one year late. |\n| **Société Générale** | large-`corporate` (all years), `bank` (2021–2023), `sovereign` 2022 | Large-corporate (~150–170bn EAD) **never** captured (only Corporate-SME); bank only captured for 2024; sovereign 2022 (~271,679 EAD) dropped because PD/LGD failed to extract from concatenated-text PDF. |\n| **ING Groep** | `Retail Other non-SME` (all years) | Genuine separate disclosed class entirely absent; combined with the qrre mislabel, ING's retail decomposition doesn't match disclosed structure. |\n| **Credit Mutuel** | `bank` 2023 | F-IRB banks subtotal disclosed (EAD 29,543) but not carried into CSV. |\n\n**Real-world changes that are NOT errors (document so they aren't re-flagged):**\n- **Deutsche Bank** — Institutions PD spikes (9.32% in 2021, 12.40% in 2022) are genuine EAD-weighted subtotals inflated by a 100%-default band, resolving to 0.19% by 2024; sovereign LGD step-up ~52%→~66% (2023) is a disclosed recalibration.\n- **Banco Santander** — bank EAD 38,552→2,748 and corporate 152,167→43,719 (2022→2023) are the documented **AIRB→FIRB rollback** (perimeter shrank), verified across two reports. 2023-report restatement of the 2022 Institutions comparative is a Santander reporting quirk; CSV correctly used each year's as-disclosed current-year figure.\n- **BNP / ING** — mortgage/QRRE LGD jumps and the ING sme_corporate EAD near-doubling (26,466→49,548) are all real disclosed moves.\n- **BPCE** — high retail PDs (mortgage 14.68%, other_retail 21.55%) are genuine 100%-default-band-inflated subtotals, not errors.\n\n## 4. Spot-Check Coverage\n\n**All 8 banks were spot-checked against source PDFs** (`spotchecked_against_pdf: true` for every bank) — none are CSV-only. Depth varied:\n\n| Depth | Banks |\n|-------|-------|\n| **Full value-by-value vs source SUB-TOTAL rows** | BNP Paribas (all 21), Groupe BPCE (all 7) |\n| **Multi-year matched against multiple report PDFs** | Deutsche Bank (3 doubted values), Banco Santander (2022/2023/2024 reports, cross-report restatement check), UniCredit (2021/2022/2024 PDFs), ING (2021–2024 reports), Société Générale (2021/2022/2024 + 2023 via comparative columns), Credit Mutuel (2023/2024 PDFs) |\n\n---\n**Bottom line:** Ship after fixing the 3 class-label/fabrication errors (BNP `sme_corporate`, ING `qrre`, Credit Mutuel `sovereign` 2024). The 4 coverage gaps shorten the panel for affected classes and should be backfilled or explicitly documented as exclusions. All flagged cross-year jumps are confirmed real disclosed changes and require no extraction fix.",
+    "perBank": [
+      {
+        "bank": "Deutsche Bank",
+        "rows_checked": 28,
+        "spotchecked_against_pdf": true,
+        "overall": "clean",
+        "summary": "All 28 Deutsche Bank rows (7 classes x 4 vintages 2021-2024) are faithful to the disclosed EU-CR6 A-IRB subtotals. The three values I most doubted were verified directly against the source PDFs and all reconcile exactly: (1) Institutions PD 9.32% in 2021 and 12.40% in 2022 are NOT wrong-row matches but genuine EAD-weighted subtotals inflated by a large 100%-Default PD band (EUR 1,754m of 19,804m in 2021; EUR 2,466m of 20,682m in 2022), which resolves out by 2023 (PD 0.88%) and 2024 (PD 0.19%). The defaulted band carries near-zero LGD (1.12% / 0.37%), so subtotal LGD stays normal. (2) The sovereign LGD step-up from ~52% (2021-22) to ~66% (2023-24) is a real disclosed LGD recalibration -- every PD band on the 2023 page shows LGD ~65-66%. PD/LGD all in range, no PD=0 for non-sovereign, all EAD>0, densities plausible, and cross-year EAD/PD/LGD move smoothly for corporate, mortgage, qrre, other_retail, sme_corporate. No extraction errors or contamination found.",
+        "findings": [
+          {
+            "vasicek_class": "bank",
+            "vintage": "2022-12-31",
+            "severity": "info",
+            "issue": "Institutions A-IRB subtotal PD is 12.40%, extraordinarily high for an interbank/institutions class (normally <1%), and PD then collapses to 0.88% (2023) and 0.19% (2024). On its face this looks like a wrong-row (defaulted sub-band) match.",
+            "verdict": "confirmed_correct",
+            "evidence": "DB 2022 Pillar 3 p.112, EU CR6 AIRB, Institutions: 'Sub-total 14,832 7,153 39.77 20,682 12.40 0.7 43.74 2.0 3,740 18.08 24 10' -> EAD post-CRM 20,682, PD 12.40%, LGD 43.74%, exactly matching CSV. The 12.40% is a genuine EAD-weighted subtotal pulled up by the '100.00 (Default)' band of EUR 2,466m (~12% of 20,682m) at PD=100%/LGD 0.37%. Faithful extraction of a real disclosed figure."
+          },
+          {
+            "vasicek_class": "bank",
+            "vintage": "2021-12-31",
+            "severity": "info",
+            "issue": "Institutions A-IRB subtotal PD is 9.32% (again very high for institutions), preceding the 2022 12.40% spike.",
+            "verdict": "confirmed_correct",
+            "evidence": "DB 2021 Pillar 3 p.118, EU CR6 AIRB, Institutions: 'Sub-total 14,740 6,339 47.49 19,804 9.32 1.2 40.94 1.7 4,381 22.12 21 7' -> EAD 19,804, PD 9.32%, LGD 40.94%, exact match to CSV. Driven by the '100.00 (Default)' band of EUR 1,754m (~8.9% of 19,804m) at PD=100%/LGD 1.12%. Real disclosed subtotal, not a mis-matched row."
+          },
+          {
+            "vasicek_class": "sovereign",
+            "vintage": "2023-12-31",
+            "severity": "info",
+            "issue": "Central-government LGD jumps from ~52% (2021/2022) to ~66% (2023) while PD/EAD stay smooth -- a sizeable level shift that could indicate a wrong-row match or model recalibration.",
+            "verdict": "real_disclosed_change",
+            "evidence": "DB 2023 Pillar 3 p.104, EU CR6 AIRB, Central governments and central banks: 'Sub-total 120,439 1,609 37.78 128,836 0.24 0.2 66.29 1.3 16,198 12.57 170 43' -> EAD 128,836, PD 0.24%, LGD 66.29%, exact match to CSV. Every individual PD band on the page shows LGD ~65-66% (vs ~50% in 2021/2022), confirming a genuine disclosed upward LGD recalibration on the sovereign book, not an extraction error."
+          }
+        ]
+      },
+      {
+        "bank": "BNP Paribas",
+        "rows_checked": 21,
+        "spotchecked_against_pdf": true,
+        "findings": [
+          {
+            "vasicek_class": "sme_corporate",
+            "vintage": "2022-12-31 / 2023-12-31 / 2024-12-31",
+            "severity": "error",
+            "issue": "The CSV 'sme_corporate' rows are NOT populated from BNP's 'SME corporates' EU-CR6 subtotal. They are taken from the adjacent 'Corporates - Specialised financing' subtotal on the same corporate page. This is a consistent (systematic) row-mismatch across all three vintages, not a random grab, but it is a misclassification: the true SME book has materially higher PD (~6-7% vs the ~4% used) and different LGD. Using the lower-PD specialised-financing series under the sme_corporate label will bias that Vasicek class's IRB calibration/backtest.",
+            "verdict": "likely_extraction_error",
+            "evidence": "bnp_2024.pdf p441 Table 39 'Corporates - Specialised financing' SUB-TOTAL = 'SUB-TOTAL 59,281 22,019 56% 71,680 3.78% 25% 3 29,818 42% 1,024 (978)' (EAD 71,680 / PD 3.78% / LGD 25%) -> exactly CSV sme_corporate 2024 (3.78/25/71680). The ACTUAL 'SME corporates' SUB-TOTAL on the same page = 'SUB-TOTAL 29,536 10,593 41% 34,145 7.02% 30% 3 19,799 58% 1,035 (986)' (EAD 34,145 / PD 7.02% / LGD 30%) and is NOT in the CSV. Same pattern in bnp_2023.pdf: p409 specialised-fin SUB-TOTAL 69,038/4.61%/13% = CSV sme_corporate 2023; true SME SUB-TOTAL 39,427/7.24%/28% omitted. p411 (FY2022) specialised-fin SUB-TOTAL 71,400/4.60%/14% = CSV sme_corporate 2022; true SME 41,754/6.16%/28% omitted."
+          },
+          {
+            "vasicek_class": "sme_corporate",
+            "vintage": "2023-12-31 -> 2024-12-31",
+            "severity": "info",
+            "issue": "LGD jump 13% -> 25% on the sme_corporate row looked like a possible wrong-row match, but it is a genuine disclosed move within BNP's Specialised-financing book (the series the CSV actually used).",
+            "verdict": "real_disclosed_change",
+            "evidence": "bnp_2023.pdf p409 specialised-fin SUB-TOTAL '...69,038 4.61% 13% 3...' (LGD 13%); bnp_2024.pdf p441 specialised-fin SUB-TOTAL '...71,680 3.78% 25% 3...' (LGD 25%). Both extracted correctly; the 13->25 LGD shift is in the source."
+          },
+          {
+            "vasicek_class": "mortgage",
+            "vintage": "2023-12-31 -> 2024-12-31",
+            "severity": "info",
+            "issue": "Mortgage LGD 12% -> 17% jump verified as a real disclosed change, not a mis-match. PD 2.00% in 2022 is genuinely the rounded figure printed in the report (not an extraction artifact).",
+            "verdict": "confirmed_correct",
+            "evidence": "bnp_2024.pdf p447 SUB-TOTAL '182,323 3,183 100% 185,517 1.61% 17% 5 27,360 15%...' (EAD 185,517/PD 1.61%/LGD 17%, density 27,360/185,517=14.7%~=15% stated); bnp_2023.pdf p415 SUB-TOTAL '181,533 3,537 100% 185,085 1.76% 12%...'; p416 (FY2022) SUB-TOTAL '183,497 5,527 101% 189,058 2.00% 12%...'. All match CSV exactly."
+          },
+          {
+            "vasicek_class": "qrre",
+            "vintage": "2023-12-31 -> 2024-12-31",
+            "severity": "info",
+            "issue": "QRRE LGD drop 52% -> 36% verified as a real disclosed change (correctly extracted), not a flipped/wrong row.",
+            "verdict": "confirmed_correct",
+            "evidence": "bnp_2024.pdf p449 first SUB-TOTAL '3,460 8,353 64% 9,881 8.91% 36% 1 2,800 28%...' (EAD 9,881/PD 8.91%/LGD 36%); bnp_2023.pdf p417 first SUB-TOTAL '3,433 8,468 68% 10,051 8.33% 52% 1 3,366 33%...' (LGD 52%). Both match CSV; the LGD move is disclosed."
+          },
+          {
+            "vasicek_class": "bank",
+            "vintage": "2023-12-31 -> 2024-12-31",
+            "severity": "info",
+            "issue": "Bank (Institutions) EAD +21% (37,244 -> 45,122) is a genuine disclosed perimeter/exposure change, not a duplicated or mis-matched row. PD/LGD continuity is smooth.",
+            "verdict": "confirmed_correct",
+            "evidence": "bnp_2024.pdf p439 Institutions SUB-TOTAL '34,833 22,810 45% 45,122 0.79% 26% 2 11,043 24%...'; bnp_2023.pdf p407 Institutions SUB-TOTAL '29,452 16,331 47% 37,244 0.79% 25%...'. Match CSV bank 2024 (0.79/26/45122) and 2023 (0.79/25/37244)."
+          },
+          {
+            "vasicek_class": "sovereign",
+            "vintage": "2022-12-31 / 2023-12-31 / 2024-12-31",
+            "severity": "info",
+            "issue": "Sovereign (Central bank/central government) low PD (0.08-0.09%) and low LGD (2-3%) are correct disclosed values; EAD declines 452,804 -> 431,674 -> 364,093 smoothly. The note that BNP excludes 2021 (PD rounded to integer in source) is consistent with included years using two-decimal PDs.",
+            "verdict": "confirmed_correct",
+            "evidence": "bnp_2024.pdf p439 Central SUB-TOTAL '362,034 2,633 50% 364,093 0.08% 3% 2 3,877 1%...'; bnp_2023.pdf p407 '429,341 3,001 50% 431,674 0.09% 2%...'; p408 (FY2022) '449,594 5,181 52% 452,804 0.08% 2%...'. All match CSV."
+          },
+          {
+            "vasicek_class": "corporate",
+            "vintage": "2022-12-31 / 2023-12-31 / 2024-12-31",
+            "severity": "info",
+            "issue": "Large/'Other' corporate subtotal correctly extracted; PD 2.52->2.73->2.87 and LGD 33->32->37 move smoothly. Correctly distinguished from the specialised-financing and SME sub-portfolios.",
+            "verdict": "confirmed_correct",
+            "evidence": "bnp_2024.pdf p442 SUB-TOTAL '223,409 336,356 45% 375,110 2.87% 37% 2 188,357 50%...' = CSV corporate 2024; bnp_2023.pdf p410 '232,524 310,003 45% 374,086 2.73% 32%...' = 2023; p412 '240,676 299,534 46% 378,795 2.52% 33%...' = 2022."
+          }
+        ],
+        "overall": "errors_found",
+        "summary": "All 21 BNP Paribas rows (7 classes x 2022/2023/2024) were verified value-by-value against the source SUB-TOTAL rows in bnp_2024.pdf (FY2024 + FY2023 comparatives) and bnp_2023.pdf (FY2023 + FY2022 comparatives). Every PD/LGD/EAD number is an accurate transcription of the disclosed EU-CR6 A-IRB subtotal, and the cross-year jumps I initially doubted (mortgage LGD 12->17, qrre LGD 52->36, bank EAD +21%, specialised-fin LGD 13->25) are all REAL disclosed changes, not wrong-row matches. ONE substantive issue: the rows labeled 'sme_corporate' are not BNP's SME corporates subtotal -- they are the adjacent 'Corporates - Specialised financing' subtotal (EAD ~71k, PD ~3.8-4.6%, LGD 14-25%). The genuine SME corporates subtotal (EAD ~34-42k, PD ~6-7%, LGD 28-30%) was omitted. This systematic misclassification understates the SME class PD and would bias the IRB backtest for that Vasicek class. Densities sane throughout. Recommend either relabeling the existing rows to 'specialised_financing'/'project_finance' or re-extracting the true SME subtotal for the sme_corporate class."
+      },
+      {
+        "bank": "Banco Santander",
+        "rows_checked": 24,
+        "spotchecked_against_pdf": true,
+        "findings": [
+          {
+            "vasicek_class": "bank",
+            "vintage": "2023-12-31",
+            "severity": "info",
+            "issue": "Institutions AIRB EAD collapses 38,552 (2022) -> 2,748 (2023), a ~14x drop, with simultaneous LGD drop 38.88% -> 14.34% and PD jump 0.21% -> 0.94%. This triple-move (EAD x14 + LGD flip + PD jump) is exactly the signature of a wrong-row match, so it was the prime suspect.",
+            "verdict": "confirmed_correct",
+            "evidence": "santander_2023.pdf p.75 Table 24 CR6-AIRB (31.12.2023): 'Subtotal (exposure class) 3,258 188 29.93 % 2,748 0.94 % 182 14.34 % 4 908 33 % 4 (3.85)' -> EAD=2,748 PD=0.94% LGD=14.34%, exact CSV match. Prior year confirmed in santander_2022.pdf p.70 (31.12.2022): 'Subtotal ... 38,552 0.21 % 2,603 38.88 % ...'. Real IRB-rollback (AIRB Institutions perimeter shrank to a small residual book), not an extraction error."
+          },
+          {
+            "vasicek_class": "corporate",
+            "vintage": "2023-12-31",
+            "severity": "info",
+            "issue": "Corporates-Other AIRB EAD drops 152,167 (2022) -> 43,719 (2023), ~3.5x, the second leg of the documented rollback.",
+            "verdict": "confirmed_correct",
+            "evidence": "santander_2023.pdf p.75 (31.12.2023): 'Subtotal (Exposicion por categoria) 45,303 18,030 31.60 % 43,719 4.14 % 35,140 46.08 % 2 36,250 83 % 937 (940)' -> EAD=43,719 PD=4.14% LGD=46.08%, exact CSV match. 2022 leg confirmed in santander_2022.pdf p.71: 'Subtotal ... 152,167 3.07 % 42,144 43.63 %'. Real perimeter change, smooth PD/LGD, not extraction error."
+          },
+          {
+            "vasicek_class": "bank",
+            "vintage": "2022-12-31",
+            "severity": "info",
+            "issue": "Cross-report check: the 2023 report's 31.12.2022 COMPARATIVE column for Institutions reads 31,443 / 0.21% / 40.47% -- which equals the CSV's 2021 bank row, NOT its 2022 row (38,552/38.88). Looked like a possible vintage mislabel.",
+            "verdict": "confirmed_correct",
+            "evidence": "Resolved: CSV uses each year's own current-year disclosure. santander_2022.pdf p.70 current-year 31.12.2022 = '38,552 ... 38.88 %' (matches CSV 2022); p.73 comparative 31.12.2021 = '31,443 ... 40.47 %' (matches CSV 2021). The 2023 report (p.77) merely RESTATED the prior-year Institutions comparative to 31,443/40.47. CSV extraction is correct; the restatement is a Santander reporting quirk, not a CSV error."
+          },
+          {
+            "vasicek_class": "qrre",
+            "vintage": "2024-12-31",
+            "severity": "info",
+            "issue": "QRRE LGD trends steadily upward 59.07 -> 64.68 -> 69.82 -> 70.04 across 2021-2024 while EAD stays ~13-16k. Checked whether the rising LGD reflects row-mismatch.",
+            "verdict": "confirmed_correct",
+            "evidence": "santander_2023.pdf p.82 (31.12.2023) QRRE 'Subtotal ... 13,074 3.62 % 19,290,794 69.82 %' and p.87 comparative (31.12.2022) '... 13,825 3.62 % 20,044,774 64.68 %' both match CSV exactly. Genuine disclosed LGD recalibration trend, not extraction error."
+          },
+          {
+            "vasicek_class": "mortgage",
+            "vintage": "2023-12-31",
+            "severity": "info",
+            "issue": "Mortgage moves smoothly; spot-verified to rule out row drift in the largest book (~280-307k EAD).",
+            "verdict": "confirmed_correct",
+            "evidence": "santander_2023.pdf p.81 (31.12.2023) 'Subtotal ... 278,141 2.96 % 2,196,297 14.87 %' = CSV mortgage 2023; p.86 comparative (31.12.2022) '... 296,778 3.97 % ... 12.09 %' = CSV mortgage 2022. Exact matches."
+          }
+        ],
+        "overall": "clean",
+        "summary": "All 24 Banco Santander rows (6 classes x 2021-2024) verified against the source EU-CR6 AIRB 'Subtotal (exposure class)' rows in santander_2022.pdf, santander_2023.pdf, and santander_2024.pdf. Every checked PD/LGD/EAD value is an exact match to the disclosed subtotals. PD (0.21-13.94%), LGD (10-70%), and EAD (>0) are all in plausible range; densities (RW% printed in source) are reasonable; no PD=0. The two dramatic moves I most doubted are confirmed REAL disclosed changes, not extraction errors: (1) bank/Institutions AIRB EAD 38,552->2,748 with LGD 38.88->14.34 and PD 0.21->0.94 across 2022->2023, and (2) corporate AIRB EAD 152,167->43,719 -- both are the documented 2022->2023 IRB-rollback (AIRB perimeter shrank to FIRB), verified in two independent reports. One nuance: the 2023 report restated the prior-year Institutions comparative to 31,443/40.47% (matching CSV's 2021 value); the CSV correctly used each year's own as-disclosed current-year figure, so this is a Santander reporting quirk, not a CSV error. No contamination or wrong-row matches found. Overall clean."
+      },
+      {
+        "bank": "UniCredit",
+        "rows_checked": 22,
+        "spotchecked_against_pdf": true,
+        "overall": "minor_flags",
+        "findings": [
+          {
+            "vasicek_class": "bank",
+            "vintage": "2021-2024",
+            "severity": "info",
+            "issue": "bank (Institutions AIRB) LGD drops 32.02% (2021) to 22.06% (2022), then 22.43/25.90; PD trends 0.29 to 0.11. Looks like a discontinuity worth checking for a wrong-row match.",
+            "verdict": "real_disclosed_change",
+            "evidence": "2021 PDF p.idx134 Institutions 'Subtotal 23,573 11,956 12.31% 25,460 0.29% 719 32.02% 2.20 7,114 27.94%' matches CSV (PD0.29/LGD32.02/EAD25460). 2022 PDF p.idx101 Institutions 'Subtotal 23,958 13,221 13.50% 25,824 0.18% 771 22.06% 2.59 5,619 21.76%' matches CSV (PD0.18/LGD22.06/EAD25824). EAD is continuous (~25-29bn) and density falls 27.9%->21.8%->15.3% smoothly, so the LGD step is a genuine model recalibration, not a mismatched row."
+          },
+          {
+            "vasicek_class": "sme_corporate",
+            "vintage": "2021-2022",
+            "severity": "info",
+            "issue": "SME-corporate PD falls sharply from 9.53% (2021) to 6.67% (2022); large single-year move suggests possible wrong-row match.",
+            "verdict": "real_disclosed_change",
+            "evidence": "2021 PDF p.idx135 'Corporates - SME' subtotal: 'Subtotal 47,695 27,862 17.76% 43,870 9.53% 52,011 26.04% 2.41 16,296 37.15%' exactly matches CSV 2021 (PD9.53/LGD26.04/EAD43870). 2022 PDF p.idx101 'Subtotal 46,227 27,137 21.13% 47,669 6.67% 53,218 22.97% ...' matches CSV 2022. EAD continuous (~44-48bn), obligor count ~52k both years; the PD shift is disclosed in source."
+          },
+          {
+            "vasicek_class": "qrre",
+            "vintage": "2024-12-31",
+            "severity": "info",
+            "issue": "QRRE PD drops from ~5.4% (2021-2023) to 3.67% in 2024 while LGD stays ~70%; check whether a different PD band/row was matched.",
+            "verdict": "confirmed_correct",
+            "evidence": "2024 PDF p.idx86-90 'Retail - Qualifying revolving' subtotal: 'Subtotal 820 7,238 53.84% 4,720 3.67% 1,555,371 70.86% - 721 15.28%' matches CSV 2024 (PD3.67/LGD70.86/EAD4720). Obligor count also fell 2,025,270->1,555,371 consistent with portfolio change; column offset (obligor count between PD and LGD) handled correctly."
+          },
+          {
+            "vasicek_class": "sovereign",
+            "vintage": "2022-2024",
+            "severity": "info",
+            "issue": "sovereign series carries note 'Central-gov row (header-bleed relabel)'; verify the relabel maps to the genuine Central-governments AIRB subtotal and PD is non-zero (non-default).",
+            "verdict": "confirmed_correct",
+            "evidence": "2022 PDF p.idx101 Central-governments subtotal 'Subtotal 25,483 1,593 53.95% 23,651 0.16% 109 20.80% 3.16 1,332 5.63%' matches CSV (PD0.16/LGD20.80/EAD23651). 2024 PDF 'Subtotal 24,894 2,425 76.50% 22,619 0.22% 95 20.75% 3.47 1,474 6.52%' matches CSV. PD non-zero (0.16-0.23%), density ~5.6-6.5% plausible for sovereign. Relabel is cosmetic (row label wrapped across lines in PDF); values are correct."
+          },
+          {
+            "vasicek_class": "sovereign",
+            "vintage": "2021-12-31",
+            "severity": "warn",
+            "issue": "sovereign series starts only in 2022, but the 2021 AIRB CR6 DOES disclose a Central-governments subtotal. The 2021-12-31 sovereign vintage is missing from the CSV (silent coverage gap, shrinks the walk-forward window for this class by one year).",
+            "verdict": "real_disclosed_change",
+            "evidence": "2021 PDF p.idx134 Central-governments subtotal exists: 'Subtotal 25,756 1,344 13.43% 24,824 0.10% 109 21.48% 2.54 1,644 6.62%' (PD0.10/LGD21.48/EAD24,824). No UniCredit sovereign 2021-12-31 row in CSV. Not an extraction error in a present value, but an omission; verdict marked 'real_disclosed_change' (the data genuinely exists in source) flagged for completeness."
+          },
+          {
+            "vasicek_class": "other_retail",
+            "vintage": "2021-12-31",
+            "severity": "warn",
+            "issue": "other_retail series starts only in 2022, but the 2021 AIRB CR6 discloses a 'Retail - of which Other non SME' subtotal. The 2021-12-31 other_retail vintage is missing from the CSV (silent one-year coverage gap).",
+            "verdict": "real_disclosed_change",
+            "evidence": "2021 PDF p.idx138 'Retail - of which Other non SME' subtotal: 'Subtotal 21,011 5,973 33.55% 22,912 4.98% 1,903,369 42.84% - 10,794 47.11%' (PD4.98/LGD42.84/EAD22,912). This is continuous with the included 2022 other_retail (EAD25,503, PD4.88, LGD40.24) yet absent from CSV. Completeness flag, not a value error."
+          },
+          {
+            "vasicek_class": "corporate",
+            "vintage": "2021-2024",
+            "severity": "info",
+            "issue": "Spot-check of the largest class (Corporates-Other) for row-match correctness across the panel.",
+            "verdict": "confirmed_correct",
+            "evidence": "2021 'Subtotal ... 176,368 3.11% 36,042 37.18% ... 46.67%' = CSV(176368/3.11/37.18); 2022 '...173,722 2.73% 36,701 35.60%' = CSV; 2024 '...155,329 3.25% 57,941 31.89%' = CSV. EAD declines smoothly 176k->174k->164k->155k, density 46.7->42.3->38.2% smooth. All correct."
+          }
+        ],
+        "summary": "Verified all 22 UniCredit AIRB EU-CR6 rows. Opened the 2021, 2022 and 2024 Pillar-3 PDFs and matched every PD/LGD/EAD to the disclosed exposure-class 'Subtotal' rows (Institutions, Corporates-SME, Corporates-Other, QRRE, Central-governments, Retail-Other-non-SME). Every present value is extraction-correct. The three apparent discontinuities (bank LGD 32->22%, SME PD 9.5->6.7%, QRRE PD 5.4->3.7% in 2024) are all genuine disclosed changes confirmed in source, not wrong-row mismatches; densities (RWA/EAD) are plausible and continuous for all classes. The 'header-bleed relabel' note on sovereign is cosmetic only (the row label wraps across PDF lines) and maps to the correct Central-governments subtotal with non-zero PD. No contamination, no implausible values, no PD=0. The only real issues are two completeness gaps: the 2021-12-31 vintages for sovereign (EAD24,824/PD0.10/LGD21.48) and other_retail (EAD22,912/PD4.98/LGD42.84) are disclosed in the 2021 report but are missing from the CSV, so those two series silently start one year late."
+      },
+      {
+        "bank": "Societe Generale",
+        "rows_checked": 19,
+        "spotchecked_against_pdf": true,
+        "overall": "minor_flags",
+        "findings": [
+          {
+            "vasicek_class": "sovereign",
+            "vintage": "2021-12-31",
+            "severity": "info",
+            "issue": "Flagged level-shift: sovereign PD=1.00% in 2021 collapses to ~0.10% in 2023/2024. Adversarially suspected as a wrong-row / rounding artifact.",
+            "verdict": "confirmed_correct",
+            "evidence": "socgen_2021.pdf p.150 'Central governments' Subtotal row reads exactly: 'Subtotal 240,036 4,920 91% 265,428 1.00% 471 2.70% 1 6,752 2.54% 138 (105)'. EAD post-CCF=265,428, weighted PD=1.00%, LGD=2.70% — matches CSV exactly. The 1.00% is a genuine exposure-weighted average driven by large 20.46%-bucket EAD (2,896) and the 100% default bucket (973), not an extraction error. Real disclosed level (later years legitimately ~0.10%)."
+          },
+          {
+            "vasicek_class": "mortgage",
+            "vintage": "2021-12-31",
+            "severity": "info",
+            "issue": "'DENSITY?' note in CSV raised doubt about RWA density plausibility for the retail mortgage subtotal.",
+            "verdict": "confirmed_correct",
+            "evidence": "socgen_2021.pdf p.152 Subtotal: '105,411 3,991 100% 108,611 1.74% 873,942 13.65% 12,150 11.19% 319'. EAD=108,611, PD=1.74%, LGD=13.65%, RWA density=11.19% — fully plausible for AIRB residential mortgage. CSV values match exactly; the 'DENSITY?' query resolves clean. Smooth 2021->2024 trend (108611->126745->118757->116982; LGD 13.65->15.92->16.27->16.37)."
+          },
+          {
+            "vasicek_class": "bank",
+            "vintage": "2021-12-31",
+            "severity": "warn",
+            "issue": "No 'bank' (Institutions) row exists in the CSV for 2021, 2022 or 2023, yet SocGen disclosed an Institutions AIRB subtotal every year. The series only starts capturing bank in 2024. Uneven panel for the walk-forward backtest.",
+            "verdict": "uncertain",
+            "evidence": "Disclosed Institutions subtotals not captured: socgen_2021 p.150 '39,906 ... 0.89% ... 23.38%'; socgen_2022 p.144 '38,844 1.24% 3,789 25.01%'; socgen_2023 (socgen_2024.pdf comparative p.137) '37,138 0.60% 3,594 23.48%'. Only 2024 (40,633/0.36/22.68, socgen_2024.pdf p.133) is in the CSV. Not a value error, but a coverage gap — bank PD/LGD history is available and was omitted."
+          },
+          {
+            "vasicek_class": "corporate",
+            "vintage": "2021-12-31",
+            "severity": "warn",
+            "issue": "The large-corporate AIRB exposure class is absent from the CSV for ALL SocGen years, although it is SocGen's largest corporate class and is disclosed every year. Only sme_corporate is captured. This silently drops ~150-170bn EUR of corporate AIRB EAD from the panel.",
+            "verdict": "uncertain",
+            "evidence": "Disclosed Corporate (large/other) subtotals omitted: 2021 EAD 152,058 PD 2.77% LGD 31.71% (socgen_2021 p.151); 2022 162,968/2.53/30.92 (p.145); 2023 165,906/2.46/30.18 (socgen_2024.pdf p.138); 2024 169,993/2.39/32.30 (socgen_2024.pdf p.134). The CSV's 'sme_corporate' (54,516/61,970/63,059/67,967) correctly maps to the Corporate-SME subtotal, but no row carries the main Corporate class. Coverage gap, not a mis-extraction of a captured value."
+          },
+          {
+            "vasicek_class": "sovereign",
+            "vintage": "2022-12-31",
+            "severity": "info",
+            "issue": "No sovereign row for 2022 in the CSV (2021 and 2023/2024 present). Gap in the sovereign series.",
+            "verdict": "uncertain",
+            "evidence": "socgen_2022.pdf p.144 Central-governments Subtotal EAD=271,679 exists (PD/LGD garbled by concatenated-text extraction: 'Subtotal 246,638 15,546 46% 271,679 0 626 0 1 ...'). The 2022 sovereign disclosure exists (EAD ~271,679, between 2021's 265,428 and 2023's 313,574 — smooth) but was not captured, likely because the PD/LGD failed to extract cleanly. Coverage gap; the omission is conservative (no bad value entered)."
+          },
+          {
+            "vasicek_class": "other_retail",
+            "vintage": "2024-12-31",
+            "severity": "info",
+            "issue": "Cross-year continuity spot-check of the most-moving captured retail series (other_retail PD rising 6.63->6.43->7.32->8.06, EAD falling 34041->28572).",
+            "verdict": "confirmed_correct",
+            "evidence": "socgen_2024.pdf p.136 Subtotal '25,969 2,415 86% 28,572 8.06% 2,106,520 31.89% 0 10,664 37.32% 1,128' matches CSV (8.06/31.89/28572). Trend is a smooth, monotone migration (shrinking book, rising PD/LGD) — a real disclosed trend, not a wrong-row match. qrre and sme_corporate 2024 also verified exactly (4,149/7.89/48.48 p.135; 67,967/3.57/19.06 p.134)."
+          }
+        ],
+        "summary": "All 19 SocGen values PRESENT in the CSV are confirmed correct against the source Pillar-3 PDFs (socgen_2021/2022/2024; 2023 verified via the comparative columns embedded in socgen_2024.pdf pp.137-140). Every captured PD/LGD/EAD matches an EU-CR6 AIRB 'Subtotal' row exactly, with smooth, plausible cross-year continuity and sensible RWA densities — no wrong-row matches, no LGD flips, no implausible jumps. The flagged sovereign-2021 PD=1.00% / LGD=2.70% (EAD 265,428) is a GENUINE disclosed exposure-weighted level (confirmed verbatim on socgen_2021.pdf p.150), not an extraction error; later years legitimately drop to ~0.10%. The 'DENSITY?' retail rows are clean. No contamination found. The only issues are COVERAGE GAPS, not value errors: (1) the large-Corporate class is disclosed every year (~150-170bn EAD) but NEVER captured (only Corporate-SME is); (2) the bank/Institutions class is disclosed every year but only captured for 2024; (3) sovereign 2022 (EAD ~271,679) is missing because its PD/LGD failed to extract from the concatenated-text 2022 PDF. These produce an uneven panel for the walk-forward backtest and are worth fixing, but no incorrect figure was entered."
+      },
+      {
+        "bank": "ING Groep",
+        "rows_checked": 24,
+        "spotchecked_against_pdf": true,
+        "overall": "errors_found",
+        "findings": [
+          {
+            "vasicek_class": "qrre",
+            "vintage": "2021-12-31 .. 2024-12-31 (all 4)",
+            "severity": "error",
+            "issue": "The class labeled 'qrre' (Qualifying Revolving Retail) is mislabeled. ING discloses NO QRRE A-IRB block in EU-CR6 in any year (2021-2024). All four 'qrre' rows are in fact ING's 'Retail - Secured by immovable property SME' (mortgage-SME, real-estate-collateralised) class. The numeric values are correctly extracted, but the class IDENTITY is wrong. For an IRB backtest this is contamination: a secured real-estate SME portfolio (LGD ~16-24%, PD ~3.8-4.3%) is being fed in as 'qualifying revolving retail', which in reality is unsecured revolving credit with very different LGD (typically 40%+) and dynamics.",
+            "verdict": "likely_extraction_error",
+            "evidence": "ING 2023 report p48 subtotal under header 'Retail - Secured by immovable property SME': '13,671 1,282 0.65 14,514 3.87 67,394 22.67 ... 192 -113' -> EAD 14,514, PD 3.87, LGD 22.67 == CSV qrre 2023. Same mapping holds every year: 2021 p41 'Retail - Secured by immovable property SME' sub-total 13,509/4.31/16.66; 2022 p51 14,958/3.96/23.72; 2024 p48 'Subtotal (exposure class) ...14,592 3.75 ...22.50'. A full scan of 2023 CR6 detail pages (40-55) found NO 'Qualifying revolving' detail block (QRRE detail block present: False)."
+          },
+          {
+            "vasicek_class": "sme_corporate",
+            "vintage": "2023-12-31",
+            "severity": "info",
+            "issue": "EAD nearly doubles from 26,466 (2022) to 49,548 (2023) (1.87x), the largest jump in the ING series. Flagged as a candidate wrong-row match, but verified to be a genuine disclosed change (and corroborated by 2024 staying at the new level, 47,644).",
+            "verdict": "real_disclosed_change",
+            "evidence": "ING 2023 report p46 'Corporates-SME' subtotal: '43,272 16,524 0.37 49,548 6.23 55,340 26.02 3 26,026 0.53 1,154 -1,018' -> EAD 49,548, PD 6.23, LGD 26.02 == CSV exactly. 2022 p49 'Corporates-SME' subtotal '23,323 6,514 0.47 26,466 5.15 ... 25.32' == CSV exactly. 2024 p46 'Corporates-SME' subtotal '...47,644 6.12 ...27.39' == CSV. Both endpoints confirmed; the step-up is disclosed by ING, not an extraction artifact."
+          },
+          {
+            "vasicek_class": "qrre (= Retail Secured immovable property SME)",
+            "vintage": "2022-12-31",
+            "severity": "info",
+            "issue": "LGD jumps +7.06pp (16.66 -> 23.72) from 2021 to 2022 in this class. Flagged as possible row-flip; verified as a real disclosed LGD move for the secured-RE-SME class.",
+            "verdict": "confirmed_correct",
+            "evidence": "ING 2021 report p41 'Retail - Secured by immovable property SME' sub-total LGD column = 16.66; ING 2022 report p51 same class subtotal LGD = 23.72. Both read directly from the disclosed subtotal rows; the values are correctly extracted and the move is genuine (subsequent years 22.67/22.50 are stable)."
+          },
+          {
+            "vasicek_class": "bank",
+            "vintage": "2022-12-31",
+            "severity": "info",
+            "issue": "Bank/Institutions PD drops 0.91 -> 0.40 (2021->2022) then to 0.30 (2023). Flagged for the size of the PD drop; verified correct against the disclosed Institutions subtotal each year.",
+            "verdict": "confirmed_correct",
+            "evidence": "Institutions subtotals: 2021 p37 '40,176 69,452 0.08 46,027 0.91 ... 21.20'; 2022 p47 '41,686 67,522 0.11 48,914 0.40 ... 21.17'; 2023 p44 '39,172 62,694 0.11 46,115 0.30 8,643 18.29 ... '; 2024 p44 'Subtotal (exposure class) 40,754 ... 47,295 0.39 ... 19.79'. All four CSV bank rows match exactly; the low/volatile PD is normal for a high-quality bank/institutions book."
+          },
+          {
+            "vasicek_class": "(coverage gap) Retail Other non-SME",
+            "vintage": "all years",
+            "severity": "warn",
+            "issue": "ING discloses a 'Retail Other non-SME' A-IRB class (a genuine separate exposure class) that is entirely absent from the ING series in the CSV. Combined with the mislabeled qrre, the retail decomposition fed to the backtest does not match ING's actual disclosed class structure.",
+            "verdict": "likely_extraction_error",
+            "evidence": "Disclosed 'Retail Other non-SME' subtotals exist every year: 2021 p44 sub-total '14,702 12,515 0.71 24,367 3.50 ... 70.42'; 2022 p54 '14,431 12,124 0.73 24,107 3.51 ... 69.83'; 2024 p51 'Subtotal (exposure class) 14,309 6,827 0.57 18,217 5.55 ... 43.33'. No row in the ING CSV (which has only bank, corporate, mortgage, other_retail, qrre, sme_corporate) corresponds to these figures."
+          }
+        ],
+        "summary": "All 24 ING numeric values were verified against the source EU-CR6 A-IRB subtotal rows in the 2021, 2022, 2023 and 2024 ING Additional Pillar III reports and every PD/LGD/EAD matches the disclosed subtotal exactly - the numeric extraction is accurate. The two largest cross-year moves I doubted are real disclosed changes, not wrong-row matches: sme_corporate EAD 26,466->49,548 (2022->2023, Corporates-SME subtotal, corroborated by 2024=47,644) and the secured-RE-SME LGD jump 16.66->23.72 (2021->2022). The serious defect is a CLASS-LABEL contamination, not a value error: the four rows tagged 'qrre' are actually ING's 'Retail - Secured by immovable property SME' (mortgage-SME) class - ING discloses no Qualifying Revolving Retail A-IRB block in any year. Feeding a secured real-estate SME book into an IRB backtest as 'QRRE' misrepresents the risk profile (real QRRE is unsecured, LGD ~40%+). Separately, ING's disclosed 'Retail Other non-SME' class is omitted from the series entirely. Recommend renaming qrre -> mortgage_sme (or secured_re_sme) and either adding the Retail-Other-non-SME class or documenting its exclusion."
+      },
+      {
+        "bank": "Groupe BPCE",
+        "rows_checked": 7,
+        "spotchecked_against_pdf": true,
+        "overall": "clean",
+        "summary": "All 7 Groupe BPCE rows (single vintage 2024-12-31) extracted faithfully from the EU CR6 A-IRB sub-total rows in bpce_2024.pdf pages 152-156. Every value (EAD, PD%, LGD%) matches the disclosed sub-total row exactly, and disclosed RWA/EAD density reconciles to the disclosed density column for all 7 classes (max deviation 0.01pp). Column alignment confirmed correct (BPCE has the obligor-count column between PD and LGD; extractor used idx3=EAD, idx4=PD%, idx6=LGD%). The A-IRB table (p152) was correctly used rather than the much smaller F-IRB table (p157, e.g. Institutions EAD 6,557 vs A-IRB 8,677). No cross-year continuity check applies (only one vintage). The high retail PDs (mortgage 14.68%, other_retail 21.55%) are not errors: they are the genuine disclosed exposure-weighted average PDs inflated by the 100%-default band, characteristic of raw EU-CR6 subtotals.",
+        "findings": [
+          {
+            "vasicek_class": "sovereign",
+            "vintage": "2024-12-31",
+            "severity": "info",
+            "issue": "PD=0.00% for sovereign could look like a missing/zero-contamination error, and LGD=7.26% is low.",
+            "verdict": "confirmed_correct",
+            "evidence": "bpce_2024.pdf p152 A-IRB row 'Central governments and central banks sub-total': d(EAD)=2,523, e(PD)=0.00%, g(LGD)=7.26%, RWA=0, density 0.00%. PD<0.005% rounds to 0.00 for sovereigns; allowed for this class. RWA=0 reconciles with density 0.00%. Matches CSV exactly."
+          },
+          {
+            "vasicek_class": "bank",
+            "vintage": "2024-12-31",
+            "severity": "info",
+            "issue": "Verify Institutions subtotal not confused with the smaller F-IRB Institutions figure.",
+            "verdict": "confirmed_correct",
+            "evidence": "bpce_2024.pdf p152 A-IRB 'Institutions sub-total': d(EAD)=8,677, e(PD)=0.41%, g(LGD)=40.42%, RWA=1,974, density 22.74% (calc 22.75%). Distinct from p157 F-IRB 'Institutions sub-total' EAD=6,557/PD=0.63%/LGD=31.59%. Extractor correctly used A-IRB. Matches CSV."
+          },
+          {
+            "vasicek_class": "mortgage",
+            "vintage": "2024-12-31",
+            "severity": "info",
+            "issue": "PD=14.68% is implausibly high for a residential-mortgage portfolio (would normally suggest a wrong-row/column match), while LGD=10.70% is mortgage-typical.",
+            "verdict": "confirmed_correct",
+            "evidence": "bpce_2024.pdf p155 A-IRB 'Retail - SME Real estate sub-total' (PDF mislabels the non-SME RE block): d(EAD)=307,749, e(PD)=14.68%, g(LGD)=10.70%, RWA=23,018, density 7.48% (calc 7.48%). The 14.68% is the exposure-weighted average PD across all bands incl. the 100%(default) bucket (EAD 2,609). Not an extraction error; faithful raw subtotal. Matches CSV."
+          },
+          {
+            "vasicek_class": "other_retail",
+            "vintage": "2024-12-31",
+            "severity": "info",
+            "issue": "PD=21.55% is very high for retail.",
+            "verdict": "confirmed_correct",
+            "evidence": "bpce_2024.pdf p156 A-IRB 'Retail - Other SMEs sub-total': d(EAD)=41,742, e(PD)=21.55%, g(LGD)=28.88%, RWA=12,329, density 29.54% (calc 29.54%). High PD driven by large default band (EAD 3,935 at 100%). Disclosed subtotal value; correct. Matches CSV."
+          },
+          {
+            "vasicek_class": "qrre",
+            "vintage": "2024-12-31",
+            "severity": "info",
+            "issue": "PD=9.63% high for revolving retail.",
+            "verdict": "confirmed_correct",
+            "evidence": "bpce_2024.pdf p155 A-IRB 'Retail - Eligible revolving exposures sub-total': d(EAD)=27,309, e(PD)=9.63%, g(LGD)=33.85%, RWA=4,159, density 15.23% (calc 15.23%). Matches CSV exactly."
+          },
+          {
+            "vasicek_class": "corporate",
+            "vintage": "2024-12-31",
+            "severity": "info",
+            "issue": "Confirm Corporates-Other subtotal (not Specialized financing or SME).",
+            "verdict": "confirmed_correct",
+            "evidence": "bpce_2024.pdf p154 A-IRB 'Corporates - Other sub-total': d(EAD)=115,996, e(PD)=5.68%, g(LGD)=33.28%, RWA=50,077, density 43.17% (calc 43.17%). Matches CSV exactly."
+          },
+          {
+            "vasicek_class": "sme_corporate",
+            "vintage": "2024-12-31",
+            "severity": "info",
+            "issue": "Confirm Corporates-SME subtotal.",
+            "verdict": "confirmed_correct",
+            "evidence": "bpce_2024.pdf p153 A-IRB 'Corporates - SME sub-total': d(EAD)=18,358, e(PD)=10.69%, g(LGD)=26.23%, RWA=10,239, density 55.77% (calc 55.77%). Matches CSV exactly."
+          }
+        ]
+      },
+      {
+        "bank": "Credit Mutuel",
+        "rows_checked": 10,
+        "spotchecked_against_pdf": true,
+        "overall": "errors_found",
+        "findings": [
+          {
+            "vasicek_class": "sovereign",
+            "vintage": "2024-12-31",
+            "severity": "error",
+            "issue": "The sovereign 2024 row (PD=0.12, LGD=34.00, EAD=30410) is byte-for-byte identical to the bank 2024 row. Credit Mutuel discloses NO IRB sovereign exposure at all: in cm_2024.pdf the F-IRB table (Tableau, p.53/PDF page 52) contains only 'Etablissements (banques)' and 'Entreprises' subtotals, and the page explicitly states 'Les administrations centrales et banques centrales sont durablement en approche standard' (central governments/central banks are permanently on the standard approach; also CR6A on p.54 shows souverains at 100% SA, 0% IRB). The sovereign row is a fabricated duplicate of the banks/Etablissements F-IRB subtotal, not a real EU-CR6 IRB subtotal. It will contaminate any sovereign-class backtest (a 0.12% PD / EUR 30.4bn 'sovereign' exposure that does not exist on IRB).",
+            "verdict": "likely_extraction_error",
+            "evidence": "cm_2024.pdf PDF page 52: 'Etablissements (banques) ... Sous-total 31 719 2 819 34% 30 410 0,12% 650 34% 2,5 7 864 26% 14 6'. The string '30 410' occurs on ONLY page 52 in the entire document (banks subtotal); no sovereign/souverain IRB subtotal exists. PDF page 45: sovereign exposures carry 0% RW under standard approach; p.53 footnote: 'Les administrations centrales et banques centrales sont durablement en approche standard.' CSV bank 2024 and sovereign 2024 are identical: PD=0.12, LGD=34.00, EAD=30410."
+          },
+          {
+            "vasicek_class": "bank",
+            "vintage": "2024-12-31",
+            "severity": "info",
+            "issue": "bank 2024 (PD=0.12, LGD=34.00, EAD=30410) is the correct F-IRB 'Etablissements (banques)' subtotal and is fine on its own. Flagged only because the bad sovereign row was cloned from it. Minor coverage note: there is no bank row for 2023 in the CSV even though cm_2023.pdf discloses an F-IRB banks subtotal (EAD=29,543, PD=0.19%, LGD=35%, p.50); that is a missing row, not a wrong value.",
+            "verdict": "confirmed_correct",
+            "evidence": "cm_2024.pdf page 52 Etablissements (banques) Sous-total: EAD 30 410, PD 0,12%, LGD 34%, RWA 7 864 (density 25.9% - plausible). cm_2023.pdf page 49 banks Sous-total EAD 29 543 / PD 0,19% / LGD 35% exists but is not carried into the CSV."
+          },
+          {
+            "vasicek_class": "corporate",
+            "vintage": "2024-12-31",
+            "severity": "info",
+            "issue": "corporate is mapped to the F-IRB 'Entreprises' subtotal (LGD 45%, foundation) consistently across both years; sme_corporate is mapped to the A-IRB 'Entreprises' subtotal (LGD 25%). This split is internally consistent and is a deliberate naming choice, not an error. Values verified.",
+            "verdict": "confirmed_correct",
+            "evidence": "cm_2024.pdf p.52 F-IRB Entreprises Sous-total: EAD 73 026, PD 2,59%, LGD 45%, RWA 51 672 (density 70.8%) == CSV corporate 2024. cm_2024.pdf p.50 A-IRB Entreprises Sous-total: EAD 88 431, PD 5,69%, LGD 25%, RWA 45 459 == CSV sme_corporate 2024."
+          },
+          {
+            "vasicek_class": "mortgage",
+            "vintage": "2023-12-31",
+            "severity": "info",
+            "issue": "All four 2023 rows verified exactly against cm_2023.pdf A-IRB/F-IRB subtotals; PD/LGD/EAD plausible and continuous into 2024 (mortgage EAD 289,619->291,029; PD 1.63->1.79; LGD 15->16; densities ~10-11%).",
+            "verdict": "confirmed_correct",
+            "evidence": "cm_2023.pdf p.47 'Biens immobiliers' Sous-total: EAD 289 619, PD 1,63%, LGD 15%, RWA 29 118. Also p.46 Entreprises A-IRB Sous-total EAD 87 004/PD 4,72%/LGD 25% (=sme_corporate 2023); Clientele de detail Sous-total EAD 395 260/PD 2,38%/LGD 19% (=other_retail 2023); p.49 F-IRB Entreprises Sous-total EAD 70 064/PD 2,42%/LGD 45% (=corporate 2023). All match."
+          }
+        ],
+        "summary": "Read 10 Credit Mutuel rows (4 vintage 2023, 6 vintage 2024) and verified them against cm_2023.pdf and cm_2024.pdf EU-CR6 (Tableau 31/34). 8 rows verify EXACTLY against disclosed Sous-total rows with plausible, continuous PD/LGD/EAD and sane RWA densities (mortgage ~10%, retail ~12%, A-IRB corporate ~50%, F-IRB corporate ~70%, banks ~26%). The corporate vs sme_corporate split (F-IRB Entreprises LGD45 vs A-IRB Entreprises LGD25) is a consistent, deliberate mapping, not an error. ONE hard error: sovereign 2024 (PD=0.12, LGD=34.00, EAD=30410) is a verbatim duplicate of bank 2024 and is fabricated - Credit Mutuel discloses no IRB sovereign exposure (central governments are permanently on the standard approach; the value 30 410 appears in the PDF only as the banks/Etablissements F-IRB subtotal). This bogus sovereign row should be dropped before backtesting. Minor coverage gap (not a value error): no bank row exists for 2023 although the F-IRB banks subtotal is disclosed (EAD 29,543)."
+      }
+    ]
+  }
+}

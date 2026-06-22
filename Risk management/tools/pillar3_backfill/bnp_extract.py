@@ -22,15 +22,18 @@ LEI = "R0MUWSFPU8MPRO8K5P83"  # BNP Paribas SA
 # page (0-based) -> (vasicek_class, subtotal occurrence on the page, anchor PD, anchor LGD).
 # Layout A (FY2022-2024 tables): value sequence idx3=EAD,4=PD,5=LGD,7=RWA,8=dens.
 # bnp_2024.pdf yields 31.12.2024 (anchor-matched) + 31.12.2023 comparative.
+# NB: on the corporate pages the 1st SUB-TOTAL is "Corporates - Specialised
+# financing" (NOT SME); the TRUE "SME corporates" is the 2nd SUB-TOTAL (occ #1).
+# Earlier the 1st was mis-mapped to sme; corrected per source-PDF verification.
 PAGEMAP_2024 = {
     439: [("sovereign", 0, 0.08, 3.0), ("bank", 1, 0.79, 26.0)],
-    441: [("sme", 0, 3.78, 25.0)],
+    441: [("sme", 1, 7.02, 30.0)],
     442: [("corporate", 0, 2.87, 37.0)],
     447: [("mortgage", 0, 1.61, 17.0)],
     449: [("qrre", 0, 8.91, 36.0)],
     450: [("other_retail", 0, 6.70, 36.0)],
     440: [("sovereign", 0, 0.08, 3.0), ("bank", 1, 0.79, 26.0)],
-    443: [("sme", 0, 3.78, 25.0)],
+    443: [("sme", 1, 7.24, 28.0)],
     444: [("corporate", 0, 2.87, 37.0)],
     448: [("mortgage", 0, 1.61, 17.0)],
     451: [("qrre", 0, 8.91, 36.0)],
@@ -42,7 +45,7 @@ PAGEMAP_2024 = {
 # to integer % -> excluded (would break precision consistency); see STATUS.md.
 PAGEMAP_2023 = {
     408: [("sovereign", 0, 0.08, 2.0), ("bank", 1, 0.76, 28.0)],
-    411: [("sme", 0, 4.60, 14.0)],
+    411: [("sme", 1, 6.16, 28.0)],
     412: [("corporate", 0, 2.52, 33.0)],
     416: [("mortgage", 0, 2.00, 12.0)],
     419: [("qrre", 0, 8.86, 51.0)],

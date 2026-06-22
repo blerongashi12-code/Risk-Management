@@ -61,6 +61,12 @@ for _, r in uc.iterrows():
         note = ""
     add(UC, "UniCredit", c, r["vintage_date"], r["pd_pct"], r["lgd_pct"], r["ead_eur_m"],
         "UniCredit Pillar III EU CR6 AIRB (raw subtotal)", note)
+# UC 2021 sovereign + other_retail: the flowing-table extractor missed these; values
+# read + density-verified from the 2021 report (p134 Central-gov, p138 Retail-Other-non-SME).
+add(UC, "UniCredit", "sovereign", "2021-12-31", 0.10, 21.48, 24824,
+    "UniCredit Pillar III 2021 EU CR6 AIRB (Central-gov subtotal, source-verified)")
+add(UC, "UniCredit", "other_retail", "2021-12-31", 4.98, 42.84, 22912,
+    "UniCredit Pillar III 2021 EU CR6 AIRB (Retail-Other-non-SME subtotal, source-verified)")
 
 # --- SocGen: 2022/2023 from extract csv; 2024 raw anchors (verified) ---
 SG = "O2RNE8IBXP4R0TD8PU41"
@@ -82,14 +88,19 @@ if os.path.exists(DL + "bpce_raw_rows.csv"):
         add(BP, "Groupe BPCE", r["vasicek_class"], "2024-12-31", r["pd_pct"], r["lgd_pct"],
             r["ead_eur_m"], "BPCE Pillar III 2024 EU CR6 AIRB (raw subtotal)")
 
-# --- Credit Mutuel: FY2024 (6/7, no qrre) + FY2023 {corp,sme,mortgage,other_retail}.
-#     FY2023 bank/sovereign/qrre were mis-assigned (all grabbed the revolving row) -> dropped ---
+# --- Credit Mutuel: FY2024 (5/7) + FY2023 {corp,sme,mortgage,other_retail}.
+#     FY2023 bank/sovereign/qrre were mis-assigned (all grabbed the revolving row) -> dropped.
+#     sovereign DROPPED for ALL years: CM has NO IRB sovereign (central govts permanently on
+#     standard approach); the 'sovereign 2024' row was a byte-identical duplicate of bank
+#     (verification finding) -> phantom, removed. ---
 CM = "9695000CG7B84NLR5984"
 if os.path.exists(DL + "cm_raw_rows.csv"):
     cm = pd.read_csv(DL + "cm_raw_rows.csv", dtype=str)
     keep23 = {"corporate", "sme_corporate", "mortgage", "other_retail"}
     for _, r in cm.iterrows():
         v, c = r["vintage_date"], r["vasicek_class"]
+        if c == "sovereign":                       # CM discloses no IRB sovereign
+            continue
         if v == "2023-12-31" and c not in keep23:
             continue
         add(CM, "Credit Mutuel", c, v, r["pd_pct"], r["lgd_pct"], r["ead_eur_m"],
@@ -119,6 +130,15 @@ if os.path.exists(DL + "santander_raw_rows.csv"):
                 if r["vasicek_class"] in ("bank", "corporate") else "")
         add(SAN, "Banco Santander", r["vasicek_class"], r["vintage_date"], r["pd_pct"], r["lgd_pct"],
             r["ead_eur_m"], "Banco Santander Pillar 3 EU CR6 AIRB (raw subtotal)", note)
+
+# --- Post-process: ING has NO Qualifying Revolving (QRRE) A-IRB block in any year;
+#     its 'qrre' rows are actually "Retail - Secured by immovable property SME"
+#     (verification finding). Relabel -> mortgage_sme so it does not contaminate the
+#     real cross-bank QRRE class (DB/Santander/BNP/UniCredit qrre are genuine). ---
+for r in rows:
+    if r["LEI"] == INGL and r["vasicek_class"] == "qrre":
+        r["vasicek_class"] = "mortgage_sme"
+        r["note"] = (r.get("note") or "") + " [ING SRE-SME, nicht QRRE: umbenannt]"
 
 df = pd.DataFrame(rows).drop_duplicates(subset=["LEI", "vasicek_class", "vintage_date"], keep="first")
 df = df.sort_values(["bank_name", "vintage_date", "vasicek_class"])

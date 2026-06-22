@@ -53,15 +53,33 @@ Authoritative Reihe: `data/pillar3_backtest_pdlgd.csv`.
 | Bank | Klassen | Jahre | Status |
 |---|---|---|---|
 | Deutsche Bank | 7/7 | 2021–2024 | ✅ komplett |
-| ING Groep | 6/7 | 2021–2024 | ✅ alle 4 Jahre (robuste Klassen-Total-Erkennung, an FY2024 kalibriert; 2023-Report nachgeladen von ing.com) |
-| Société Générale | 6/7 (ohne corporate) | 2021–2024 | 🟢 2021 ergänzt (Report nachgeladen); corporate (CSV≠roh) fehlt durchgängig, bank nur 2024, sovereign-2021-PD=1,00 (verifiziert, Level-Shift) |
-| UniCredit | 6/7 (ohne mortgage) | 2021–2024 | 🟡 echte Retail-Mortgage (Header-Bleed) |
+| ING Groep | 6/7 | 2021–2024 | ✅ alle 4 Jahre. **„qrre" → `mortgage_sme` umbenannt** (Verifikation: ING hat KEINEN QRRE-A-IRB-Block; die Zeilen sind „Retail – Secured by immovable property SME"). Retail-Other-non-SME nicht separat erfasst (Lücke) |
+| Société Générale | 6/7 (ohne corporate) | 2021–2024 | 🟢 2021 ergänzt; corporate (CSV≠roh) fehlt durchgängig, bank nur 2024, sovereign-2021-PD=1,00 (verifiziert, Level-Shift) |
+| UniCredit | 6/7 (ohne mortgage) | 2021–2024 | ✅ alle 4 Jahre komplett. 2021 sovereign + other_retail via Verifikation aus Quelle ergänzt (p134/p138, dichte-verifiziert). „sovereign" = Central-gov-Zeile (relabel) |
 | Groupe BPCE | 7/7 | 2024 | 🔴 2022/2023 Multi-Block (3 Sub-Entity-Blöcke: Gruppe/BP/CE bzw. A-/F-IRB; Klassen-Labels zeilenumbrochen) → Vorjahres-Disambiguierung unzuverlässig (sme/qrre/sovereign mehrdeutig), nicht geschrieben |
-| Crédit Mutuel | 6/7 (2024) · 4/7 (2023) | 2023, 2024 | 🔴 2021/2022-PDFs (Groupe CM) nachgeladen + Parser für Layout-Drift gefixt (LGD@idx5 vs idx6, Label-„-" entfernt), ABER degenerierte kuratierte Anker (bank==sovereign 0,12/34) + Mehrfach-Zeilen-Kollisionen → Vorjahres-Mapping unzuverlässig (other_retail-EAD springt 135k/36k/395k); nicht geschrieben |
-| BNP Paribas | 7/7 | 2022–2024 | ✅ 3 Jahre komplett (alle 7 Klassen), anchor- + dichte- + EAD-verifiziert; 2023 doppelt validiert (2024-Doc-Komparativ == 2023-Doc-Primär) |
+| Crédit Mutuel | 5/7 (2024) · 4/7 (2023) | 2023, 2024 | 🔴 sovereign ENTFERNT (Verifikation: CM hat keinen IRB-sovereign; „sovereign 2024" war byte-identisches Duplikat von bank → Phantom). 2021/2022-PDFs geladen, aber degenerierte Anker + Layout-Drift → Vorjahres-Mapping unzuverlässig, nicht geschrieben |
+| BNP Paribas | 7/7 | 2022–2024 | ✅ 3 Jahre, anchor-/dichte-/EAD-verifiziert; 2023 doppelt validiert. **`sme_corporate` korrigiert** (war fälschlich „Corporates – Specialised financing", jetzt echtes „SME corporates", Verifikation an Quell-PDF-Labels p441 bestätigt) |
 | Crédit Agricole | – | – | 🔴 doku-blockiert: nur Halbjahres-`pdfPreview`-Viewer; Jahresend-IDs nicht auffindbar |
 | Banco Santander | 6/6 IRB | 2021–2024 | ✅ 4 Jahre komplett (keine sovereign = Standardised); label+jahr-getrieben, Dichte-verifiziert. bank/corporate-AIRB-EAD schrumpft 2022→2023 (realer IRB-Rollback zu FIRB, verifiziert) |
 | Rabobank | – | – | 🔴 PDF bild-basiert (Text-Extraktion scheitert → OCR) |
+
+## Adversariale Verifikation (8-Banken-Workflow, je 1 Prüf-Agent gegen Quell-PDFs)
+Ergebnis: **die Zahl-Extraktion ist durchgängig korrekt** (jeder stichprobenartig
+gegen die Quell-„Sub-total"-Zeile geprüfte PD/LGD/EAD-Wert stimmt). Gefundene und
+**behobene** Defekte waren ausschließlich Klassen-Zuordnungen:
+- **BNP `sme_corporate`**: war „Corporates – Specialised financing" → auf echtes
+  „SME corporates" korrigiert (occ #1 statt #0 auf der Corporate-Seite).
+- **ING `qrre`**: ING hat keinen QRRE-A-IRB-Block → in `mortgage_sme` umbenannt
+  (echtes „Secured by immovable property SME"), damit die echte QRRE-Klasse
+  (DB/Santander/BNP/UniCredit) nicht kontaminiert wird.
+- **CM `sovereign` 2024**: Phantom (Duplikat der bank-Zeile) → entfernt.
+- **Lücken-Fill aus Verifikation**: UniCredit 2021 sovereign + other_retail
+  (aus Quelle gelesen, dichte-verifiziert) ergänzt.
+Als **real disclosed** (kein Fehler) bestätigt: DB-Institutions-PD-Spitzen
+(100%-Default-Band), DB-sovereign-LGD-Rekalibrierung, Santander-IRB-Rollback,
+BPCE-Retail-PDs (Default-Band). Voller Report: `VERIFICATION_REPORT.json`.
+Offene Lücken (dokumentiert, nicht fabriziert): SocGen large-corporate (alle Jahre)
++ bank-Vorjahre, ING-Retail-Other-non-SME, CM-bank-2023-F-IRB.
 
 ## Wichtiger Befund
 Für etliche Banken (UniCredit, SocGen-corporate, …) sind die **kuratierten
