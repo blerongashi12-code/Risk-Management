@@ -20,7 +20,8 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 DIR = "C:/Users/blero/Downloads/RiskMgmt/Risk management/data/"
 OUT = DIR + "backtest_raw/rabobank_raw_rows.csv"
 LEI = "DG3RU1DBUFHT4ZF9WN62"   # Cooperatieve Rabobank U.A.
-FILES = {"2022": "rabobank_2022.pdf", "2024": "rabobank_2024.pdf"}
+FILES = {"2020": "rabobank_2020.pdf", "2021": "rabobank_2021.pdf",
+         "2022": "rabobank_2022.pdf", "2024": "rabobank_2024.pdf"}
 
 NUM = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
 SUB = re.compile(r"Subtotal\s+(.*)", re.I)
@@ -33,6 +34,18 @@ def nums(s):
         try: out.append(float(t.replace(",", "")))
         except ValueError: pass
     return out
+
+def pick_layout(v):
+    """Layout drifts across years: some reports prefix each row with a row number
+    (EAD=idx4), others don't (EAD=idx3). Try both and keep the one whose
+    RWA/EAD reconciles with the reported density (cross-check)."""
+    for off in (1, 0):                       # off=1: row# present; off=0: none
+        if len(v) < off + 10:
+            continue
+        ead, pd, lgd, rwa, dens = v[off+3], v[off+4], v[off+6], v[off+8], v[off+9]
+        if ead > 100 and 0 < pd < 40 and 0 < lgd <= 100 and abs(rwa / ead * 100 - dens) < 3:
+            return ead, pd, lgd, rwa, dens
+    return None
 
 def classify(label):
     l = label.lower().replace("- ", "-").replace(" -", "-")
@@ -74,21 +87,20 @@ def extract_year(path):
                     continue
                 after = m.group(1)
                 n = nums(ln)
-                # numbers present on the Subtotal line? (need the full row: >=11 with row#)
-                if len(n) >= 11:
+                if len(n) >= 10:                 # figures on the Subtotal line
                     label = after
                     vals = n
-                else:
-                    # wrapped: label tail + figures on the next line
+                else:                            # wrapped: tail + figures on next line
                     nxt = lines[j + 1] if j + 1 < len(lines) else ""
                     label = (after + " " + re.sub(r"^\s*\d+\s*", "", nxt)).strip()
                     vals = nums(nxt)
-                if len(vals) < 11:
+                got = pick_layout(vals)
+                if not got:
                     continue
                 cls = classify(label)
                 if not cls or cls in rows:
                     continue
-                ead, pd, lgd, rwa, dens = vals[4], vals[5], vals[7], vals[9], vals[10]
+                ead, pd, lgd, rwa, dens = got
                 rows[cls] = dict(page=i + 1, ead=ead, pd=pd, lgd=lgd, rwa=rwa, dens=dens,
                                  label=label[:40])
     return rows
