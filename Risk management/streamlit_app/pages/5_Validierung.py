@@ -131,6 +131,28 @@ with tab_bt:
         unsafe_allow_html=True,
     )
 
+    st.markdown(
+        '<div style="background:#EAF2F8;border:1px solid #C9DAE8;'
+        'border-left:4px solid #034B6F;padding:0.95rem 1.15rem;border-radius:6px;'
+        'margin:0.1rem 0 1rem 0;color:#051C2C;font-size:0.92rem;line-height:1.75;">'
+        '<strong>Die Kern-Idee — zeitlich versetzt, Jahr für Jahr.</strong> Wir '
+        'verfolgen dieselbe Risiko-Zeitreihe (PD/LGD) auf <strong>zwei Wegen</strong> '
+        'und legen sie übereinander:<br>'
+        '🔴 <strong>Realität</strong> — wie haben sich die <em>tatsächlich '
+        'gemeldeten</em> PD/LGD über die Jahre entwickelt?<br>'
+        '🔵 <strong>Modell</strong> — wie hätten sie sich entwickelt, wenn wir die '
+        '<em>real eingetretenen</em> Zins- und Ölpreis-Bewegungen durch unser '
+        'Modell laufen lassen?<br>'
+        '<strong>Der entscheidende Punkt:</strong> jeder Schritt startet mit den '
+        'PD/LGD/EAD <em>des jeweiligen (Vor-)Jahres</em> — kein Blick in die '
+        'Zukunft. Das Modell sagt also immer nur <strong>ein Jahr voraus</strong> '
+        'und wird dann wieder an den echten Wert angedockt. So sieht man direkt: '
+        'zieht das Modell die Reihe in <em>dieselbe Richtung</em> wie die Realität '
+        '— und ähnlich stark?'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
     # ====================================================================
     #  Daten laden (cached)
     # ====================================================================
@@ -558,12 +580,12 @@ with tab_bt:
     # ===== Probe A · PD-Backtest (PIT-Modell vs. TTC-Meldung) =============
     if pd_stats.get("n", 0) > 0:
         st.markdown(
-            "**Probe A · Modell-Prognose vs. Realität (jährlich) — der Vergleich, "
-            "der zählt.**  Wir nehmen den real eingetretenen Öl- + Zinsanstieg "
-            "jedes Jahres, lassen ihn durch das Modell laufen und stellen die "
-            "**Prognose (blaue Linie)** der **Realität (rote Linie)** gegenüber — "
-            "je Jahr, über alle Banken gemittelt. Über jedem Jahr steht der "
-            "Treiber (Zins-/Öl-Anstieg), der die Prognose erzeugt hat.")
+            "**Probe A · Entwicklung der PD-Reihe: Realität vs. Modell.**  Genau "
+            "die zeitversetzte Kern-Idee von oben, als Bild: 🔴 **rote Linie = wie "
+            "sich die tatsächlich gemeldete PD entwickelt hat**, 🔵 **blaue Linie = "
+            "wie sie sich entwickelt, wenn wir den realen Zins-/Öl-Schock jedes "
+            "Jahres ins Modell geben** (jeweils neu vom Istwert des Vorjahres aus). "
+            "Über jedem Jahr steht der Treiber, der die Modell-Bewegung erzeugt.")
         pa1, pa2, pa3, pa4 = st.columns(4, gap="small")
         pa1.metric("PD-Vorhersagen", f"{pd_stats['n']}",
                    "Bank × Klasse × Jahr", delta_color="off")
@@ -584,43 +606,53 @@ with tab_bt:
             "**über** dem naiven, schlägt das Modell nicht einmal diese."
         )
 
-        # Jahres-Mittel: Modell-Prognose vs. Realität, mit Treiber je Jahr
+        # Niveau-Trajektorie: wie entwickelt sich die PD-Reihe — Realität vs. Modell
+        # (Modell = 1-Jahres-Vorhersage, jeweils neu vom Istwert des Vorjahres aus)
         amac = annual_macro or {}
-        yr_agg = (pd_bt.groupby("year")[["d_pred_pp", "d_real_pp"]]
-                  .mean().reset_index())
-        yr_agg["dr"] = yr_agg["year"].map(
-            lambda y: amac.get(int(y), {}).get("d_r_10y_pp", float("nan")))
-        yr_agg["dbrent_pct"] = yr_agg["year"].map(
-            lambda y: (amac.get(int(y), {}).get("d_brent_log", 0.0) or 0.0) * 100)
+        by_year = (pd_bt.groupby("year")
+                   .agg(real=("pd_real_pct", "mean"),
+                        model=("pd_pred_pct", "mean"),
+                        base=("pd_base_pct", "mean"))
+                   .reset_index().sort_values("year"))
+        yrs_all = [int(y) for y in by_year["year"]]
+        anchor = yrs_all[0] - 1
+        x_axis = [anchor] + yrs_all
+        anchor_val = float(by_year["base"].iloc[0])
+        y_real = [anchor_val] + [float(v) for v in by_year["real"]]
+        # Vom Modell prognostizierte 1-Jahres-Änderung je Jahr (= model − base):
+        d_pred_yr = {int(r["year"]): float(r["model"] - r["base"])
+                     for _, r in by_year.iterrows()}
         fig_pa = go.Figure()
         fig_pa.add_trace(go.Scatter(
-            x=yr_agg["year"], y=yr_agg["d_pred_pp"], name="Modell-Prognose",
-            mode="lines+markers", line=dict(color=COLORS["navy"], width=3),
+            x=x_axis, y=y_real, name="🔴 Realität (gemeldete PD)",
+            mode="lines+markers", line=dict(color=COLORS["crimson"], width=3),
             marker=dict(size=11),
-            hovertemplate="FY%{x}<br><b>Modell sagt</b>: ΔPD %{y:+.3f} pp<extra></extra>",
+            hovertemplate="FY%{x}<br><b>Realität</b>: PD %{y:.2f} %<extra></extra>",
         ))
-        fig_pa.add_trace(go.Scatter(
-            x=yr_agg["year"], y=yr_agg["d_real_pp"], name="Realität (gemeldet)",
-            mode="lines+markers",
-            line=dict(color=COLORS["crimson"], width=3, dash="dot"),
-            marker=dict(size=11),
-            hovertemplate="FY%{x}<br><b>Realität</b>: ΔPD %{y:+.3f} pp<extra></extra>",
-        ))
-        fig_pa.add_hline(y=0, line_color=COLORS["hairline"], line_width=1)
-        # Treiber je Jahr als Label über den Punkten
-        for _, r in yr_agg.iterrows():
-            top = max(float(r["d_pred_pp"]), float(r["d_real_pp"]))
+        # Modell = 1-Jahres-Vorhersage, jeweils NEU vom Istwert des Vorjahres aus
+        # → je Jahr ein blauer Ast, der von der roten Realitäts-Linie abzweigt.
+        for i, y in enumerate(yrs_all):
+            mp = y_real[i] + d_pred_yr.get(y, 0.0)
+            fig_pa.add_trace(go.Scatter(
+                x=[x_axis[i], y], y=[y_real[i], mp],
+                mode="lines+markers",
+                line=dict(color=COLORS["navy"], width=2.5, dash="dot"),
+                marker=dict(size=11, symbol="diamond", color=COLORS["navy"]),
+                name="🔵 Modell (1-Jahres-Vorhersage)", showlegend=(i == 0),
+                hovertemplate=f"FY{y}<br><b>Modell sagt</b>: PD %{{y:.2f}} %<extra></extra>",
+            ))
+            dr = amac.get(y, {}).get("d_r_10y_pp", float("nan"))
+            ob = (amac.get(y, {}).get("d_brent_log", 0.0) or 0.0) * 100
             fig_pa.add_annotation(
-                x=r["year"], y=top, yshift=30, showarrow=False,
-                text=(f"<b>{int(r['year'])}</b><br>Zins {r['dr']:+.1f} pp · "
-                      f"Öl {r['dbrent_pct']:+.0f} %"),
-                font=dict(size=10, color=COLORS["stone"]), align="center",
+                x=y, y=max(y_real[i + 1], mp), yshift=26, showarrow=False,
+                text=f"Zins {dr:+.1f} pp · Öl {ob:+.0f} %",
+                font=dict(size=9, color=COLORS["stone"]),
             )
         fig_pa.update_layout(
-            title="Jährlich: realen Öl- + Zinsschock durchs Modell laufen lassen → Prognose vs. Realität",
-            xaxis_title="Jahr (Schock wirkt über das Jahr · Portfolio eingefroren Ende Vorjahr — zeitlich versetzt)",
-            yaxis_title="Ø Veränderung der PD [Prozentpunkte]",
-            height=430, xaxis=dict(tickmode="array", tickvals=list(yr_agg["year"])),
+            title="Entwicklung der PD-Reihe: Realität vs. Modell (mit realem Zins/Öl gefüttert)",
+            xaxis_title="Jahr (Modell = 1-Jahres-Vorhersage, jeweils neu vom Vorjahres-Istwert — zeitlich versetzt)",
+            yaxis_title="Ø PD über alle Banken/Segmente [%]",
+            height=440, xaxis=dict(tickmode="array", tickvals=x_axis),
             margin=dict(t=70),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
         )
