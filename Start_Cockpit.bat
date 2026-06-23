@@ -25,6 +25,16 @@ if errorlevel 1 (
     python -m pip install -r requirements.txt
 )
 
+REM --- 2b) Alte Cockpit-Server beenden + Bytecode-Cache leeren ---
+REM  Nach einem Code-Update haelt ein NOCH LAUFENDER Server das alte Modul
+REM  im Speicher -> Streamlit wirft beim Neu-Laden "ImportError" fuer neue
+REM  Funktionen (z.B. frozen_2factor_delta). Ein Browser-Refresh reicht nicht.
+REM  Darum beenden wir alte "streamlit run"-Prozesse und loeschen alle
+REM  __pycache__-Ordner, BEVOR frisch gestartet wird.
+echo [Reset] Beende evtl. laufende Cockpit-Server und leere den Bytecode-Cache ...
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -like '*streamlit run*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+for /d /r . %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d" >nul 2>&1
+
 REM --- 3) Entry-Datei per Muster finden ------------------------
 REM  Der Dateiname enthaelt einen Umlaut (Einfuehrung_in_das_Modell).
 REM  Damit die .bat unabhaengig von der Windows-Codepage laeuft, wird
