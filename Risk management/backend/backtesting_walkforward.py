@@ -454,6 +454,226 @@ def build_pdlgd_walkforward(
 
 
 # ============================================================================
+# 3c. Series-driven frozen-portfolio (eine Quelle: pillar3_backtest_pdlgd.csv)
+# ============================================================================
+# Der Pfad in 3b liest PD/LGD aus pillar3_bank_pd_lgd.csv UND EAD aus
+# pillar3_portfolio_timeseries.csv — beide sind dünn (faktisch nur Deutsche
+# Bank vollständig). Die *rohe* Backtest-Reihe pillar3_backtest_pdlgd.csv
+# enthält dagegen PD, LGD **und** EAD je (LEI, Klasse, Stichtag) für alle
+# zehn Banken über 2021-2024 (alles aus derselben EU-CR6-AIRB-Vintage →
+# input-seitig 100 % Pillar-3, MODEL_ASSUMPTIONS A-02c). Dieser Pfad nutzt
+# diese eine Quelle und macht den Walk-Forward damit für das gesamte
+# Bankuniversum lauffähig — der Sinn der Datenarbeit.
+
+_BACKTEST_CSV = _ROOT / "data" / "pillar3_backtest_pdlgd.csv"
+
+# Klassen, die das IRB-K-Modell (vasicek.asset_correlation) direkt kennt.
+_VALID_VCLASS = {"corporate", "sme_corporate", "bank", "sovereign",
+                 "mortgage", "qrre", "other_retail"}
+# Roh-Reihen-Labels ohne eigenen Basel-Korrelations-Slot → auf den
+# ökonomisch passenden gültigen Slot abbilden. „mortgage_sme" (ING:
+# Retail – durch Immobilien besichtigte SME) nutzt die Retail-Mortgage-
+# Korrelation ρ = 0.15 (Basel behandelt durch Wohnimmobilien besicherte
+# Retail-Forderungen unabhängig vom SME-Status mit 0.15).
+_VCLASS_ALIAS = {"mortgage_sme": "mortgage"}
+
+
+def load_backtest_series(path=None) -> pd.DataFrame:
+    """Die rohe EU-CR6-AIRB-Backtest-Reihe (PD + LGD + EAD je LEI × Klasse ×
+    Stichtag) — die einzige Eingangsquelle für den series-driven
+    Frozen-Portfolio-Walk-Forward. Spalten: LEI, bank_name, vasicek_class,
+    vintage_date, pd_pct, lgd_pct, ead_eur_m, source, note."""
+    p = Path(path) if path else _BACKTEST_CSV
+    df = pd.read_csv(p)
+    df["pd_pct"]  = pd.to_numeric(df["pd_pct"],  errors="coerce")
+    df["lgd_pct"] = pd.to_numeric(df["lgd_pct"], errors="coerce")
+    df["ead_eur"] = pd.to_numeric(df["ead_eur_m"], errors="coerce") * 1e6
+    df["vintage_date"] = df["vintage_date"].astype(str)
+    return df
+
+
+def build_frozen_portfolio_series(lei: str, vintage: str,
+                                  series_df: pd.DataFrame):
+    """Eingefrorenes BankPortfolio für (Bank, Stichtag) ausschließlich aus
+    der rohen Backtest-Reihe — PD, LGD und EAD stammen aus derselben
+    Pillar-3-EU-CR6-Vintage. Restlaufzeit ist in der Roh-Reihe nicht erfasst
+    → Basel-Default M = 2.5 J (konsistent über alle Vintages, daher
+    zeitvergleichs-neutral). None, wenn keine verwertbaren Segmente."""
+    from vasicek import PortfolioSegment, BankPortfolio
+    sub = series_df[(series_df["LEI"] == lei)
+                    & (series_df["vintage_date"] == vintage)]
+    if sub.empty:
+        return None
+    segs = []
+    for _, r in sub.iterrows():
+        raw = str(r["vasicek_class"])
+        vclass = _VCLASS_ALIAS.get(raw, raw)
+        if vclass not in _VALID_VCLASS:
+            continue
+        pp, ll, ead = float(r["pd_pct"]), float(r["lgd_pct"]), float(r["ead_eur"])
+        if not (ead > 0) or pp != pp or ll != ll:
+            continue
+        segs.append(PortfolioSegment(
+            name=f"{lei}:{raw}", exposure_class=vclass,
+            ead=ead, pd=pp / 100.0, lgd=ll / 100.0, maturity_years=2.5,
+            sales_m_eur=(20.0 if vclass == "sme_corporate" else None),
+        ))
+    if not segs:
+        return None
+    return BankPortfolio(name=f"{lei}@{vintage}", segments=segs, lei=lei)
+
+
+def build_pdlgd_walkforward_series(
+    lei: str,
+    macro_q_with_m: pd.DataFrame,
+    capital_wide: pd.DataFrame,
+    *,
+    series_df: pd.DataFrame | None = None,
+    bank_name: str | None = None,
+    kappa_lgd: float = 0.30,
+    lag_years: int = 1,
+    lag_quarters: int = 1,
+) -> pd.DataFrame:
+    """Walk-Forward für EINE Bank, gespeist aus der rohen Backtest-Reihe.
+
+    Strikt no-look-ahead: ein Quartal im Jahr Y nutzt die Pillar-3-Vintage
+    31.12.(Y−lag_years). Ist genau dieser Stichtag für die Bank nicht in der
+    Reihe vorhanden, wird das Quartal übersprungen (kein Rückfall auf einen
+    späteren/anderen Jahrgang — Look-ahead würde so vermieden). Pro Quartal:
+    Portfolio einfrieren → RWA-Skalierung unter realisiertem M(t→t+1) →
+    Prognose ΔRWA_credit = gemeldete RWA_credit(t) · (scale−1) gegen die um
+    Volumen (Non-Credit-RWA-Wachstum) bereinigte Realität.
+
+    Output-Schema kompatibel mit walkforward_error_stats / per_bank_summary
+    (zusätzlich Spalte ``bank_name``)."""
+    if macro_q_with_m.empty or capital_wide.empty:
+        return pd.DataFrame()
+    if series_df is None:
+        series_df = load_backtest_series()
+    bank_vintages = set(series_df.loc[series_df["LEI"] == lei, "vintage_date"])
+    if not bank_vintages:
+        return pd.DataFrame()
+    if bank_name is None:
+        nm = series_df.loc[series_df["LEI"] == lei, "bank_name"]
+        bank_name = str(nm.iloc[0]) if len(nm) else lei
+
+    cw = capital_wide[capital_wide["LEI_Code"] == lei].copy()
+    if cw.empty:
+        return pd.DataFrame()
+    cw["rwa_op"] = cw.get("rwa_operational", pd.Series(0, index=cw.index))
+    cw["rwa_noncredit"] = cw["rwa_market"].fillna(0) + cw["rwa_op"].fillna(0)
+    g_idx = {int(r["Period"]): r for _, r in cw.iterrows()}
+    periods_sorted = sorted(g_idx.keys())
+    pidx = {p: i for i, p in enumerate(periods_sorted)}
+    macro_lookup = {(int(r["Period_start"]), int(r["Period_end"])): r
+                    for _, r in macro_q_with_m.iterrows()}
+
+    _frozen: dict[str, object] = {}
+    rows = []
+    for p_start in periods_sorted:
+        i_end = pidx[p_start] + lag_quarters
+        if i_end >= len(periods_sorted):
+            continue
+        p_end = periods_sorted[i_end]
+        macro = macro_lookup.get((p_start, p_end))
+        if macro is None:
+            continue
+        m_q = float(macro["m_hybrid"])
+        yr = p_start // 100
+        pd_vintage = f"{yr - int(lag_years)}-12-31"     # strikt no-look-ahead
+        if pd_vintage not in bank_vintages:
+            continue
+        if pd_vintage not in _frozen:
+            _frozen[pd_vintage] = build_frozen_portfolio_series(
+                lei, pd_vintage, series_df)
+        scale = frozen_rwa_scale(_frozen[pd_vintage], m_q, kappa_lgd=kappa_lgd)
+        if scale is None:
+            continue
+        rs, re_ = g_idx[p_start], g_idx[p_end]
+        rwa_c_s = rs.get("rwa_credit"); rwa_c_e = re_.get("rwa_credit")
+        rwa_nc_s = rs.get("rwa_noncredit"); rwa_nc_e = re_.get("rwa_noncredit")
+        if any(pd.isna(x) for x in (rwa_c_s, rwa_c_e, rwa_nc_s, rwa_nc_e)) \
+                or rwa_c_s <= 0:
+            continue
+        pred_d = float(rwa_c_s) * (scale - 1.0)
+        actual_d = float(rwa_c_e) - float(rwa_c_s)
+        vol_factor = (float(rwa_nc_e) / float(rwa_nc_s) - 1.0) if rwa_nc_s > 0 else 0.0
+        volume_d = float(rwa_c_s) * vol_factor
+        risk_driven_d = actual_d - volume_d
+        sign_match = ((pred_d >= 0 and risk_driven_d >= 0)
+                      or (pred_d < 0 and risk_driven_d < 0))
+        rows.append({
+            "LEI_Code":                    lei,
+            "bank_name":                   bank_name,
+            "Period_start":                int(p_start),
+            "Period_end":                  int(p_end),
+            "period_label_end":            _period_label(int(p_end)),
+            "pd_vintage":                  pd_vintage,
+            "m_quarter":                   m_q,
+            "brent_log_q":                 float(macro["brent_log_q"]),
+            "dr_10y_pp_q":                 float(macro["dr_10y_pp_q"]),
+            "rwa_scale":                   scale,
+            "rwa_credit_start":            float(rwa_c_s),
+            "rwa_credit_end":              float(rwa_c_e),
+            "rwa_noncredit_start":         float(rwa_nc_s),
+            "rwa_noncredit_end":           float(rwa_nc_e),
+            "pred_dRWA_credit_eur":        pred_d,
+            "actual_dRWA_credit_eur":      actual_d,
+            "volume_dRWA_credit_eur":      volume_d,
+            "risk_driven_dRWA_credit_eur": risk_driven_d,
+            "pred_dK_eur":                 pred_d * 0.08,
+            "actual_dK_eur":               actual_d * 0.08,
+            "risk_driven_dK_eur":          risk_driven_d * 0.08,
+            "error_eur":                   pred_d - risk_driven_d,
+            "error_pct_of_start":          (pred_d - risk_driven_d) / float(rwa_c_s),
+            "sign_match":                  bool(sign_match),
+        })
+    return pd.DataFrame(rows)
+
+
+def build_pdlgd_panel(
+    capital_wide: pd.DataFrame,
+    macro_q_with_m: pd.DataFrame,
+    *,
+    series_df: pd.DataFrame | None = None,
+    irb_leis: set[str] | None = None,
+    kappa_lgd: float = 0.30,
+    lag_years: int = 1,
+    lag_quarters: int = 1,
+) -> pd.DataFrame:
+    """Series-driven Frozen-Portfolio-Walk-Forward über ALLE Banken der
+    Backtest-Reihe (optional auf ``irb_leis`` eingeschränkt). Konkatenierte
+    Einzel-Bank-Panels; Schema wie build_pdlgd_walkforward_series."""
+    if series_df is None:
+        series_df = load_backtest_series()
+    leis = set(series_df["LEI"].dropna().unique())
+    if irb_leis is not None:
+        leis &= set(irb_leis)
+    names = (series_df.drop_duplicates("LEI").set_index("LEI")["bank_name"]
+             .to_dict())
+    frames = []
+    for lei in sorted(leis):
+        f = build_pdlgd_walkforward_series(
+            lei, macro_q_with_m, capital_wide,
+            series_df=series_df, bank_name=names.get(lei),
+            kappa_lgd=kappa_lgd, lag_years=lag_years, lag_quarters=lag_quarters)
+        if not f.empty:
+            frames.append(f)
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def backtest_series_coverage(series_df: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Abdeckungs-Matrix Bank × Stichtag (Anzahl IRB-Klassen je Zelle) — für
+    den Datenbasis-Überblick im UI (macht die Roh-Reihe greifbar)."""
+    if series_df is None:
+        series_df = load_backtest_series()
+    cov = (series_df.groupby(["bank_name", "vintage_date"])["vasicek_class"]
+           .nunique().reset_index(name="n_classes"))
+    return cov.pivot(index="bank_name", columns="vintage_date",
+                     values="n_classes").fillna(0).astype(int)
+
+
+# ============================================================================
 # 4. Walk-Forward Panel
 # ============================================================================
 def build_walkforward_panel(
@@ -740,6 +960,31 @@ def _test_frozen_portfolio_pdlgd():
         "RWA-Skalierung muss vintage-abhängig sein (Zeitreihe wirkt)"
 
 
+def _test_series_frozen_portfolio():
+    """Series-driven Frozen-Portfolio: für mehrere Banken aus der rohen
+    Reihe baubar, RWA-Skalierung unter Adverse-M > 1 und vintage-abhängig,
+    mortgage_sme wird auf einen gültigen Basel-Slot abgebildet (kein Crash)."""
+    try:
+        ser = load_backtest_series()
+    except FileNotFoundError:
+        print("  [SKIP] series frozen-portfolio (kein pillar3_backtest_pdlgd.csv)")
+        return
+    DB = "7LTWFZYICNSX8D621K86"
+    fp22 = build_frozen_portfolio_series(DB, "2022-12-31", ser)
+    fp23 = build_frozen_portfolio_series(DB, "2023-12-31", ser)
+    assert fp22 is not None and len(fp22.segments) >= 5, "DB 2022 unvollständig"
+    s22 = frozen_rwa_scale(fp22, -2.0)
+    s23 = frozen_rwa_scale(fp23, -2.0)
+    assert s22 is not None and s22 > 1.1, f"Adverse-Skalierung zu klein: {s22}"
+    assert abs(s22 - s23) > 1e-4, "RWA-Skalierung muss vintage-abhängig sein"
+    # ING führt mortgage_sme — Builder darf nicht crashen und den Slot mappen
+    ING = "549300NYKK9MWM7GGW15"
+    fp_ing = build_frozen_portfolio_series(ING, "2023-12-31", ser)
+    assert fp_ing is not None, "ING 2023 sollte baubar sein"
+    classes = {s.exposure_class for s in fp_ing.segments}
+    assert classes <= _VALID_VCLASS, f"ungültige Klasse durchgerutscht: {classes}"
+
+
 def _test_randomwalk_benchmark():
     panel = pd.DataFrame({
         "pred_dRWA_credit_eur":        [10.0, -5.0, 8.0, 2.0],
@@ -775,6 +1020,7 @@ if __name__ == "__main__":
         ("period label",             _test_period_label),
         ("vintage_for_period map",   _test_vintage_for_period),
         ("frozen-portfolio PD/LGD",  _test_frozen_portfolio_pdlgd),
+        ("series frozen-portfolio",  _test_series_frozen_portfolio),
         ("random-walk benchmark",    _test_randomwalk_benchmark),
         ("scale-curve monotonicity", _test_scale_curve_monotone),
     ]:
