@@ -153,6 +153,16 @@ if os.path.exists(DL + "rabobank_raw_rows.csv"):
         add(RABO, "Rabobank", r["vasicek_class"], r["vintage_date"], r["pd_pct"], r["lgd_pct"],
             r["ead_eur_m"], "Rabobank Pillar 3 Year Report EU CR6 AIRB (raw subtotal)", note)
 
+# --- Crédit Agricole S.A.: EU-CR6 Advanced-IRB. CA *S.A.* (not CA Group) is the entity
+#     in the EBA Transparency panel -> the backtestable CA entity. The year-end 2024 report
+#     yields 31.12.2024 + the 31.12.2023 comparative (7/7 each, density-verified). ---
+CASA = "F0HUI1NY1AZMJMD8LP67"
+if os.path.exists(DL + "ca_raw_rows.csv"):
+    ca = pd.read_csv(DL + "ca_raw_rows.csv", dtype=str)
+    for _, r in ca.iterrows():
+        add(CASA, "Credit Agricole SA", r["vasicek_class"], r["vintage_date"], r["pd_pct"],
+            r["lgd_pct"], r["ead_eur_m"], "Credit Agricole S.A. Pillar 3 EU CR6 A-IRB (raw subtotal)")
+
 # --- Post-process: ING has NO Qualifying Revolving (QRRE) A-IRB block in any year;
 #     its 'qrre' rows are actually "Retail - Secured by immovable property SME"
 #     (verification finding). Relabel -> mortgage_sme so it does not contaminate the

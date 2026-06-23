@@ -1,0 +1,27 @@
+LEI,bank_name,vasicek_class,vintage_date,pd_pct,lgd_pct,ead_eur_m,rwa_eur_m,density,source,page
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,sovereign,2021-12-31,0.04,5.50,109440,1029,0.940,Credit Agricole S.A. Pillar 3 2021 EU CR6 A-IRB (raw subtotal),40
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,bank,2021-12-31,1.44,25.83,29561,2928,9.910,Credit Agricole S.A. Pillar 3 2021 EU CR6 A-IRB (raw subtotal),40
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,corporate,2021-12-31,2.00,39.40,122279,48123,39.360,Credit Agricole S.A. Pillar 3 2021 EU CR6 A-IRB (raw subtotal),41
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,mortgage,2021-12-31,1.35,11.07,111564,9216,8.260,Credit Agricole S.A. Pillar 3 2021 EU CR6 A-IRB (raw subtotal),41
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,qrre,2021-12-31,4.49,60.03,10934,3580,32.740,Credit Agricole S.A. Pillar 3 2021 EU CR6 A-IRB (raw subtotal),41
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,other_retail,2021-12-31,5.26,32.53,54955,19152,34.850,Credit Agricole S.A. Pillar 3 2021 EU CR6 A-IRB (raw subtotal),42
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,sovereign,2022-12-31,0.05,8.21,132966,1610,1.210,Credit Agricole S.A. Pillar 3 2022 EU CR6 A-IRB (raw subtotal),40
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,bank,2022-12-31,1.73,30.90,26505,4352,16.420,Credit Agricole S.A. Pillar 3 2022 EU CR6 A-IRB (raw subtotal),40
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,corporate,2022-12-31,1.94,36.44,133580,47964,35.910,Credit Agricole S.A. Pillar 3 2022 EU CR6 A-IRB (raw subtotal),41
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,sme_corporate,2022-12-31,4.44,40.89,13162,6305,47.900,Credit Agricole S.A. Pillar 3 2022 EU CR6 A-IRB (raw subtotal),41
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,mortgage,2022-12-31,1.32,10.85,113906,9512,8.350,Credit Agricole S.A. Pillar 3 2022 EU CR6 A-IRB (raw subtotal),41
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,other_retail,2022-12-31,5.69,27.70,61574,20346,33.040,Credit Agricole S.A. Pillar 3 2022 EU CR6 A-IRB (raw subtotal),40
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,sovereign,2023-12-31,0.06,8.26,133857,1949,1.460,Credit Agricole S.A. Pillar 3 2023 EU CR6 A-IRB (raw subtotal),127
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,bank,2023-12-31,2.23,29.97,21278,3099,14.570,Credit Agricole S.A. Pillar 3 2023 EU CR6 A-IRB (raw subtotal),127
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,corporate,2023-12-31,2.01,36.77,170299,61622,36.180,Credit Agricole S.A. Pillar 3 2023 EU CR6 A-IRB (raw subtotal),129
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,sme_corporate,2023-12-31,4.38,42.51,17723,9011,50.840,Credit Agricole S.A. Pillar 3 2023 EU CR6 A-IRB (raw subtotal),128
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,mortgage,2023-12-31,1.40,10.91,116801,9806,8.400,Credit Agricole S.A. Pillar 3 2023 EU CR6 A-IRB (raw subtotal),130
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,qrre,2023-12-31,4.78,78.18,13266,4444,33.500,Credit Agricole S.A. Pillar 3 2023 EU CR6 A-IRB (raw subtotal),130
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,other_retail,2023-12-31,5.94,31.37,61483,20823,33.870,Credit Agricole S.A. Pillar 3 2023 EU CR6 A-IRB (raw subtotal),131
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,sovereign,2024-12-31,0.06,8.26,144574,2277,1.580,Credit Agricole S.A. Pillar 3 2024 EU CR6 A-IRB (raw subtotal),122
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,bank,2024-12-31,1.84,28.36,24951,3416,13.690,Credit Agricole S.A. Pillar 3 2024 EU CR6 A-IRB (raw subtotal),122
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,corporate,2024-12-31,1.52,36.92,191305,72293,37.790,Credit Agricole S.A. Pillar 3 2024 EU CR6 A-IRB (raw subtotal),124
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,sme_corporate,2024-12-31,4.38,43.33,18440,9778,53.030,Credit Agricole S.A. Pillar 3 2024 EU CR6 A-IRB (raw subtotal),123
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,mortgage,2024-12-31,1.54,10.87,118185,9653,8.170,Credit Agricole S.A. Pillar 3 2024 EU CR6 A-IRB (raw subtotal),125
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,qrre,2024-12-31,5.46,79.67,13432,4767,35.490,Credit Agricole S.A. Pillar 3 2024 EU CR6 A-IRB (raw subtotal),125
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,other_retail,2024-12-31,6.16,30.38,63181,20642,32.670,Credit Agricole S.A. Pillar 3 2024 EU CR6 A-IRB (raw subtotal),126
