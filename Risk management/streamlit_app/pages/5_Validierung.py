@@ -382,7 +382,7 @@ with tab_bt:
                "<em>zur richtigen Zeit</em> feuern (sie tun es: genau in den "
                "Krisen). Den eigentlichen Vergleich Prognose-gegen-Realität siehst "
                "du weiter unten in <strong>Ebene 3 → Probe A</strong> "
-               "(blaue Balken = Modell, rote Balken = Realität).",
+               "(blaue Linie = Modell, rote Linie = Realität).",
         metrik="Δr₁₀ⱼ = Veränderung des 10-Jahres-Zinses in <strong>Prozentpunkten</strong> "
                "(z. B. +2,8 pp = von 0 % auf 2,8 %). ΔBrent = log-Veränderung des "
                "Ölpreises über das Quartal (≈ prozentuale Änderung).",
@@ -510,9 +510,11 @@ with tab_bt:
     if pd_stats.get("n", 0) > 0:
         st.markdown(
             "**Probe A · Modell-Prognose vs. Realität (jährlich) — der Vergleich, "
-            "der zählt.**  In der Grafik unten: **blaue Balken = unsere "
-            "Modell-Prognose** der PD-Änderung, **rote Balken = die tatsächlich "
-            "gemeldete (reale) PD-Änderung** — je Jahr, gemittelt über alle Banken.")
+            "der zählt.**  Wir nehmen den real eingetretenen Öl- + Zinsanstieg "
+            "jedes Jahres, lassen ihn durch das Modell laufen und stellen die "
+            "**Prognose (blaue Linie)** der **Realität (rote Linie)** gegenüber — "
+            "je Jahr, über alle Banken gemittelt. Über jedem Jahr steht der "
+            "Treiber (Zins-/Öl-Anstieg), der die Prognose erzeugt hat.")
         pa1, pa2, pa3, pa4 = st.columns(4, gap="small")
         pa1.metric("PD-Vorhersagen", f"{pd_stats['n']}",
                    "Bank × Klasse × Jahr", delta_color="off")
@@ -533,27 +535,44 @@ with tab_bt:
             "**über** dem naiven, schlägt das Modell nicht einmal diese."
         )
 
-        # Jahres-Mittel: prognostizierte vs. realisierte PD-Änderung
+        # Jahres-Mittel: Modell-Prognose vs. Realität, mit Treiber je Jahr
+        amac = annual_macro or {}
         yr_agg = (pd_bt.groupby("year")[["d_pred_pp", "d_real_pp"]]
                   .mean().reset_index())
+        yr_agg["dr"] = yr_agg["year"].map(
+            lambda y: amac.get(int(y), {}).get("d_r_10y_pp", float("nan")))
+        yr_agg["dbrent_pct"] = yr_agg["year"].map(
+            lambda y: (amac.get(int(y), {}).get("d_brent_log", 0.0) or 0.0) * 100)
         fig_pa = go.Figure()
-        fig_pa.add_trace(go.Bar(
-            x=yr_agg["year"], y=yr_agg["d_pred_pp"], name="Modell-Prognose ΔPD",
-            marker_color=COLORS["navy"], opacity=0.88,
-            hovertemplate="FY%{x}<br>Modell ΔPD = %{y:+.3f} pp<extra></extra>",
+        fig_pa.add_trace(go.Scatter(
+            x=yr_agg["year"], y=yr_agg["d_pred_pp"], name="Modell-Prognose",
+            mode="lines+markers", line=dict(color=COLORS["navy"], width=3),
+            marker=dict(size=11),
+            hovertemplate="FY%{x}<br><b>Modell sagt</b>: ΔPD %{y:+.3f} pp<extra></extra>",
         ))
-        fig_pa.add_trace(go.Bar(
-            x=yr_agg["year"], y=yr_agg["d_real_pp"], name="gemeldet (realisiert) ΔPD",
-            marker_color=COLORS["crimson"], opacity=0.88,
-            hovertemplate="FY%{x}<br>gemeldet ΔPD = %{y:+.3f} pp<extra></extra>",
+        fig_pa.add_trace(go.Scatter(
+            x=yr_agg["year"], y=yr_agg["d_real_pp"], name="Realität (gemeldet)",
+            mode="lines+markers",
+            line=dict(color=COLORS["crimson"], width=3, dash="dot"),
+            marker=dict(size=11),
+            hovertemplate="FY%{x}<br><b>Realität</b>: ΔPD %{y:+.3f} pp<extra></extra>",
         ))
         fig_pa.add_hline(y=0, line_color=COLORS["hairline"], line_width=1)
+        # Treiber je Jahr als Label über den Punkten
+        for _, r in yr_agg.iterrows():
+            top = max(float(r["d_pred_pp"]), float(r["d_real_pp"]))
+            fig_pa.add_annotation(
+                x=r["year"], y=top, yshift=30, showarrow=False,
+                text=(f"<b>{int(r['year'])}</b><br>Zins {r['dr']:+.1f} pp · "
+                      f"Öl {r['dbrent_pct']:+.0f} %"),
+                font=dict(size=10, color=COLORS["stone"]), align="center",
+            )
         fig_pa.update_layout(
-            title="Ø PD-Änderung je Jahr · Modell-Prognose vs. tatsächlich gemeldet",
-            xaxis_title="Pillar-3-Jahrgang (Stichjahr)",
-            yaxis_title="Ø ΔPD [Prozentpunkte]",
-            height=340, barmode="group", bargap=0.3,
-            xaxis=dict(tickmode="array", tickvals=list(yr_agg["year"])),
+            title="Jährlich: realen Öl- + Zinsschock durchs Modell laufen lassen → Prognose vs. Realität",
+            xaxis_title="Jahr (Schock wirkt über das Jahr · Portfolio eingefroren Ende Vorjahr — zeitlich versetzt)",
+            yaxis_title="Ø Veränderung der PD [Prozentpunkte]",
+            height=430, xaxis=dict(tickmode="array", tickvals=list(yr_agg["year"])),
+            margin=dict(t=70),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
         )
         st.plotly_chart(fig_pa, use_container_width=True)
