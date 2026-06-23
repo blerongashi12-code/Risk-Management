@@ -625,14 +625,19 @@ with tab_bt:
     # Links: eingefrorene PD/LGD-Entwicklung (die Input-Reihe, greifbar)
     with bk_l:
         sb = series[series["LEI"] == sel_lei].copy()
-        sb["w"] = sb["ead_eur_m"]
-        agg = (sb.groupby("vintage_date")
-                 .apply(lambda d: pd.Series({
-                     "PD": np.average(d["pd_pct"], weights=d["w"]),
-                     "LGD": np.average(d["lgd_pct"], weights=d["w"]),
-                     "EAD_bn": d["ead_eur_m"].sum()/1e3,
-                 }))
-                 .reset_index().sort_values("vintage_date"))
+
+        def _wavg(d, col):
+            w = d["ead_eur_m"].to_numpy(dtype=float)
+            x = d[col].to_numpy(dtype=float)
+            return float(np.average(x, weights=w)) if np.nansum(w) > 0 else float("nan")
+
+        # Version-sichere EAD-Gewichtung (kein groupby.apply → robust über
+        # pandas-Versionen, kein FutureWarning auf Gruppen-Spalten).
+        agg = (pd.DataFrame([
+                   {"vintage_date": v, "PD": _wavg(d, "pd_pct"),
+                    "LGD": _wavg(d, "lgd_pct"), "EAD_bn": d["ead_eur_m"].sum()/1e3}
+                   for v, d in sb.groupby("vintage_date")])
+               .sort_values("vintage_date"))
         agg["yr"] = agg["vintage_date"].str[:4]
         fig_pd = go.Figure()
         fig_pd.add_trace(go.Scatter(
