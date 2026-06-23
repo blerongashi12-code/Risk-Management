@@ -11,7 +11,7 @@ Jahrgänge 2021-2024, EU-CR6-A-IRB-Sub-totals, dichte-/kontinuitäts-verifiziert
 (keine fabrizierten Werte).
 
 Validierung in drei Ebenen (ehrliche Outcomes-Analysis nach SR 11-7):
-  1. Stress-Treiber-Timing  · trifft der Makro-Faktor M die bekannten Krisen?
+  1. Stress-Treiber-Timing  · treffen die zwei Faktoren die bekannten Krisen?
   2. Strukturelle Soundness  · ist die bank-spezifische RWA-Antwort monoton
                                und konservativ (Vasicek/Basel-konsistent)?
   3. Outcomes-Analysis       · Prognose vs. realisiertes ΔRWA_credit — inkl.
@@ -216,6 +216,23 @@ with tab_bt:
     pd_bt, annual_macro = _build_pd_bt(series)
     pd_stats = pd_backtest_stats(pd_bt) if pd_bt is not None else {"n": 0}
 
+    # --- Einheitliche Lesehilfe unter jeder Grafik (addressatengerecht) ---
+    def lese(was, befund, modell, metrik=None):
+        rows = [("Was zeigt die Grafik?", was),
+                ("Befund — was sehen wir?", befund),
+                ("Aussage — was heißt das für unser Modell?", modell)]
+        if metrik:
+            rows.append(("Verwendete Kennzahl — einfach erklärt", metrik))
+        inner = "".join(
+            f'<div style="margin:0.18rem 0;"><span style="color:#034B6F;'
+            f'font-weight:700;">{lab}</span> {txt}</div>' for lab, txt in rows)
+        st.markdown(
+            f'<div style="background:#F7F9FB;border:1px solid #E6E6E6;'
+            f'border-left:4px solid #034B6F;padding:0.85rem 1.1rem;'
+            f'border-radius:6px;margin:0.1rem 0 0.8rem 0;color:#051C2C;'
+            f'font-size:0.9rem;line-height:1.65;">{inner}</div>',
+            unsafe_allow_html=True)
+
     # ====================================================================
     #  Abschnitt 1 · Datenbasis greifbar machen
     # ====================================================================
@@ -263,19 +280,20 @@ with tab_bt:
     fig_cov.update_yaxes(autorange="reversed")
     st.plotly_chart(fig_cov, use_container_width=True)
 
-    st.markdown(
-        '<div style="background:#F4F4F4;padding:0.7rem 1.0rem;border-radius:6px;'
-        'margin:0.2rem 0 0.6rem 0;color:#051C2C;font-size:0.84rem;line-height:1.55;">'
-        '<strong>Quelle &amp; Integrität.</strong> Jeder Wert stammt direkt aus '
-        'einem <em>EU-CR6-A-IRB-„Sub-total"</em> des bankpublizierten Pillar-3-'
-        'Reports (EBA-ITS/2020/04, CRR Art. 431-455) — kein abgeleiteter, '
-        'proxied oder fabrizierter Wert. Verifikation pro Zelle: Spalten gegen '
-        'FY2024-Anker kalibriert, RWA/EAD-Dichte-Cross-Check und bankinterne '
-        'EAD-Kontinuität über die Jahre. Volle Klassen × Jahr = 7; weiße/helle '
-        'Zellen markieren reine Quellgrenzen (gerundete oder im PDF '
-        'verschmolzene Werte), nicht fehlende Sorgfalt.'
-        '</div>',
-        unsafe_allow_html=True,
+    lese(
+        was="Pro Bank (Zeile) und Pillar-3-Jahrgang (Spalte) die Anzahl der "
+            "Kreditklassen, für die wir PD, LGD und EAD aus dem Geschäftsbericht "
+            "extrahiert haben — dunkler = vollständiger (max. 7 Klassen).",
+        befund="10 europäische Großbanken über vier Jahre (2021–2024), fast "
+               "durchgehend dunkelblau. Helle Zellen sind reine Quellgrenzen "
+               "(im PDF gerundete/verschmolzene Werte), keine fehlende Sorgfalt.",
+        modell="Erst diese lückenarme, einheitliche Zeitreihe macht den "
+               "historischen Test überhaupt möglich — ohne sie könnten wir das "
+               "Modell nur am heutigen Stand anwenden, nicht in der Vergangenheit prüfen.",
+        metrik="Quelle &amp; Integrität: jeder Wert ist ein bankpubliziertes "
+               "<em>EU-CR6-A-IRB-Sub-total</em> (EBA-ITS/2020/04, CRR Art. 431-455) "
+               "— kein abgeleiteter, geschätzter oder erfundener Wert; pro Zelle "
+               "gegen FY2024 kalibriert und über RWA/EAD-Dichte geprüft.",
     )
 
     # ====================================================================
@@ -288,14 +306,28 @@ with tab_bt:
         'border-left:4px solid #C9A227;padding:0.85rem 1.1rem;border-radius:6px;'
         'margin:0.3rem 0 0.9rem 0;color:#051C2C;font-size:0.86rem;line-height:1.6;">'
         '<strong>Warum das die erste Validierung ist.</strong> Das Modell wird '
-        'von <strong>zwei getrennten, beobachtbaren Faktoren</strong> getrieben '
-        '— dem Zinsschock <code>Δr₁₀<sub>J</sub></code> und dem Energie-/'
-        'Angebotsschock <code>ΔBrent</code> (kein in einen einzelnen Vasicek-M '
-        'kollabierter Aggregat-Regler mehr). Jeder Faktor wirkt über '
-        '<em>sektor-spezifische</em> Sensitivitäten β (Ebene 2). Bevor man '
-        'Prognosen vergleicht, müssen diese Treiber <em>zur richtigen Zeit '
-        'ausschlagen</em> — und der dominante Treiber 2022-2024 war eindeutig '
-        'der Zinsschock.'
+        'von <strong>zwei getrennten, messbaren Faktoren</strong> getrieben — dem '
+        'Zinsschock <code>Δr₁₀<sub>J</sub></code> und dem Energie-/Angebotsschock '
+        '<code>ΔBrent</code>. Jeder wirkt über <em>sektor-spezifische</em> '
+        'Sensitivitäten (Ebene 2). Bevor man Prognosen vergleicht, müssen diese '
+        'Treiber <em>zur richtigen Zeit</em> ausschlagen — also genau dann, wenn '
+        'real eine Krise herrschte.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # --- Krisen-Legende: kurze Definition der markierten Episoden ---------
+    st.markdown(
+        '<div style="background:#FBF2F2;border:1px solid #E8C9CF;'
+        'border-left:4px solid #A52F4D;padding:0.8rem 1.05rem;border-radius:6px;'
+        'margin:0.1rem 0 0.8rem 0;color:#051C2C;font-size:0.86rem;line-height:1.65;">'
+        '<strong>Die markierten Krisen (gestrichelte Linien in der Grafik):</strong><br>'
+        '• <strong>Ukraine Q1 2022</strong> — russischer Überfall → Energiepreis- '
+        '&amp; Inflationsschock.<br>'
+        '• <strong>Zinswende Q3 2022</strong> — schnellste Leitzins-Anhebung der '
+        'EZB-Geschichte gegen die Inflation.<br>'
+        '• <strong>SVB/CS Q1 2023</strong> — Kollaps der Silicon Valley Bank + '
+        'Credit-Suisse-Notrettung → kurze Banken-Vertrauenskrise.'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -336,13 +368,20 @@ with tab_bt:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
     )
     st.plotly_chart(fig_f, use_container_width=True)
-    insight(
-        "<strong>Befund.</strong> Der Zinsschock (Balken) schlägt 2022 massiv "
-        "positiv aus — der Bundesbank-10J-Zins sprang über das Jahr um rund "
-        "+2,8 pp (Ukraine- &amp; Inflationsschock, EZB-Wende), gefolgt von der "
-        "SVB/CS-Episode Q1 2023. Genau das sind die bekannten Stress-Phasen. "
-        "Beide Faktoren sind also zeitlich korrekt verankert — die Grund-"
-        "voraussetzung dafür, dass das Modell das Richtige stresst."
+    lese(
+        was="Die zwei tatsächlich eingetretenen Schocks pro Quartal — der "
+            "Zinsschock als Balken (rot = Zins gestiegen, türkis = gefallen) und "
+            "der Ölpreis als gelbe Linie. Gestrichelte Linien = die oben "
+            "definierten Krisen.",
+        befund="Der Zinsschock springt 2022 massiv nach oben (10-Jahres-Zins "
+               "+2,8 pp übers Jahr) — exakt in der Ukraine-/Inflations-/Zinswende-"
+               "Phase, gefolgt von SVB/CS Anfang 2023.",
+        modell="Die beiden Treiber des Modells schlagen genau dann aus, wenn real "
+               "Stress herrschte. Das Modell stresst also das Richtige zur "
+               "richtigen Zeit — diese Grund-Plausibilität ist bestanden.",
+        metrik="Δr₁₀ⱼ = Veränderung des 10-Jahres-Zinses in <strong>Prozentpunkten</strong> "
+               "(z. B. +2,8 pp = von 0 % auf 2,8 %). ΔBrent = log-Veränderung des "
+               "Ölpreises über das Quartal (≈ prozentuale Änderung).",
     )
 
     # ====================================================================
@@ -363,8 +402,8 @@ with tab_bt:
         'reagiert am stärksten auf Zinsen (β_rate≫β_oil — Affordability + '
         'Hauspreis-Kanal); <strong>Bank</strong> hat ein <em>negatives</em> '
         'β_rate (NIM-Uplift bei steigenden Zinsen); <strong>Sovereign</strong> '
-        'ist macro-inert (Zins wirkt dort über den Marktbuch-Kanal). Diese '
-        'Differenzierung ersetzt den früheren pauschalen Single-M-Regler.'
+        'ist macro-inert (Zins wirkt dort über den separaten Marktbuch-Kanal). '
+        'Genau diese Differenzierung ist der Kern des 2-Faktor-Modells.'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -391,6 +430,22 @@ with tab_bt:
     )
     fig_beta.update_yaxes(autorange="reversed")
     st.plotly_chart(fig_beta, use_container_width=True)
+    lese(
+        was="Wie stark jede Kreditklasse auf die beiden Schocks reagiert — die "
+            "Stellschrauben des Modells. Rot = Risiko steigt bei dem Schock, "
+            "blau = Risiko sinkt, weiß = kein Effekt.",
+        befund="Mortgage reagiert am stärksten auf Zinsen (Affordability + "
+               "Hauspreise); Bank ist beim Zins <em>blau/negativ</em> (Banken "
+               "verdienen an höheren Zinsen — NIM); Sovereign ist null (läuft "
+               "über das Marktbuch). Alle Vorzeichen ökonomisch plausibel.",
+        modell="Das Modell behandelt Zins- und Ölschock getrennt und je Sektor "
+               "unterschiedlich — kein pauschaler Auf-/Ab-Regler. Die Reaktion "
+               "ist also ökonomisch fundiert, nicht willkürlich.",
+        metrik="β (Beta) = um wie viele <strong>Prozentpunkte</strong> sich die "
+               "PD (bzw. γ für LGD) ändert, wenn der Faktor um eine Einheit steigt "
+               "(Zins +1 pp bzw. Öl +100 %). Jeder Wert ist quellenbelegt "
+               "(EBA-2025-Methodik §2.4.2, ECB WP 2897/3112).",
+    )
 
     # --- Realistische, bank-spezifische Zins-Antwort der RWA ---
     resp = _rate_response(series)
@@ -413,15 +468,19 @@ with tab_bt:
         margin=dict(r=180),
     )
     st.plotly_chart(fig_rr, use_container_width=True)
-    insight(
-        "<strong>Befund.</strong> Die Antwort ist monoton steigend im Zinsschock "
-        "und konservativ (mehr Zins-Stress ⇒ mehr RWA), und die Größenordnung "
-        "ist jetzt <strong>realistisch</strong>: ein +2,8-pp-Schock (wie 2022) "
-        "projiziert grob +5 bis +15 % Kredit-RWA — plausibel im Bereich echter "
-        "EBA-Stresstests, nicht mehr die +180 %-Überschießung des alten "
-        "Single-M-Pfads. Die <em>Spreizung</em> zwischen den Banken zeigt, dass "
-        "die echte Pillar-3-Zeitreihe wirkt: Häuser mit höherem Corporate-/"
-        "Mortgage-Anteil reagieren steiler, ausgeprägte Retail-Bücher flacher."
+    lese(
+        was="Wie stark das vom Modell prognostizierte Kredit-RWA jeder Bank "
+            "steigt, wenn der Zins um X Prozentpunkte anzieht (Ölpreis fix). "
+            "Jede Linie = eine Bank.",
+        befund="Alle Linien steigen sauber an (mehr Zins-Stress ⇒ mehr RWA, nie "
+               "weniger) und liegen in realistischer Höhe: ein +2,8-pp-Schock wie "
+               "2022 ergibt grob +5 bis +15 % RWA — im Bereich echter EBA-Stresstests.",
+        modell="Die Stress-Mechanik ist <strong>konservativ</strong> (Risiko nur "
+               "nach oben) und <strong>bank-individuell</strong> (steilere Linien "
+               "= riskanterer Portfolio-Mix). Das ist genau das Verhalten, das ein "
+               "seriöses Stress-Modell zeigen muss.",
+        metrik="ΔRWA in <strong>% der Baseline</strong> = wie viel mehr Eigenkapital "
+               "die Bank unter dem Schock hinterlegen müsste, relativ zum Normalzustand.",
     )
 
     # ====================================================================
@@ -456,6 +515,15 @@ with tab_bt:
         pa4.metric("MAE Modell vs. naiv",
                    f"{pd_stats['mae_model']:.2f} / {pd_stats['mae_naive']:.2f} pp",
                    "schlägt 'keine Änderung' nicht", delta_color="off")
+        st.caption(
+            "**So liest du die Kennzahlen:** **Trefferquote** = in wie viel % der "
+            "Fälle die gemeldete PD in die vom Modell vorhergesagte Richtung lief "
+            "(50 % = reiner Zufall). **Korrelation** = Gleichlauf von Vorhersage "
+            "und Realität, von −1 bis +1 (0 = kein Zusammenhang). **MAE** = "
+            "durchschnittlicher Vorhersage-Fehler in Prozentpunkten; *naiv* = die "
+            "simpelste Vergleichsprognose *PD bleibt gleich*. Liegt der Modell-MAE "
+            "**über** dem naiven, schlägt das Modell nicht einmal diese."
+        )
 
         # Jahres-Mittel: prognostizierte vs. realisierte PD-Änderung
         yr_agg = (pd_bt.groupby("year")[["d_pred_pp", "d_real_pp"]]
@@ -527,6 +595,13 @@ with tab_bt:
               "Modell ≥ Ist (sichere Seite)", delta_color="off")
     o4.metric("Beobachtungen", f"{n_pairs}", f"{n_banks_bt} Banken × Quartale",
               delta_color="off")
+    st.caption(
+        "**So liest du die Kennzahlen:** **Trefferquote** = Anteil der Quartale, "
+        "in denen das RWA in die vorhergesagte Richtung lief (50 % = Zufall). "
+        "**Korrelation** = Gleichlauf Prognose ↔ Realität (−1…+1; 0 = keiner). "
+        "**Konservativ-Anteil** = wie oft das Modell — bei richtiger Richtung — "
+        "den Effekt eher **über**schätzt (auf der sicheren Seite liegt)."
+    )
 
     # Standardisierter Scatter (z-Scores) — entkoppelt das Skalen-Thema vom
     # Richtungs-/Korrelations-Thema. Runde, unkorrelierte Wolke = kein Signal.
@@ -559,40 +634,52 @@ with tab_bt:
         st.plotly_chart(fig_zs, use_container_width=True)
     with sc_r:
         st.markdown(
-            '<div style="font-size:0.86rem;line-height:1.65;color:#051C2C;'
-            'margin-top:1.5rem;">'
-            '<strong>Wie man den Scatter liest.</strong> Läge echte '
-            'Prognosekraft vor, drängten sich die Punkte um die rote 45°-Linie. '
-            'Stattdessen bilden sie eine <em>runde, unkorrelierte Wolke</em> — '
-            'die quartalsweise Richtung der realisierten RWA-Bewegung folgt dem '
-            'Modell nicht. Standardisiert (z-Scores), damit der reine '
-            'Skalen-Unterschied ausgeblendet ist und nur der '
-            '<em>Zusammenhang</em> sichtbar bleibt.'
+            '<div style="font-size:0.88rem;line-height:1.7;color:#051C2C;'
+            'margin-top:0.4rem;">'
+            '<strong>Was ist ein z-Score (die hier verwendete Kennzahl)?</strong> '
+            'Eine simple Umrechnung, die Zahlen vergleichbar macht: '
+            '<code>z = (Wert − Mittelwert) ÷ Standardabweichung</code>. '
+            'z = 0 heißt „genau der Durchschnitt", z = +1 „eine Standardabweichung '
+            'darüber". Wir rechnen beide Achsen so um, damit der reine '
+            '<em>Größenunterschied</em> (die Modell-Zahl ist viel größer als die '
+            'realisierte) verschwindet und nur der <strong>Zusammenhang</strong> '
+            'übrig bleibt.<br><br>'
+            '<strong>Wie man den Scatter liest.</strong> Bei echter Prognosekraft '
+            'lägen die Punkte nahe der roten 45°-Linie. Stattdessen sieht man eine '
+            '<em>runde Wolke ohne Richtung</em> — die quartalsweise RWA-Bewegung '
+            'folgt dem Modell nicht. <strong>Das ist der ehrliche Befund</strong> '
+            '(warum: siehe Erklärung unter Probe A).'
             '</div>',
             unsafe_allow_html=True,
         )
 
-    # Stress-konditionale Trefferquote
+    # Konditionale Trefferquote — wird das Modell in echten Zinsschock-Quartalen besser?
+    st.markdown("**Wird das Modell in echten Zinsschock-Quartalen treffsicherer?**")
     thr_rows = []
-    for lbl, t in [("Alle Quartale (|M| ≥ 0)", 0.0),
-                   ("Schock (|M| ≥ 0.5)", 0.5),
-                   ("Stress (|M| ≥ 1.0)", 1.0),
-                   ("Schwer-Stress (|M| ≥ 1.5)", 1.5)]:
-        s = panel[panel["m_quarter"].abs() >= t]
+    for lbl, t in [("Alle Quartale", 0.0),
+                   ("spürbarer Zinsschock (|Δr| ≥ 0,25 pp)", 0.25),
+                   ("starker Zinsschock (|Δr| ≥ 0,50 pp)", 0.50),
+                   ("sehr starker Zinsschock (|Δr| ≥ 1,0 pp)", 1.0)]:
+        s = panel[panel["dr_10y_pp_q"].abs() >= t]
         ss = walkforward_error_stats(s)
         thr_rows.append({
-            "Filter": lbl, "n Paare": ss.get("n", 0),
+            "Quartals-Filter": lbl, "n Paare": ss.get("n", 0),
             "Trefferquote": f"{ss.get('hit_rate', 0)*100:.0f}%",
             "Korrelation": f"{ss.get('corr', float('nan')):+.2f}",
         })
     st.dataframe(pd.DataFrame(thr_rows), use_container_width=True,
                  hide_index=True, height=180)
+    st.caption(
+        "Auch wenn man nur die Quartale mit echtem Zinsschock betrachtet, bleibt "
+        "die Trefferquote nahe 50 %. Das zeigt: die schwache Übereinstimmung liegt "
+        "nicht an zu ruhigen Quartalen, sondern am grundsätzlichen "
+        "PIT-vs-TTC-Unterschied (oben erklärt)."
+    )
 
     insight(
         f"<strong>Ehrlicher Befund (Probe B).</strong> Die <em>Größenordnung</em> "
-        f"der 2-Faktor-Prognose ist jetzt realistisch (median ~2 % ΔRWA pro "
-        f"Quartal statt der früheren Single-M-Überschießung). Die "
-        f"Richtungs-Trefferquote liegt dennoch bei <strong>{hr:.0f}%</strong> und "
+        f"der 2-Faktor-Prognose ist realistisch (median ~2 % ΔRWA pro Quartal). "
+        f"Die Richtungs-Trefferquote liegt dennoch bei <strong>{hr:.0f}%</strong> und "
         f"die Korrelation bei <strong>{stats.get('corr', float('nan')):+.2f}</strong> "
         f"— wie bei Probe A: regulatorisches RWA bewegt sich quartalsweise vor "
         f"allem durch Steuerung (CRM, Umschichtung, IRB↔SA) und TTC-Glättung, "
@@ -662,9 +749,11 @@ with tab_bt:
         )
         st.plotly_chart(fig_pd, use_container_width=True)
         st.caption(
-            "Die tatsächliche Input-Reihe dieser Bank — EAD-gewichtetes "
-            "Portfolio-PD/-LGD je Pillar-3-Stichtag. Genau diese Werte friert "
-            "der Walk-Forward zu jedem T0 ein (no-look-ahead)."
+            "**Was:** die echten Eingangswerte dieser Bank — EAD-gewichtete Ø PD "
+            "(rot) und Ø LGD (blau) je Pillar-3-Stichtag. **Aussage:** genau diese "
+            "Werte friert der Backtest zu jedem Zeitpunkt ein (kein Blick in die "
+            "Zukunft); man sieht hier auch direkt, wie stabil/geglättet (TTC) die "
+            "gemeldeten Parameter über die Jahre sind."
         )
 
     # Rechts: Richtungstreffer je Quartal (realisiert, lesbare Skala)
@@ -697,6 +786,12 @@ with tab_bt:
         bb2.metric("Trefferquote", f"{bstats.get('hit_rate', 0)*100:.0f}%")
         bb3.metric("Ø frozen-Vintage",
                    sub["pd_vintage"].mode().iloc[0][:4] if len(sub) else "—")
+        st.caption(
+            "**Was:** je Quartal die tatsächliche, um Volumen bereinigte RWA-"
+            "Bewegung dieser Bank — **grün ✓** = Modell traf die Richtung, "
+            "**rot ✗** = daneben. **Aussage:** macht die Trefferbilanz pro Institut "
+            "greifbar (die Höhe ist die Realität, die Farbe der Modell-Treffer)."
+        )
 
     # ====================================================================
     #  Abschnitt 6 · Verdikt
@@ -749,8 +844,8 @@ veröffentlicht war. Fehlt dieser exakte Jahrgang für eine Bank, wird das
 Quartal übersprungen (kein Rückgriff auf einen späteren Jahrgang).
 
 **Schritt B — Realisierte 2 Faktoren.** Zwischen den Stichtagen messen wir die
-zwei Schocks getrennt: ΔBrent (log-Return) und Δr₁₀ⱼ (Prozentpunkte). KEINE
-Kollabierung mehr in einen einzelnen Vasicek-M.
+zwei Schocks getrennt: ΔBrent (log-Return) und Δr₁₀ⱼ (Prozentpunkte) — getrennt,
+nicht zu einem einzelnen Aggregat-Faktor verrechnet.
 
 **Schritt C — Sektor-differenzierte 2-Faktor-Transmission.** Pro IRB-Klasse:
 """)
@@ -789,7 +884,7 @@ reines Mengenwachstum bereinigt (Proxy: Wachstum des Nicht-Kredit-RWA), um die
   „obere-Schranke"-Erzählung eines Stress-Tools.
 
 **Limitationen (offen dokumentiert).**
-1. *Restlaufzeit* ist in der Roh-Reihe nicht erfasst → Basel-Default M = 2.5 J
+1. *Restlaufzeit* ist in der Roh-Reihe nicht erfasst → Basel-Default 2,5 Jahre
    (konstant über alle Jahrgänge, daher zeitvergleichs-neutral).
 2. **PIT vs. TTC** — der Kern: das Modell projiziert eine Point-in-Time-
    Reaktion, die gemeldeten A-IRB-PD/RWA sind Through-the-Cycle (geglättet,
@@ -809,37 +904,6 @@ IRB-K: Vasicek (2002); BCBS (2017, *Basel III: Finalising post-crisis reforms*).
 Backtest-Evaluation: Hyndman & Athanasopoulos (2021, Kap. 5.8); Pesaran &
 Timmermann (1992, *JBES*). Governance: SR 11-7 (Outcomes Analysis), EBA GL 2014/14.
 """)
-
-    # ====================================================================
-    #  Challenger · empirische OLS-Sensitivität (komplementärer Sanity-Check)
-    # ====================================================================
-    with st.expander("Challenger · empirische OLS-Sensitivität (ΔCET1-Quote ~ M)",
-                     expanded=False):
-        st.caption(
-            "Komplementäre, datengetriebene Gegenprobe: pro Bank wird die "
-            "realisierte 1Y-Veränderung der CET1-Quote gegen den trailing-1Y-"
-            "M-Faktor regressiert (OLS-Panel) — ein empirisches β als Challenger "
-            "zum strukturellen Modell."
-        )
-        realized = compute_realized_changes(wide, lag_quarters=4)
-        fp_full = build_forecast_panel(realized, macro)
-        fp_full = fp_full.dropna(subset=["m_at_start", "delta_ratio_pp"])
-        fp_full = fp_full.merge(bank_dir[["lei", "bank_name"]],
-                                left_on="LEI_Code", right_on="lei", how="left")
-        fp_full_clean = fp_full[fp_full["delta_ratio_pp"].abs() <= 5.0].copy()
-        sens = fit_empirical_sensitivity(fp_full_clean)
-        ck1, ck2, ck3, ck4 = st.columns(4, gap="small")
-        ck1.metric("Sample n", f"{sens.get('n', 0):,}", delta_color="off")
-        ck2.metric("β (Sens. zu M)", f"{sens.get('beta', 0):+.3f}",
-                   f"t = {sens.get('t_beta', 0):+.2f}", delta_color="off")
-        ck3.metric("R²", f"{sens.get('r2', 0):.3f}", "Erklärte Varianz",
-                   delta_color="off")
-        ck4.metric("RMSE", f"{sens.get('rmse', 0):.3f} pp", delta_color="off")
-        st.caption(
-            "Niedriges R² ist erwartet — bank-idiosynkratische Variation "
-            "überlagert die Macro-Komponente. Dient als Vorzeichen-Sanity-Check, "
-            "konsistent mit dem strukturellen Walk-Forward oben."
-        )
 
     # ====================================================================
     #  Methodik-Konzeptdokument zum Download
