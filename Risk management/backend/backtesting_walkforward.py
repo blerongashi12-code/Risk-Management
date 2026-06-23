@@ -523,6 +523,29 @@ def build_frozen_portfolio_series(lei: str, vintage: str,
     return BankPortfolio(name=f"{lei}@{vintage}", segments=segs, lei=lei)
 
 
+def frozen_2factor_delta(frozen, d_brent_log: float, d_r_10y_pp: float):
+    """Prognostizierte ΔRWA/ΔEL des eingefrorenen Portfolios unter dem
+    realisierten **2-Faktor**-Schock (ΔBrent_log, Δr_10y_pp) — konsistent mit
+    dem Live-Modell (two_factor_stress, sektor-differenzierte β). Ersetzt den
+    früheren Single-Vasicek-M-Pfad (frozen_rwa_scale): statt alles in einen
+    Systemfaktor zu kollabieren, wirken beide Faktoren über klassen-spezifische
+    Sensitivitäten direkt auf PD und LGD. None bei leerem Portfolio."""
+    if frozen is None:
+        return None
+    from two_factor_stress import capital_bridge_2factor
+    base = frozen.portfolio_kpis()
+    if not base or base.get("rwa", 0) <= 0:
+        return None
+    br = capital_bridge_2factor(frozen, float(d_brent_log), float(d_r_10y_pp))
+    return {
+        "rwa_base":      float(base["rwa"]),
+        "delta_rwa":     float(br["delta_rwa"]),
+        "delta_rwa_pd":  float(br["delta_rwa_pd"]),
+        "delta_rwa_lgd": float(br["delta_rwa_lgd"]),
+        "delta_el":      float(br["delta_el"]),
+    }
+
+
 def build_pdlgd_walkforward_series(
     lei: str,
     macro_q_with_m: pd.DataFrame,
@@ -536,16 +559,19 @@ def build_pdlgd_walkforward_series(
 ) -> pd.DataFrame:
     """Walk-Forward für EINE Bank, gespeist aus der rohen Backtest-Reihe.
 
+    Stress-Transmission über das **2-Faktor-Modell** (ΔBrent + Δr_10y separat,
+    sektor-differenzierte β; two_factor_stress.capital_bridge_2factor) — NICHT
+    mehr der kollabierte Single-Vasicek-M.
+
     Strikt no-look-ahead: ein Quartal im Jahr Y nutzt die Pillar-3-Vintage
     31.12.(Y−lag_years). Ist genau dieser Stichtag für die Bank nicht in der
     Reihe vorhanden, wird das Quartal übersprungen (kein Rückfall auf einen
-    späteren/anderen Jahrgang — Look-ahead würde so vermieden). Pro Quartal:
-    Portfolio einfrieren → RWA-Skalierung unter realisiertem M(t→t+1) →
-    Prognose ΔRWA_credit = gemeldete RWA_credit(t) · (scale−1) gegen die um
-    Volumen (Non-Credit-RWA-Wachstum) bereinigte Realität.
+    späteren/anderen Jahrgang). Pro Quartal: Portfolio einfrieren → 2-Faktor-
+    ΔRWA → Prognose ΔRWA_credit = gemeldete RWA_credit(t) · (scale−1) gegen die
+    um Volumen (Non-Credit-RWA-Wachstum) bereinigte Realität.
 
     Output-Schema kompatibel mit walkforward_error_stats / per_bank_summary
-    (zusätzlich Spalte ``bank_name``)."""
+    (zusätzlich ``bank_name`` + 2-Faktor-Kanal-Splits)."""
     if macro_q_with_m.empty or capital_wide.empty:
         return pd.DataFrame()
     if series_df is None:
@@ -579,6 +605,7 @@ def build_pdlgd_walkforward_series(
         if macro is None:
             continue
         m_q = float(macro["m_hybrid"])
+        d_brent = float(macro["brent_log_q"]); d_rate = float(macro["dr_10y_pp_q"])
         yr = p_start // 100
         pd_vintage = f"{yr - int(lag_years)}-12-31"     # strikt no-look-ahead
         if pd_vintage not in bank_vintages:
@@ -586,16 +613,21 @@ def build_pdlgd_walkforward_series(
         if pd_vintage not in _frozen:
             _frozen[pd_vintage] = build_frozen_portfolio_series(
                 lei, pd_vintage, series_df)
-        scale = frozen_rwa_scale(_frozen[pd_vintage], m_q, kappa_lgd=kappa_lgd)
-        if scale is None:
+        delta = frozen_2factor_delta(_frozen[pd_vintage], d_brent, d_rate)
+        if delta is None:
             continue
+        rb = delta["rwa_base"]
+        scale = (rb + delta["delta_rwa"]) / rb       # relativer 2-Faktor-Faktor
         rs, re_ = g_idx[p_start], g_idx[p_end]
         rwa_c_s = rs.get("rwa_credit"); rwa_c_e = re_.get("rwa_credit")
         rwa_nc_s = rs.get("rwa_noncredit"); rwa_nc_e = re_.get("rwa_noncredit")
         if any(pd.isna(x) for x in (rwa_c_s, rwa_c_e, rwa_nc_s, rwa_nc_e)) \
                 or rwa_c_s <= 0:
             continue
+        # Relativen 2-Faktor-Effekt auf die *gemeldete* RWA_credit anwenden
         pred_d = float(rwa_c_s) * (scale - 1.0)
+        pred_d_pd = float(rwa_c_s) * (delta["delta_rwa_pd"] / rb)
+        pred_d_lgd = float(rwa_c_s) * (delta["delta_rwa_lgd"] / rb)
         actual_d = float(rwa_c_e) - float(rwa_c_s)
         vol_factor = (float(rwa_nc_e) / float(rwa_nc_s) - 1.0) if rwa_nc_s > 0 else 0.0
         volume_d = float(rwa_c_s) * vol_factor
@@ -610,14 +642,16 @@ def build_pdlgd_walkforward_series(
             "period_label_end":            _period_label(int(p_end)),
             "pd_vintage":                  pd_vintage,
             "m_quarter":                   m_q,
-            "brent_log_q":                 float(macro["brent_log_q"]),
-            "dr_10y_pp_q":                 float(macro["dr_10y_pp_q"]),
+            "brent_log_q":                 d_brent,
+            "dr_10y_pp_q":                 d_rate,
             "rwa_scale":                   scale,
             "rwa_credit_start":            float(rwa_c_s),
             "rwa_credit_end":              float(rwa_c_e),
             "rwa_noncredit_start":         float(rwa_nc_s),
             "rwa_noncredit_end":           float(rwa_nc_e),
             "pred_dRWA_credit_eur":        pred_d,
+            "pred_dRWA_pd_eur":            pred_d_pd,
+            "pred_dRWA_lgd_eur":           pred_d_lgd,
             "actual_dRWA_credit_eur":      actual_d,
             "volume_dRWA_credit_eur":      volume_d,
             "risk_driven_dRWA_credit_eur": risk_driven_d,
@@ -671,6 +705,95 @@ def backtest_series_coverage(series_df: pd.DataFrame | None = None) -> pd.DataFr
            .nunique().reset_index(name="n_classes"))
     return cov.pivot(index="bank_name", columns="vintage_date",
                      values="n_classes").fillna(0).astype(int)
+
+
+def compute_annual_macro(brent_df: pd.DataFrame, svensson_df: pd.DataFrame,
+                         years, *, maturity: float = 10.0) -> dict:
+    """Realisierte **Jahres**-Makro-Deltas 31.12.(Y−1) → 31.12.(Y):
+    d_brent_log (log-Return) und d_r_10y_pp (Δ 10J-Zins in Prozentpunkten).
+    Treibt den PD-Backtest (Jahres-Schritt, passend zum Pillar-3-Jahrgang)."""
+    from svensson import zero_rate, params_from_row
+    if "Close_USD" in brent_df.columns:
+        bc = brent_df["Close_USD"].dropna()
+    elif "Close" in brent_df.columns:
+        bc = brent_df["Close"].dropna()
+    else:
+        return {}
+    rates = pd.Series(
+        [zero_rate(maturity, params_from_row(r), as_decimal=False)
+         for _, r in svensson_df.iterrows()], index=svensson_df.index)
+
+    def _at(s, ts):
+        idx = s.index[s.index <= pd.Timestamp(ts)]
+        return float(s.loc[idx[-1]]) if len(idx) else float("nan")
+
+    out = {}
+    for y in years:
+        b0, b1 = _at(bc, f"{y-1}-12-31"), _at(bc, f"{y}-12-31")
+        r0, r1 = _at(rates, f"{y-1}-12-31"), _at(rates, f"{y}-12-31")
+        if any(x != x for x in (b0, b1, r0, r1)) or b0 <= 0:
+            continue
+        out[int(y)] = {
+            "d_brent_log": float(np.log(b1 / b0)),
+            "d_r_10y_pp":  float(r1 - r0),
+            "brent_start": b0, "brent_end": b1,
+            "r_start": r0, "r_end": r1,
+        }
+    return out
+
+
+def build_pd_backtest(series_df: pd.DataFrame, annual_macro: dict) -> pd.DataFrame:
+    """PD-Backtest: 2-Faktor-Vorhersage der **gemeldeten** Pillar-3-PD vs. die
+    tatsächlich im Folgejahr gemeldete PD.
+
+    Für jedes (Bank, Klasse) und jeden Jahres-Schritt Y: nimm die gemeldete
+    PD(Y−1), wende den realisierten Jahres-2-Faktor-Schock an → PD_pred(Y),
+    vergleiche mit der gemeldeten PD(Y). Macht die **PIT-vs-TTC-Divergenz**
+    sichtbar: das Modell ist Point-in-Time, die regulatorisch gemeldete A-IRB-
+    PD ist Through-the-Cycle (geglättet, antizyklisch) — beide bewegen sich
+    nicht zwangsläufig gleich (Kern-Befund des Backtests)."""
+    from two_factor_stress import stress_pd, SENSITIVITY_MATRIX
+    if series_df.empty or not annual_macro:
+        return pd.DataFrame()
+    s = series_df.copy()
+    s["yr"] = s["vintage_date"].str[:4].astype(int)
+    rows = []
+    for (lei, cls, name), g in s.groupby(["LEI", "vasicek_class", "bank_name"]):
+        if cls not in SENSITIVITY_MATRIX:
+            continue
+        pdy = {int(r["yr"]): float(r["pd_pct"]) for _, r in g.iterrows()}
+        for y, mac in annual_macro.items():
+            if (y - 1) not in pdy or y not in pdy:
+                continue
+            pb = pdy[y - 1] / 100.0
+            pp = stress_pd(pb, mac["d_brent_log"], mac["d_r_10y_pp"], cls)
+            pr = pdy[y] / 100.0
+            rows.append({
+                "LEI": lei, "bank_name": name, "vasicek_class": cls, "year": int(y),
+                "pd_base_pct": pb * 100, "pd_pred_pct": pp * 100, "pd_real_pct": pr * 100,
+                "d_pred_pp": (pp - pb) * 100, "d_real_pp": (pr - pb) * 100,
+                "dir_match": bool(np.sign(pp - pb) == np.sign(pr - pb)),
+            })
+    return pd.DataFrame(rows)
+
+
+def pd_backtest_stats(pd_bt: pd.DataFrame) -> dict:
+    """Kennzahlen des PD-Backtests: Richtungs-Trefferquote, Korrelation der
+    PD-Änderungen, MAE des Modells vs. naive „keine-Änderung"-Prognose."""
+    if pd_bt.empty:
+        return {"n": 0}
+    dp = pd_bt["d_pred_pp"].to_numpy(); dr = pd_bt["d_real_pp"].to_numpy()
+    mae_model = float(np.mean(np.abs(pd_bt["pd_pred_pct"] - pd_bt["pd_real_pct"])))
+    mae_naive = float(np.mean(np.abs(pd_bt["pd_base_pct"] - pd_bt["pd_real_pct"])))
+    corr = float(np.corrcoef(dp, dr)[0, 1]) if (np.std(dp) > 0 and np.std(dr) > 0) else float("nan")
+    return {
+        "n":          int(len(pd_bt)),
+        "hit_rate":   float(pd_bt["dir_match"].mean()),
+        "corr":       corr,
+        "mae_model":  mae_model,
+        "mae_naive":  mae_naive,
+        "skill_vs_naive": (1.0 - mae_model / mae_naive) if mae_naive > 0 else float("nan"),
+    }
 
 
 # ============================================================================
@@ -973,10 +1096,16 @@ def _test_series_frozen_portfolio():
     fp22 = build_frozen_portfolio_series(DB, "2022-12-31", ser)
     fp23 = build_frozen_portfolio_series(DB, "2023-12-31", ser)
     assert fp22 is not None and len(fp22.segments) >= 5, "DB 2022 unvollständig"
-    s22 = frozen_rwa_scale(fp22, -2.0)
-    s23 = frozen_rwa_scale(fp23, -2.0)
-    assert s22 is not None and s22 > 1.1, f"Adverse-Skalierung zu klein: {s22}"
-    assert abs(s22 - s23) > 1e-4, "RWA-Skalierung muss vintage-abhängig sein"
+    # 2-Faktor: positiver Zinsschock erhöht RWA, vintage-abhängig + realistisch
+    d22 = frozen_2factor_delta(fp22, 0.10, 2.0)    # +10% Brent, +200bp Zins
+    d23 = frozen_2factor_delta(fp23, 0.10, 2.0)
+    assert d22 is not None and d22["delta_rwa"] > 0, "Adverse-Schock muss RWA erhöhen"
+    rel22 = d22["delta_rwa"] / d22["rwa_base"]
+    assert 0 < rel22 < 0.5, f"2-Faktor-ΔRWA unrealistisch hoch: {rel22:.2%}"
+    assert abs(d22["delta_rwa"] - d23["delta_rwa"]) > 1.0, "muss vintage-abhängig sein"
+    # negativer Zinsschock senkt RWA (gegenrichtung)
+    dn = frozen_2factor_delta(fp22, -0.10, -2.0)
+    assert dn["delta_rwa"] < 0, "Benigner Schock muss RWA senken"
     # ING führt mortgage_sme — Builder darf nicht crashen und den Slot mappen
     ING = "549300NYKK9MWM7GGW15"
     fp_ing = build_frozen_portfolio_series(ING, "2023-12-31", ser)
