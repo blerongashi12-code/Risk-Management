@@ -54,9 +54,9 @@ Authoritative Reihe: `data/pillar3_backtest_pdlgd.csv`.
 |---|---|---|---|
 | Deutsche Bank | 7/7 | 2021–2024 | ✅ komplett |
 | ING Groep | 6/7 | 2021–2024 | ✅ alle 4 Jahre. **„qrre" → `mortgage_sme` umbenannt** (Verifikation: ING hat KEINEN QRRE-A-IRB-Block; die Zeilen sind „Retail – Secured by immovable property SME"). Retail-Other-non-SME nicht separat erfasst (Lücke) |
-| Société Générale | 6/7 (ohne corporate) | 2021–2024 | 🟢 2021 ergänzt; corporate (CSV≠roh) fehlt durchgängig, bank nur 2024, sovereign-2021-PD=1,00 (verifiziert, Level-Shift) |
+| Société Générale | 7/7 (2021·2023·2024) | 2021–2024 | ✅ large-corporate ergänzt (war Anker-Fehler 2.39/30.18→32.30), bank 2021/2023 source-verified ergänzt. 2022 = 5/7: bank+sovereign nicht extrahierbar (konkatenierter PDF-Text). sovereign-2021-PD=1,00 (verifiziert, Level-Shift) |
 | UniCredit | 6/7 (ohne mortgage) | 2021–2024 | ✅ alle 4 Jahre komplett. 2021 sovereign + other_retail via Verifikation aus Quelle ergänzt (p134/p138, dichte-verifiziert). „sovereign" = Central-gov-Zeile (relabel) |
-| Groupe BPCE | 7/7 | 2024 | 🔴 2022/2023 Multi-Block (3 Sub-Entity-Blöcke: Gruppe/BP/CE bzw. A-/F-IRB; Klassen-Labels zeilenumbrochen) → Vorjahres-Disambiguierung unzuverlässig (sme/qrre/sovereign mehrdeutig), nicht geschrieben |
+| Groupe BPCE | 7/7 | 2024 | 🔴 2022/2023 Multi-Block (3 Sub-Entity-Blöcke). Value-Match gegen 2024-Anker getestet: nur 2023-mortgage matcht sauber (dist 0,28); sonst greift der Matcher den falschen Block (2022-mortgage→block3 PD19,68 statt block1) oder Klassen kollidieren (corporate≡qrre, sme≡other_retail auf derselben Zeile). Vorjahre nicht geschrieben (keine Fabrikation) |
 | Crédit Mutuel | 5/7 (2024) · 4/7 (2023) | 2023, 2024 | 🔴 sovereign ENTFERNT (Verifikation: CM hat keinen IRB-sovereign; „sovereign 2024" war byte-identisches Duplikat von bank → Phantom). 2021/2022-PDFs geladen, aber degenerierte Anker + Layout-Drift → Vorjahres-Mapping unzuverlässig, nicht geschrieben |
 | BNP Paribas | 7/7 | 2022–2024 | ✅ 3 Jahre, anchor-/dichte-/EAD-verifiziert; 2023 doppelt validiert. **`sme_corporate` korrigiert** (war fälschlich „Corporates – Specialised financing", jetzt echtes „SME corporates", Verifikation an Quell-PDF-Labels p441 bestätigt) |
 | Crédit Agricole | – | – | 🔴 doku-blockiert: nur Halbjahres-`pdfPreview`-Viewer; Jahresend-IDs nicht auffindbar |
