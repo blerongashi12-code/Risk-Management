@@ -103,6 +103,15 @@ if os.path.exists(DL + "bpce_prior_rows.csv"):
     for _, r in bpp.iterrows():
         add(BP, "Groupe BPCE", r["vasicek_class"], r["vintage_date"], r["pd_pct"], r["lgd_pct"],
             r["ead_eur_m"], "BPCE Pillar III EU CR6 A-IRB block-1 (distinctive class, source-verified)")
+# BPCE 2021: from the June-2022 half-year UPDATE report (31.12.2021 A-IRB comparative,
+# block-6, p80-83). Abbreviated report -> only sovereign/bank/other_retail present
+# (mortgage absent); all density-verified + EAD-continuous with 2022/2023.
+add(BP, "Groupe BPCE", "sovereign", "2021-12-31", 0.33, 9.00, 58551,
+    "BPCE Pillar III H1-2022 update, 31.12.2021 A-IRB comparative (source-verified)")
+add(BP, "Groupe BPCE", "bank", "2021-12-31", 2.83, 32.32, 7480,
+    "BPCE Pillar III H1-2022 update, 31.12.2021 A-IRB comparative (source-verified)")
+add(BP, "Groupe BPCE", "other_retail", "2021-12-31", 14.67, 24.15, 45285,
+    "BPCE Pillar III H1-2022 update, 31.12.2021 A-IRB comparative (source-verified)")
 
 # --- Credit Mutuel: FY2024 (5/7) + FY2023 {corp,sme,mortgage,other_retail}.
 #     FY2023 bank/sovereign/qrre were mis-assigned (all grabbed the revolving row) -> dropped.

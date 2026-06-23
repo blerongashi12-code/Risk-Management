@@ -21,7 +21,7 @@ DIR = "C:/Users/blero/Downloads/RiskMgmt/Risk management/data/"
 OUT = DIR + "backtest_raw/rabobank_raw_rows.csv"
 LEI = "DG3RU1DBUFHT4ZF9WN62"   # Cooperatieve Rabobank U.A.
 FILES = {"2020": "rabobank_2020.pdf", "2021": "rabobank_2021.pdf",
-         "2022": "rabobank_2022.pdf", "2024": "rabobank_2024.pdf"}
+         "2022": "rabobank_2022.pdf", "2023": "rabobank_2023.pdf", "2024": "rabobank_2024.pdf"}
 
 NUM = re.compile(r"-?\d[\d,]*(?:\.\d+)?")
 SUB = re.compile(r"Subtotal\s+(.*)", re.I)
