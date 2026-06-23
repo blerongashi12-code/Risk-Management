@@ -487,6 +487,55 @@ with tab_bt:
                "die Bank unter dem Schock hinterlegen müsste, relativ zum Normalzustand.",
     )
 
+    # --- Modell-Versprechen vs. Realität: realer Zinsschock → ΔRWA ---------
+    st.markdown(
+        "**Und hielt die Realität dieses Versprechen?**  Die Kurve oben ist die "
+        "*Modell-Zusage* (Zins rauf → RWA rauf). Jetzt die Gegenprobe an **echten "
+        "Quartalen**: wir sortieren alle Bank-Quartale nach dem real eingetretenen "
+        "Zinsschock und zeigen, wie stark das Kredit-RWA laut **Modell (blau)** "
+        "und in der **Realität (rot)** tatsächlich stieg (Median je Gruppe).")
+    rr = panel.copy()
+    rr["pred_pct"] = rr["pred_dRWA_credit_eur"] / rr["rwa_credit_start"] * 100
+    rr["real_pct"] = rr["risk_driven_dRWA_credit_eur"] / rr["rwa_credit_start"] * 100
+    _bins = [-100.0, 0.0, 0.25, 0.75, 100.0]
+    _labels = ["Zins gefallen (<0)", "leicht + (0–0,25 pp)",
+               "moderat + (0,25–0,75)", "stark + (>0,75 pp)"]
+    rr["bucket"] = pd.cut(rr["dr_10y_pp_q"], bins=_bins, labels=_labels)
+    g = (rr.groupby("bucket", observed=True)
+           .agg(model=("pred_pct", "median"), real=("real_pct", "median"),
+                n=("pred_pct", "size")).reset_index())
+    fig_rv = go.Figure()
+    fig_rv.add_trace(go.Bar(
+        x=g["bucket"], y=g["model"], name="Modell-Prognose (Median)",
+        marker_color=COLORS["navy"], opacity=0.9,
+        hovertemplate="%{x}<br>Modell ΔRWA (Median) = %{y:+.1f} %<extra></extra>"))
+    fig_rv.add_trace(go.Bar(
+        x=g["bucket"], y=g["real"], name="Realität (Median)",
+        marker_color=COLORS["crimson"], opacity=0.9,
+        hovertemplate="%{x}<br>Ist ΔRWA (Median) = %{y:+.1f} %<extra></extra>"))
+    fig_rv.add_hline(y=0, line_color=COLORS["hairline"], line_width=1)
+    fig_rv.update_layout(
+        title="Wenn der Zins wirklich stieg: Modell-Prognose vs. realisierte RWA-Änderung",
+        xaxis_title="real eingetretener Zinsschock im Quartal (gruppiert)",
+        yaxis_title="ΔRWA_credit [% der Baseline · Median]",
+        height=380, barmode="group",
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0))
+    st.plotly_chart(fig_rv, use_container_width=True)
+    lese(
+        was="Alle Bank-Quartale, gruppiert nach dem tatsächlich eingetretenen "
+            "Zinsschock (x-Achse). Blau = wie stark das RWA laut Modell hätte "
+            "steigen sollen, Rot = wie stark es real stieg (jeweils Median).",
+        befund="Die blaue Modell-Reaktion wird mit größerem Zinsanstieg klar "
+               "größer (wie gebaut). Die rote Realität bleibt dagegen flach und "
+               "folgt dem Zins kaum.",
+        modell="Bestätigt den Kern-Befund: die <em>Mechanik</em> stimmt "
+               "(Zins↑ ⇒ Modell-RWA↑), aber die real gemeldete RWA-Bewegung folgt "
+               "dem Zins quartalsweise nicht — weil gemeldetes RWA gesteuert und "
+               "geglättet ist (dieselbe Ursache wie bei der PD: PIT vs. TTC).",
+        metrik="Median = der mittlere Wert einer Gruppe (robuster gegen Ausreißer "
+               "als der Durchschnitt). ΔRWA in % der Baseline-RWA.",
+    )
+
     # ====================================================================
     #  Abschnitt 4 · Validierungsebene 3 — Outcomes-Analysis (ehrlich)
     # ====================================================================
@@ -818,6 +867,42 @@ with tab_bt:
             "Bewegung dieser Bank — **grün ✓** = Modell traf die Richtung, "
             "**rot ✗** = daneben. **Aussage:** macht die Trefferbilanz pro Institut "
             "greifbar (die Höhe ist die Realität, die Farbe der Modell-Treffer)."
+        )
+
+    # --- Prognostizierte vs. realisierte PD je Segment (jährlich, 1-J-forward) ---
+    bank_pd = (pd_bt[pd_bt["LEI"] == sel_lei].copy()
+               if (pd_bt is not None and not pd_bt.empty) else pd.DataFrame())
+    if not bank_pd.empty:
+        st.markdown(
+            f"**{sel_name} · prognostizierte vs. realisierte PD je Segment.**  "
+            "Unsere PD ist eine **1-Jahres-Vorausschau**, daher Jahr für Jahr: das "
+            "Modell nimmt die PD vom Vorjahr + den realen Schock und sagt die PD "
+            "dieses Jahres voraus (**blau**) — daneben die tatsächlich gemeldete "
+            "PD (**rot**). Jahr wählbar:")
+        yrs = sorted(int(y) for y in bank_pd["year"].unique())
+        ysel = st.radio("Prognose-Jahr", yrs, index=len(yrs) - 1,
+                        horizontal=True, key="bt_seg_year")
+        bp = bank_pd[bank_pd["year"] == ysel].sort_values("pd_real_pct", ascending=False)
+        fig_seg = go.Figure()
+        fig_seg.add_trace(go.Bar(
+            x=bp["vasicek_class"], y=bp["pd_pred_pct"], name="Modell-Prognose PD",
+            marker_color=COLORS["navy"], opacity=0.9,
+            hovertemplate="%{x}<br>Modell-PD = %{y:.2f} %<extra></extra>"))
+        fig_seg.add_trace(go.Bar(
+            x=bp["vasicek_class"], y=bp["pd_real_pct"], name="realisierte (gemeldete) PD",
+            marker_color=COLORS["crimson"], opacity=0.9,
+            hovertemplate="%{x}<br>gemeldete PD = %{y:.2f} %<extra></extra>"))
+        fig_seg.update_layout(
+            title=f"{sel_name} · PD je Segment {ysel}: Modell-Prognose vs. Realität",
+            xaxis_title="Segment (IRB-Klasse)", yaxis_title="PD [%]",
+            height=380, barmode="group",
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0))
+        st.plotly_chart(fig_seg, use_container_width=True)
+        st.caption(
+            "**Lesart:** blau ≈ rot heißt gute Prognose. In Stress-Jahren liegt das "
+            "Modell bei einzelnen Segmenten über der gemeldeten PD — derselbe "
+            "PIT-vs-TTC-Effekt wie oben, jetzt je Segment sichtbar. (Forward-PD: "
+            f"Prognose {ysel} basiert auf dem Stand 31.12.{ysel-1} + Schock {ysel}.)"
         )
 
     # ====================================================================
