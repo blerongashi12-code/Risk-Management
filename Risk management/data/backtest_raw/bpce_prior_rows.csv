@@ -1,0 +1,9 @@
+LEI,bank_name,vasicek_class,vintage_date,pd_pct,lgd_pct,ead_eur_m,rwa_eur_m,density,source,page
+FR9695005MSX1OYEMGDF,Groupe BPCE,sovereign,2022-12-31,0.57,9.48,55833,325,0.580,"BPCE Pillar III 2022 EU CR6 A-IRB block-1 (distinctive class, density-verified)",0
+FR9695005MSX1OYEMGDF,Groupe BPCE,bank,2022-12-31,2.80,39.19,7708,2137,27.720,"BPCE Pillar III 2022 EU CR6 A-IRB block-1 (distinctive class, density-verified)",0
+FR9695005MSX1OYEMGDF,Groupe BPCE,mortgage,2022-12-31,19.68,10.66,303715,27056,8.910,"BPCE Pillar III 2022 EU CR6 A-IRB block-1 (distinctive class, density-verified)",0
+FR9695005MSX1OYEMGDF,Groupe BPCE,other_retail,2022-12-31,15.65,24.37,45693,11536,25.250,"BPCE Pillar III 2022 EU CR6 A-IRB block-1 (distinctive class, density-verified)",0
+FR9695005MSX1OYEMGDF,Groupe BPCE,sovereign,2023-12-31,0.73,8.60,70124,475,0.680,"BPCE Pillar III 2023 EU CR6 A-IRB block-1 (distinctive class, density-verified)",0
+FR9695005MSX1OYEMGDF,Groupe BPCE,bank,2023-12-31,0.71,35.57,6968,1598,22.940,"BPCE Pillar III 2023 EU CR6 A-IRB block-1 (distinctive class, density-verified)",0
+FR9695005MSX1OYEMGDF,Groupe BPCE,mortgage,2023-12-31,14.26,10.77,308983,22819,7.390,"BPCE Pillar III 2023 EU CR6 A-IRB block-1 (distinctive class, density-verified)",0
+FR9695005MSX1OYEMGDF,Groupe BPCE,other_retail,2023-12-31,20.25,27.75,45191,12866,28.470,"BPCE Pillar III 2023 EU CR6 A-IRB block-1 (distinctive class, density-verified)",0

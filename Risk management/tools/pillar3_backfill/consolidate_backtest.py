@@ -95,6 +95,14 @@ if os.path.exists(DL + "bpce_raw_rows.csv"):
     for _, r in bp[bp.vintage_date == "2024-12-31"].iterrows():
         add(BP, "Groupe BPCE", r["vasicek_class"], "2024-12-31", r["pd_pct"], r["lgd_pct"],
             r["ead_eur_m"], "BPCE Pillar III 2024 EU CR6 AIRB (raw subtotal)")
+# BPCE 2022/2023: only the 4 distinctive A-IRB classes (sovereign/bank/mortgage/other_retail)
+# from block-1, density-verified + EAD-continuous. corporate (PD discontinuity) and
+# sme/qrre (multi-subclass collisions across the 4-block table) remain documented gaps.
+if os.path.exists(DL + "bpce_prior_rows.csv"):
+    bpp = pd.read_csv(DL + "bpce_prior_rows.csv", dtype=str)
+    for _, r in bpp.iterrows():
+        add(BP, "Groupe BPCE", r["vasicek_class"], r["vintage_date"], r["pd_pct"], r["lgd_pct"],
+            r["ead_eur_m"], "BPCE Pillar III EU CR6 A-IRB block-1 (distinctive class, source-verified)")
 
 # --- Credit Mutuel: FY2024 (5/7) + FY2023 {corp,sme,mortgage,other_retail}.
 #     FY2023 bank/sovereign/qrre were mis-assigned (all grabbed the revolving row) -> dropped.
