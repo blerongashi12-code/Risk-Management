@@ -130,6 +130,15 @@ if os.path.exists(DL + "cm_raw_rows.csv"):
             continue
         add(CM, "Credit Mutuel", c, v, r["pd_pct"], r["lgd_pct"], r["ead_eur_m"],
             "Credit Mutuel Pilier 3 EU CR6 AIRB (raw subtotal)")
+# CM 2021/2022: only the two distinctive-LGD classes are reliably mappable (the
+# degenerate-anchor classes stay wrong-row). corporate (LGD 45, EAD continuous
+# 67->70->73k, anchor-matched) + mortgage (LGD 15-16, EAD continuous ~214-291k).
+add(CM, "Credit Mutuel", "corporate", "2022-12-31", 2.39, 45.00, 66725,
+    "Credit Mutuel Pilier 3 2022 EU CR6 AIRB corporate (LGD-distinctive, continuity-verified)")
+add(CM, "Credit Mutuel", "mortgage", "2021-12-31", 2.14, 15.00, 214247,
+    "Credit Mutuel Pilier 3 2021 EU CR6 AIRB mortgage (LGD-distinctive, continuity-verified)")
+add(CM, "Credit Mutuel", "mortgage", "2022-12-31", 2.10, 15.00, 229540,
+    "Credit Mutuel Pilier 3 2022 EU CR6 AIRB mortgage (LGD-distinctive, continuity-verified)")
 
 # --- BNP Paribas: EU-CR6 IRBA-by-PD-scale subtotals, anchor+density+EAD-continuity
 #     verified. bnp_2024.pdf yields 2024 + the 2023 comparative; bnp_2023/2021 add
