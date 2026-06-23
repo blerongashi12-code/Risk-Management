@@ -369,16 +369,20 @@ with tab_bt:
     )
     st.plotly_chart(fig_f, use_container_width=True)
     lese(
-        was="Die zwei tatsächlich eingetretenen Schocks pro Quartal — der "
-            "Zinsschock als Balken (rot = Zins gestiegen, türkis = gefallen) und "
-            "der Ölpreis als gelbe Linie. Gestrichelte Linien = die oben "
-            "definierten Krisen.",
+        was="Die zwei tatsächlich eingetretenen <strong>Markt-Schocks</strong> pro "
+            "Quartal — Zinsschock (Balken, rot = gestiegen) und Ölpreis (gelbe "
+            "Linie). Wichtig: das ist der <strong>Input</strong> des Modells (aus "
+            "Bundesbank-Zins + Brent-Ölpreis), <em>nicht</em> unsere PD/LGD-Reihe "
+            "und <em>noch keine Prognose</em>. Gestrichelt = die oben definierten Krisen.",
         befund="Der Zinsschock springt 2022 massiv nach oben (10-Jahres-Zins "
                "+2,8 pp übers Jahr) — exakt in der Ukraine-/Inflations-/Zinswende-"
                "Phase, gefolgt von SVB/CS Anfang 2023.",
-        modell="Die beiden Treiber des Modells schlagen genau dann aus, wenn real "
-               "Stress herrschte. Das Modell stresst also das Richtige zur "
-               "richtigen Zeit — diese Grund-Plausibilität ist bestanden.",
+        modell="<strong>Schritt 1 von 3.</strong> Diese Grafik vergleicht <em>noch "
+               "nicht</em> Modell gegen Realität — sie prüft nur, ob die Auslöser "
+               "<em>zur richtigen Zeit</em> feuern (sie tun es: genau in den "
+               "Krisen). Den eigentlichen Vergleich Prognose-gegen-Realität siehst "
+               "du weiter unten in <strong>Ebene 3 → Probe A</strong> "
+               "(blaue Balken = Modell, rote Balken = Realität).",
         metrik="Δr₁₀ⱼ = Veränderung des 10-Jahres-Zinses in <strong>Prozentpunkten</strong> "
                "(z. B. +2,8 pp = von 0 % auf 2,8 %). ΔBrent = log-Veränderung des "
                "Ölpreises über das Quartal (≈ prozentuale Änderung).",
@@ -504,7 +508,11 @@ with tab_bt:
 
     # ===== Probe A · PD-Backtest (PIT-Modell vs. TTC-Meldung) =============
     if pd_stats.get("n", 0) > 0:
-        st.markdown("**Probe A · Prognostizierte vs. gemeldete PD — das PIT-vs-TTC-Problem**")
+        st.markdown(
+            "**Probe A · Modell-Prognose vs. Realität (jährlich) — der Vergleich, "
+            "der zählt.**  In der Grafik unten: **blaue Balken = unsere "
+            "Modell-Prognose** der PD-Änderung, **rote Balken = die tatsächlich "
+            "gemeldete (reale) PD-Änderung** — je Jahr, gemittelt über alle Banken.")
         pa1, pa2, pa3, pa4 = st.columns(4, gap="small")
         pa1.metric("PD-Vorhersagen", f"{pd_stats['n']}",
                    "Bank × Klasse × Jahr", delta_color="off")
