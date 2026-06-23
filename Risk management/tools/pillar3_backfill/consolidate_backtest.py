@@ -80,6 +80,13 @@ SG24 = {"corporate": (2.39, 32.30, 169993),  # large "Corporate - Other" (was mi
         "bank": (0.36, 22.68, 40633), "sovereign": (0.09, 1.54, 310916)}
 for c, (p, l, e) in SG24.items():
     add(SG, "Societe Generale", c, "2024-12-31", p, l, e, "SocGen Pillar 3 2024 EU CR6 AIRB (raw)")
+# SocGen bank 2021/2023: Institutions subtotal exists + density-verified, but the
+# extractor missed it (empty learned context -> overlap<1). FY2022 not extractable
+# (concatenated-text PDF). Source-read p150 (2021) / p142 (2023).
+add(SG, "Societe Generale", "bank", "2021-12-31", 0.89, 23.38, 39906,
+    "SocGen Pillar 3 2021 EU CR6 AIRB Institutions subtotal (source-verified)")
+add(SG, "Societe Generale", "bank", "2023-12-31", 0.60, 23.48, 37138,
+    "SocGen Pillar 3 2023 EU CR6 AIRB Institutions subtotal (source-verified)")
 
 # --- BPCE: FY2024 clean (7/7 RAW-OK); prior years pending (multi-block) ---
 BP = "FR9695005MSX1OYEMGDF"
