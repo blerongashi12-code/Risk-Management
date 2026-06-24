@@ -518,55 +518,6 @@ with tab_bt:
                "die Bank unter dem Schock hinterlegen müsste, relativ zum Normalzustand.",
     )
 
-    # --- Modell-Versprechen vs. Realität: realer Zinsschock → ΔRWA ---------
-    st.markdown(
-        "**Und hielt die Realität dieses Versprechen?**  Die Kurve oben ist die "
-        "*Modell-Zusage* (Zins rauf → RWA rauf). Jetzt die Gegenprobe an **echten "
-        "Quartalen**: wir sortieren alle Bank-Quartale nach dem real eingetretenen "
-        "Zinsschock und zeigen, wie stark das Kredit-RWA laut **Modell (blau)** "
-        "und in der **Realität (rot)** tatsächlich stieg (Median je Gruppe).")
-    rr = panel.copy()
-    rr["pred_pct"] = rr["pred_dRWA_credit_eur"] / rr["rwa_credit_start"] * 100
-    rr["real_pct"] = rr["risk_driven_dRWA_credit_eur"] / rr["rwa_credit_start"] * 100
-    _bins = [-100.0, 0.0, 0.25, 0.75, 100.0]
-    _labels = ["Zins gefallen (<0)", "leicht + (0–0,25 pp)",
-               "moderat + (0,25–0,75)", "stark + (>0,75 pp)"]
-    rr["bucket"] = pd.cut(rr["dr_10y_pp_q"], bins=_bins, labels=_labels)
-    g = (rr.groupby("bucket", observed=True)
-           .agg(model=("pred_pct", "median"), real=("real_pct", "median"),
-                n=("pred_pct", "size")).reset_index())
-    fig_rv = go.Figure()
-    fig_rv.add_trace(go.Bar(
-        x=g["bucket"], y=g["model"], name="Modell-Prognose (Median)",
-        marker_color=COLORS["navy"], opacity=0.9,
-        hovertemplate="%{x}<br>Modell ΔRWA (Median) = %{y:+.1f} %<extra></extra>"))
-    fig_rv.add_trace(go.Bar(
-        x=g["bucket"], y=g["real"], name="Realität (Median)",
-        marker_color=COLORS["crimson"], opacity=0.9,
-        hovertemplate="%{x}<br>Ist ΔRWA (Median) = %{y:+.1f} %<extra></extra>"))
-    fig_rv.add_hline(y=0, line_color=COLORS["hairline"], line_width=1)
-    fig_rv.update_layout(
-        title="Wenn der Zins wirklich stieg: Modell-Prognose vs. realisierte RWA-Änderung",
-        xaxis_title="real eingetretener Zinsschock im Quartal (gruppiert)",
-        yaxis_title="ΔRWA_credit [% der Baseline · Median]",
-        height=380, barmode="group",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0))
-    st.plotly_chart(fig_rv, use_container_width=True)
-    lese(
-        was="Alle Bank-Quartale, gruppiert nach dem tatsächlich eingetretenen "
-            "Zinsschock (x-Achse). Blau = wie stark das RWA laut Modell hätte "
-            "steigen sollen, Rot = wie stark es real stieg (jeweils Median).",
-        befund="Die blaue Modell-Reaktion wird mit größerem Zinsanstieg klar "
-               "größer (wie gebaut). Die rote Realität bleibt dagegen flach und "
-               "folgt dem Zins kaum.",
-        modell="Bestätigt den Kern-Befund: die <em>Mechanik</em> stimmt "
-               "(Zins↑ ⇒ Modell-RWA↑), aber die real gemeldete RWA-Bewegung folgt "
-               "dem Zins quartalsweise nicht — weil gemeldetes RWA gesteuert und "
-               "geglättet ist (dieselbe Ursache wie bei der PD: PIT vs. TTC).",
-        metrik="Median = der mittlere Wert einer Gruppe (robuster gegen Ausreißer "
-               "als der Durchschnitt). ΔRWA in % der Baseline-RWA.",
-    )
-
     # ====================================================================
     #  Abschnitt 4 · Validierungsebene 3 — Outcomes-Analysis (ehrlich)
     # ====================================================================
@@ -581,8 +532,8 @@ with tab_bt:
         'und vergleichen die prognostizierte <strong>CET1-Quote</strong> mit der '
         'tatsächlich gemeldeten — das ist der <strong>Kern-Test</strong> (die '
         'CET1-Quote ist die Solvenz-Kennzahl, die das Modell liefern soll). '
-        'Darunter öffnen wir die zwei Kanäle, die die CET1-Quote bewegen: die '
-        '<strong>PD</strong> und das <strong>Kredit-RWA</strong>.'
+        'Darunter öffnen wir den Haupt-Treiber dahinter: die <strong>PD-Entwicklung</strong> '
+        '(gesamt und je Segment).'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -747,6 +698,39 @@ with tab_bt:
         )
         st.plotly_chart(fig_pa, use_container_width=True)
 
+        # --- Pro Segment: Realität vs. Modell (gewähltes Jahr, Ø über alle Banken) ---
+        seg_years = sorted(int(y) for y in pd_bt["year"].unique())
+        sy = st.radio("PD je Segment — Prognose-Jahr wählen", seg_years,
+                      index=len(seg_years) - 1, horizontal=True, key="pd_seg_year")
+        seg = (pd_bt[pd_bt["year"] == sy].groupby("vasicek_class")
+               .agg(real=("pd_real_pct", "mean"), model=("pd_pred_pct", "mean"))
+               .reset_index().sort_values("real", ascending=False))
+        fig_seg = go.Figure()
+        fig_seg.add_trace(go.Bar(
+            x=seg["vasicek_class"], y=seg["real"], name="🔴 Realität (gemeldete PD)",
+            marker_color=COLORS["crimson"], opacity=0.9,
+            text=[f"{v:.2f}" for v in seg["real"]], textposition="outside",
+            textfont=dict(size=9),
+            hovertemplate="%{x}<br>Realität: %{y:.2f} %<extra></extra>"))
+        fig_seg.add_trace(go.Bar(
+            x=seg["vasicek_class"], y=seg["model"], name="🔵 Modell (Vorjahr + Schock)",
+            marker_color=COLORS["navy"], opacity=0.9,
+            text=[f"{v:.2f}" for v in seg["model"]], textposition="outside",
+            textfont=dict(size=9),
+            hovertemplate="%{x}<br>Modell: %{y:.2f} %<extra></extra>"))
+        fig_seg.update_layout(
+            title=f"PD je Segment {sy}: Realität vs. Modell (Ø über alle Banken)",
+            xaxis_title="Segment (IRB-Klasse)", yaxis_title="PD [%]",
+            height=400, barmode="group", margin=dict(t=56),
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0))
+        st.plotly_chart(fig_seg, use_container_width=True)
+        st.caption(
+            f"Pro Kreditklasse: 🔴 tatsächlich gemeldete PD {sy} vs. 🔵 Modell-Prognose "
+            f"(PD {sy-1} + realer Schock {sy}). Wo **blau über rot** liegt, stresst das "
+            f"Modell die Klasse stärker als die geglättete TTC-Meldung — im Schockjahr "
+            f"2022 am deutlichsten, in ruhigen Jahren liegen beide eng beieinander."
+        )
+
         st.markdown(
             '<div style="background:#FFF8E7;border:1px solid #E6D9A8;'
             'border-left:4px solid #C9A227;padding:0.85rem 1.1rem;'
@@ -775,118 +759,6 @@ with tab_bt:
             unsafe_allow_html=True,
         )
     st.divider()
-
-    # ===== Kanal-Detail 2 · RWA-Outcomes (2-Faktor) ======================
-    st.markdown("**Kanal-Detail 2 · Kredit-RWA: Modell vs. Realität** — der zweite "
-                "Treiber der CET1-Quote (Nenner).")
-    pred = panel["pred_dRWA_credit_eur"].to_numpy(dtype=float)
-    real = panel["risk_driven_dRWA_credit_eur"].to_numpy(dtype=float)
-
-    o1, o2, o3, o4 = st.columns(4, gap="small")
-    hr = stats.get("hit_rate", float("nan")) * 100
-    o1.metric("Richtungs-Trefferquote", f"{hr:.0f}%", "vs. 50 % Zufall",
-              delta_color="off")
-    o2.metric("Korrelation Modell↔Ist", f"{stats.get('corr', float('nan')):+.2f}",
-              "Pearson, alle Paare", delta_color="off")
-    o3.metric("Konservativ-Anteil",
-              f"{stats.get('conservative_share', float('nan'))*100:.0f}%",
-              "Modell ≥ Ist (sichere Seite)", delta_color="off")
-    o4.metric("Beobachtungen", f"{n_pairs}", f"{n_banks_bt} Banken × Quartale",
-              delta_color="off")
-    st.caption(
-        "**So liest du die Kennzahlen:** **Trefferquote** = Anteil der Quartale, "
-        "in denen das RWA in die vorhergesagte Richtung lief (50 % = Zufall). "
-        "**Korrelation** = Gleichlauf Prognose ↔ Realität (−1…+1; 0 = keiner). "
-        "**Konservativ-Anteil** = wie oft das Modell — bei richtiger Richtung — "
-        "den Effekt eher **über**schätzt (auf der sicheren Seite liegt)."
-    )
-
-    # Standardisierter Scatter (z-Scores) — entkoppelt das Skalen-Thema vom
-    # Richtungs-/Korrelations-Thema. Runde, unkorrelierte Wolke = kein Signal.
-    sc_l, sc_r = st.columns([3, 2], gap="medium")
-    with sc_l:
-        zp = (pred - pred.mean()) / (pred.std() if pred.std() > 0 else 1.0)
-        zr = (real - real.mean()) / (real.std() if real.std() > 0 else 1.0)
-        fig_zs = go.Figure()
-        fig_zs.add_trace(go.Scattergl(
-            x=zp, y=zr, mode="markers",
-            marker=dict(size=6, color=COLORS["navy"], opacity=0.35),
-            text=panel["bank_name"] + " · " + panel["period_label_end"],
-            hovertemplate="%{text}<br>Modell (z): %{x:+.2f}<br>Ist (z): %{y:+.2f}<extra></extra>",
-            name="Bank-Quartal",
-        ))
-        lim = 3.2
-        fig_zs.add_trace(go.Scatter(
-            x=[-lim, lim], y=[-lim, lim], mode="lines",
-            line=dict(color=COLORS["crimson"], width=2, dash="dash"),
-            name="45° (perfekt)",
-        ))
-        fig_zs.add_hline(y=0, line_color=COLORS["hairline"], line_width=1)
-        fig_zs.add_vline(x=0, line_color=COLORS["hairline"], line_width=1)
-        fig_zs.update_layout(
-            title="Prognose vs. Ist · standardisiert (z-Scores)",
-            xaxis_title="Modell-Prognose (z)", yaxis_title="Ist risiko-bereinigt (z)",
-            height=400, xaxis_range=[-lim, lim], yaxis_range=[-lim, lim],
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
-        )
-        st.plotly_chart(fig_zs, use_container_width=True)
-    with sc_r:
-        st.markdown(
-            '<div style="font-size:0.88rem;line-height:1.7;color:#051C2C;'
-            'margin-top:0.4rem;">'
-            '<strong>Was ist ein z-Score (die hier verwendete Kennzahl)?</strong> '
-            'Eine simple Umrechnung, die Zahlen vergleichbar macht: '
-            '<code>z = (Wert − Mittelwert) ÷ Standardabweichung</code>. '
-            'z = 0 heißt „genau der Durchschnitt", z = +1 „eine Standardabweichung '
-            'darüber". Wir rechnen beide Achsen so um, damit der reine '
-            '<em>Größenunterschied</em> (die Modell-Zahl ist viel größer als die '
-            'realisierte) verschwindet und nur der <strong>Zusammenhang</strong> '
-            'übrig bleibt.<br><br>'
-            '<strong>Wie man den Scatter liest.</strong> Bei echter Prognosekraft '
-            'lägen die Punkte nahe der roten 45°-Linie. Stattdessen sieht man eine '
-            '<em>runde Wolke ohne Richtung</em> — die quartalsweise RWA-Bewegung '
-            'folgt dem Modell nicht. <strong>Das ist der ehrliche Befund</strong> '
-            '(warum: siehe Erklärung unter Probe A).'
-            '</div>',
-            unsafe_allow_html=True,
-        )
-
-    # Konditionale Trefferquote — wird das Modell in echten Zinsschock-Quartalen besser?
-    st.markdown("**Wird das Modell in echten Zinsschock-Quartalen treffsicherer?**")
-    thr_rows = []
-    for lbl, t in [("Alle Quartale", 0.0),
-                   ("spürbarer Zinsschock (|Δr| ≥ 0,25 pp)", 0.25),
-                   ("starker Zinsschock (|Δr| ≥ 0,50 pp)", 0.50),
-                   ("sehr starker Zinsschock (|Δr| ≥ 1,0 pp)", 1.0)]:
-        s = panel[panel["dr_10y_pp_q"].abs() >= t]
-        ss = walkforward_error_stats(s)
-        thr_rows.append({
-            "Quartals-Filter": lbl, "n Paare": ss.get("n", 0),
-            "Trefferquote": f"{ss.get('hit_rate', 0)*100:.0f}%",
-            "Korrelation": f"{ss.get('corr', float('nan')):+.2f}",
-        })
-    st.dataframe(pd.DataFrame(thr_rows), use_container_width=True,
-                 hide_index=True, height=180)
-    st.caption(
-        "Auch wenn man nur die Quartale mit echtem Zinsschock betrachtet, bleibt "
-        "die Trefferquote nahe 50 %. Das zeigt: die schwache Übereinstimmung liegt "
-        "nicht an zu ruhigen Quartalen, sondern am grundsätzlichen "
-        "PIT-vs-TTC-Unterschied (oben erklärt)."
-    )
-
-    insight(
-        f"<strong>Ehrlicher Befund (Probe B).</strong> Die <em>Größenordnung</em> "
-        f"der 2-Faktor-Prognose ist realistisch (median ~2 % ΔRWA pro Quartal). "
-        f"Die Richtungs-Trefferquote liegt dennoch bei <strong>{hr:.0f}%</strong> und "
-        f"die Korrelation bei <strong>{stats.get('corr', float('nan')):+.2f}</strong> "
-        f"— wie schon bei der PD: das einzelne RWA bewegt sich quartalsweise vor "
-        f"allem durch Steuerung (CRM, Umschichtung, IRB↔SA) und TTC-Glättung, "
-        f"nicht durch den Makro-Schock. <strong>Wichtig:</strong> das ist <u>kein</u> "
-        f"Widerspruch zum guten CET1-Ergebnis oben — die einzelnen Kanäle (PD, RWA) "
-        f"sind quartalsweise verrauscht, aber in der <em>Zielgröße CET1-Quote</em> "
-        f"(Niveau, jährlich) trifft das Modell konservativ und nah. Der einzelne "
-        f"Kanal taugt nicht als Punktprognose, die Solvenz-Aussage schon."
-    )
 
     # ===== Hervorgehoben · warum 2022 daneben (PIT vs. TTC) ==============
     st.markdown(
@@ -1155,9 +1027,11 @@ Timmermann (1992, *JBES*). Governance: SR 11-7 (Outcomes Analysis), EBA GL 2014/
                 )
 
     footer(
-        f"Pillar-3-Walk-Forward-Backtest · {n_pairs:,} Bank-Quartal-Paare · "
-        f"{n_banks_bt} Banken × {n_vintages} Pillar-3-Jahrgänge · "
-        f"Trefferquote {hr:.0f}% · Korrelation {stats.get('corr', float('nan')):+.2f} · "
+        f"Pillar-3-Walk-Forward-Backtest · {n_banks_bt} Banken × {n_vintages} "
+        f"Pillar-3-Jahrgänge · CET1-Kern-Test: MAE "
+        f"{cet1_stats.get('mae_pp', 0):.1f} pp · "
+        f"{cet1_stats.get('within_1pp', 0)*100:.0f}% ≤ 1 pp · "
+        f"{cet1_stats.get('conservative_share', 0)*100:.0f}% konservativ · "
         f"Datenbasis: pillar3_backtest_pdlgd.csv ({n_points} EU-CR6-Punkte) + "
         f"EBA Transparency 2020-2025 + Brent (ICE) + Bundesbank-Svensson"
     )
