@@ -618,26 +618,32 @@ with tab_bt:
         fig_c = go.Figure()
         fig_c.add_trace(go.Scatter(
             x=cx, y=cy_real, name="🔴 Realität (gemeldete CET1-Quote)",
-            mode="lines+markers", line=dict(color=COLORS["crimson"], width=3),
+            mode="lines+markers+text", line=dict(color=COLORS["crimson"], width=3),
             marker=dict(size=11),
+            text=[f"{v:.1f}%" for v in cy_real], textposition="bottom center",
+            textfont=dict(size=11, color=COLORS["crimson"]),
             hovertemplate="FY%{x}<br><b>Realität</b>: CET1 %{y:.2f} %<extra></extra>"))
         for i, y in enumerate(cyrs):
             mp = cy_real[i] + cpred_change.get(y, 0.0)
+            dr = (annual_macro or {}).get(y, {}).get("d_r_10y_pp", float("nan"))
             fig_c.add_trace(go.Scatter(
-                x=[cx[i], y], y=[cy_real[i], mp], mode="lines+markers",
+                x=[cx[i], y], y=[cy_real[i], mp], mode="lines+markers+text",
                 line=dict(color=COLORS["navy"], width=2.5, dash="dot"),
                 marker=dict(size=11, symbol="diamond", color=COLORS["navy"]),
+                text=["", f"{mp:.1f}%"], textposition="top center",
+                textfont=dict(size=11, color=COLORS["navy"]),
                 name="🔵 Modell (realer Schock eingespeist)", showlegend=(i == 0),
-                hovertemplate=f"FY{y}<br><b>Modell</b>: CET1 %{{y:.2f}} %<extra></extra>"))
-            dr = (annual_macro or {}).get(y, {}).get("d_r_10y_pp", float("nan"))
+                hovertemplate=(f"FY{y} · Zins {dr:+.1f} pp<br>"
+                               f"<b>Modell</b>: CET1 %{{y:.2f}} %<extra></extra>")))
+            gap = mp - cy_real[i + 1]
             fig_c.add_annotation(
-                x=y, y=max(cy_real[i + 1], mp), yshift=24, showarrow=False,
-                text=f"Zins {dr:+.1f} pp", font=dict(size=9, color=COLORS["stone"]))
+                x=y, y=min(cy_real[i + 1], mp), yshift=-22, showarrow=False,
+                text=f"Δ {gap:+.1f} pp", font=dict(size=9, color=COLORS["stone"]))
         fig_c.update_layout(
-            title="CET1-Quote: Realität vs. Modell unter dem real eingetretenen Schock",
-            xaxis_title="Jahr (Modell-Prognose jeweils vom Vorjahres-Istwert + realer Schock)",
-            yaxis_title="CET1-Quote [%]  (Ø über alle Banken)",
-            height=430, xaxis=dict(tickmode="array", tickvals=cx), margin=dict(t=60),
+            title="Modell-CET1-Quote vs. Realität (in %, Ø über alle Banken)",
+            xaxis_title="Jahr (Modell = Vorjahres-Istwert + realer Schock · zeitlich versetzt)",
+            yaxis_title="CET1-Quote [%]",
+            height=440, xaxis=dict(tickmode="array", tickvals=cx), margin=dict(t=60),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0))
         st.plotly_chart(fig_c, use_container_width=True)
         lese(
@@ -708,35 +714,35 @@ with tab_bt:
         fig_pa = go.Figure()
         fig_pa.add_trace(go.Scatter(
             x=x_axis, y=y_real, name="🔴 Realität (gemeldete PD)",
-            mode="lines+markers", line=dict(color=COLORS["crimson"], width=3),
+            mode="lines+markers+text", line=dict(color=COLORS["crimson"], width=3),
             marker=dict(size=11),
+            text=[f"{v:.2f}%" for v in y_real], textposition="bottom center",
+            textfont=dict(size=11, color=COLORS["crimson"]),
             hovertemplate="FY%{x}<br><b>Realität</b>: PD %{y:.2f} %<extra></extra>",
         ))
         # Modell = 1-Jahres-Vorhersage, jeweils NEU vom Istwert des Vorjahres aus
         # → je Jahr ein blauer Ast, der von der roten Realitäts-Linie abzweigt.
         for i, y in enumerate(yrs_all):
             mp = y_real[i] + d_pred_yr.get(y, 0.0)
-            fig_pa.add_trace(go.Scatter(
-                x=[x_axis[i], y], y=[y_real[i], mp],
-                mode="lines+markers",
-                line=dict(color=COLORS["navy"], width=2.5, dash="dot"),
-                marker=dict(size=11, symbol="diamond", color=COLORS["navy"]),
-                name="🔵 Modell (1-Jahres-Vorhersage)", showlegend=(i == 0),
-                hovertemplate=f"FY{y}<br><b>Modell sagt</b>: PD %{{y:.2f}} %<extra></extra>",
-            ))
             dr = amac.get(y, {}).get("d_r_10y_pp", float("nan"))
             ob = (amac.get(y, {}).get("d_brent_log", 0.0) or 0.0) * 100
-            fig_pa.add_annotation(
-                x=y, y=max(y_real[i + 1], mp), yshift=26, showarrow=False,
-                text=f"Zins {dr:+.1f} pp · Öl {ob:+.0f} %",
-                font=dict(size=9, color=COLORS["stone"]),
-            )
+            fig_pa.add_trace(go.Scatter(
+                x=[x_axis[i], y], y=[y_real[i], mp],
+                mode="lines+markers+text",
+                line=dict(color=COLORS["navy"], width=2.5, dash="dot"),
+                marker=dict(size=11, symbol="diamond", color=COLORS["navy"]),
+                text=["", f"{mp:.2f}%"], textposition="top center",
+                textfont=dict(size=11, color=COLORS["navy"]),
+                name="🔵 Modell (1-Jahres-Vorhersage)", showlegend=(i == 0),
+                hovertemplate=(f"FY{y} · Zins {dr:+.1f} pp · Öl {ob:+.0f} %<br>"
+                               f"<b>Modell sagt</b>: PD %{{y:.2f}} %<extra></extra>"),
+            ))
         fig_pa.update_layout(
-            title="Entwicklung der PD-Reihe: Realität vs. Modell (mit realem Zins/Öl gefüttert)",
-            xaxis_title="Jahr (Modell = 1-Jahres-Vorhersage, jeweils neu vom Vorjahres-Istwert — zeitlich versetzt)",
-            yaxis_title="Ø PD über alle Banken/Segmente [%]",
+            title="Modell-PD vs. Realität (in %, Ø über alle Banken & Segmente)",
+            xaxis_title="Jahr (Modell = Vorjahres-Istwert + realer Schock · zeitlich versetzt)",
+            yaxis_title="Ø PD [%]",
             height=440, xaxis=dict(tickmode="array", tickvals=x_axis),
-            margin=dict(t=70),
+            margin=dict(t=60),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0),
         )
         st.plotly_chart(fig_pa, use_container_width=True)
@@ -882,6 +888,32 @@ with tab_bt:
         f"Kanal taugt nicht als Punktprognose, die Solvenz-Aussage schon."
     )
 
+    # ===== Hervorgehoben · warum 2022 daneben (PIT vs. TTC) ==============
+    st.markdown(
+        '<div style="background:#FBF2F2;border:2px solid #A52F4D;'
+        'border-radius:8px;padding:1.0rem 1.25rem;margin:0.6rem 0 0.4rem 0;'
+        'color:#051C2C;font-size:1.0rem;line-height:1.8;">'
+        '<div style="font-size:1.05rem;font-weight:800;color:#A52F4D;'
+        'margin-bottom:0.3rem;">Warum lagen wir 2022 ~2,7 pp daneben? '
+        '→ <span style="text-decoration:underline;">PIT vs. TTC</span></div>'
+        '2022 explodierte der Zins (<strong>+2,8 pp</strong>). '
+        '<strong>Unser Modell ist Point-in-Time (PIT)</strong> — es reagiert '
+        '<strong>sofort</strong>: „PD&nbsp;rauf → CET1&nbsp;runter". Die '
+        '<strong>gemeldeten regulatorischen PD sind aber Through-the-Cycle '
+        '(TTC)</strong> — per Vorschrift geglättet und antizyklisch (CRR&nbsp;'
+        'Art.&nbsp;180), damit sie im Abschwung gerade <strong>nicht</strong> '
+        'springen. Sie blieben also flach → die gemeldete CET1 blieb stabil. '
+        'Dazu kommt: die Banken <strong>verdienten</strong> am Zinsanstieg '
+        '(Zinsüberschuss), was unser Modell bewusst <strong>nicht gegenrechnet</strong>. '
+        '<br><strong style="color:#A52F4D;">Fazit:</strong> Die 2022-Lücke ist '
+        '<strong>kein Modellfehler</strong>, sondern der Unterschied zwischen einer '
+        '<strong>PIT-Sofortreaktion (Modell)</strong> und einer '
+        '<strong>TTC-geglätteten Meldung (Realität)</strong> — und sie zeigt in die '
+        '<strong>sichere Richtung</strong> (Modell konservativer als die Realität).'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
     # ====================================================================
     #  Abschnitt 5 · Bank-Drilldown
     # ====================================================================
@@ -982,42 +1014,6 @@ with tab_bt:
             "Bewegung dieser Bank — **grün ✓** = Modell traf die Richtung, "
             "**rot ✗** = daneben. **Aussage:** macht die Trefferbilanz pro Institut "
             "greifbar (die Höhe ist die Realität, die Farbe der Modell-Treffer)."
-        )
-
-    # --- Prognostizierte vs. realisierte PD je Segment (jährlich, 1-J-forward) ---
-    bank_pd = (pd_bt[pd_bt["LEI"] == sel_lei].copy()
-               if (pd_bt is not None and not pd_bt.empty) else pd.DataFrame())
-    if not bank_pd.empty:
-        st.markdown(
-            f"**{sel_name} · prognostizierte vs. realisierte PD je Segment.**  "
-            "Unsere PD ist eine **1-Jahres-Vorausschau**, daher Jahr für Jahr: das "
-            "Modell nimmt die PD vom Vorjahr + den realen Schock und sagt die PD "
-            "dieses Jahres voraus (**blau**) — daneben die tatsächlich gemeldete "
-            "PD (**rot**). Jahr wählbar:")
-        yrs = sorted(int(y) for y in bank_pd["year"].unique())
-        ysel = st.radio("Prognose-Jahr", yrs, index=len(yrs) - 1,
-                        horizontal=True, key="bt_seg_year")
-        bp = bank_pd[bank_pd["year"] == ysel].sort_values("pd_real_pct", ascending=False)
-        fig_seg = go.Figure()
-        fig_seg.add_trace(go.Bar(
-            x=bp["vasicek_class"], y=bp["pd_pred_pct"], name="Modell-Prognose PD",
-            marker_color=COLORS["navy"], opacity=0.9,
-            hovertemplate="%{x}<br>Modell-PD = %{y:.2f} %<extra></extra>"))
-        fig_seg.add_trace(go.Bar(
-            x=bp["vasicek_class"], y=bp["pd_real_pct"], name="realisierte (gemeldete) PD",
-            marker_color=COLORS["crimson"], opacity=0.9,
-            hovertemplate="%{x}<br>gemeldete PD = %{y:.2f} %<extra></extra>"))
-        fig_seg.update_layout(
-            title=f"{sel_name} · PD je Segment {ysel}: Modell-Prognose vs. Realität",
-            xaxis_title="Segment (IRB-Klasse)", yaxis_title="PD [%]",
-            height=380, barmode="group",
-            legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0))
-        st.plotly_chart(fig_seg, use_container_width=True)
-        st.caption(
-            "**Lesart:** blau ≈ rot heißt gute Prognose. In Stress-Jahren liegt das "
-            "Modell bei einzelnen Segmenten über der gemeldeten PD — derselbe "
-            "PIT-vs-TTC-Effekt wie oben, jetzt je Segment sichtbar. (Forward-PD: "
-            f"Prognose {ysel} basiert auf dem Stand 31.12.{ysel-1} + Schock {ysel}.)"
         )
 
     # ====================================================================
