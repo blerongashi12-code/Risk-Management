@@ -790,7 +790,7 @@ with tab_bt:
     #  Abschnitt 5 · Bank-Drilldown
     # ====================================================================
     st.divider()
-    eyebrow("Bank-Drilldown · eingefrorene Risikoparameter und Richtungstreffer je Institut")
+    eyebrow("Bank-Drilldown · eingefrorene Risikoparameter und CET1-Quote (Modell vs. Realität) je Institut")
 
     size_rank = (panel.groupby(["LEI_Code", "bank_name"])["rwa_credit_start"]
                  .mean().sort_values(ascending=False))
@@ -851,42 +851,56 @@ with tab_bt:
             "gemeldeten Parameter über die Jahre sind."
         )
 
-    # Rechts: Richtungstreffer je Quartal (realisiert, lesbare Skala)
+    # Rechts: CET1-Quote Modell vs. Realität je Bank (die Zielgröße)
     with bk_r:
-        sub = panel[panel["LEI_Code"] == sel_lei].sort_values("Period_end").copy()
-        sub["date_end"] = pd.to_datetime(sub["Period_end"].apply(
-            lambda p: f"{p//100}-{p%100:02d}-01"))
-        sub["real_pct"] = sub["risk_driven_dRWA_credit_eur"] / sub["rwa_credit_start"] * 100
-        fig_h = go.Figure()
-        fig_h.add_trace(go.Bar(
-            x=sub["date_end"], y=sub["real_pct"],
-            marker_color=[COLORS["teal"] if m else COLORS["crimson"]
-                          for m in sub["sign_match"]],
-            text=["✓" if m else "✗" for m in sub["sign_match"]],
-            textposition="outside", textfont=dict(size=11),
-            hovertemplate="<b>%{x|%Y-%m}</b><br>Ist risiko-bereinigt: "
-                          "%{y:+.2f}% der RWA<extra></extra>",
-        ))
-        fig_h.add_hline(y=0, line_color=COLORS["hairline"], line_width=1)
-        fig_h.update_layout(
-            title=f"{sel_name} · realisiertes ΔRWA + Richtungstreffer (✓/✗)",
-            xaxis_title="Quartal-Ende",
-            yaxis_title="Ist risiko-bereinigt (% der RWA)",
-            height=360, showlegend=False,
-        )
-        st.plotly_chart(fig_h, use_container_width=True)
-        bstats = walkforward_error_stats(sub)
-        bb1, bb2, bb3 = st.columns(3, gap="small")
-        bb1.metric("Quartale", f"{bstats.get('n', 0)}")
-        bb2.metric("Trefferquote", f"{bstats.get('hit_rate', 0)*100:.0f}%")
-        bb3.metric("Ø frozen-Vintage",
-                   sub["pd_vintage"].mode().iloc[0][:4] if len(sub) else "—")
-        st.caption(
-            "**Was:** je Quartal die tatsächliche, um Volumen bereinigte RWA-"
-            "Bewegung dieser Bank — **grün ✓** = Modell traf die Richtung, "
-            "**rot ✗** = daneben. **Aussage:** macht die Trefferbilanz pro Institut "
-            "greifbar (die Höhe ist die Realität, die Farbe der Modell-Treffer)."
-        )
+        bc = (cet1_bt[cet1_bt["LEI"] == sel_lei].sort_values("year")
+              if (cet1_bt is not None and not cet1_bt.empty) else pd.DataFrame())
+        if bc.empty:
+            st.info(f"Für {sel_name} liegen keine CET1-Jahresdaten vor "
+                    "(EBA-Jahresend-Stichtage 31.12. fehlen für diese Bank).")
+        else:
+            byrs = [int(y) for y in bc["year"]]
+            anchor = byrs[0] - 1
+            bx = [anchor] + byrs
+            by_real = ([float(bc["cet1_ratio_start"].iloc[0])]
+                       + [float(v) for v in bc["cet1_ratio_real"]])
+            fig_bc = go.Figure()
+            fig_bc.add_trace(go.Scatter(
+                x=bx, y=by_real, name="🔴 Realität (gemeldet)",
+                mode="lines+markers+text", line=dict(color=COLORS["crimson"], width=3),
+                marker=dict(size=10),
+                text=[f"{v:.1f}%" for v in by_real], textposition="bottom center",
+                textfont=dict(size=10, color=COLORS["crimson"]),
+                hovertemplate="FY%{x}<br><b>Realität</b>: CET1 %{y:.2f} %<extra></extra>"))
+            for i, (_, r) in enumerate(bc.iterrows()):
+                yy = int(r["year"]); mp = float(r["cet1_ratio_pred"])
+                fig_bc.add_trace(go.Scatter(
+                    x=[bx[i], yy], y=[by_real[i], mp], mode="lines+markers+text",
+                    line=dict(color=COLORS["navy"], width=2.5, dash="dot"),
+                    marker=dict(size=10, symbol="diamond", color=COLORS["navy"]),
+                    text=["", f"{mp:.1f}%"], textposition="top center",
+                    textfont=dict(size=10, color=COLORS["navy"]),
+                    name="🔵 Modell (realer Schock)", showlegend=(i == 0),
+                    hovertemplate=f"FY{yy}<br><b>Modell</b>: CET1 %{{y:.2f}} %<extra></extra>"))
+            fig_bc.update_layout(
+                title=f"{sel_name} · CET1-Quote: Modell vs. Realität",
+                xaxis_title="Jahr (Modell = Vorjahres-Istwert + realer Schock)",
+                yaxis_title="CET1-Quote [%]",
+                height=360, xaxis=dict(tickmode="array", tickvals=bx),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0))
+            st.plotly_chart(fig_bc, use_container_width=True)
+            mae_b = float(bc["abs_error_pp"].mean())
+            cons_b = int(bc["conservative"].sum())
+            d1b, d2b, d3b = st.columns(3, gap="small")
+            d1b.metric("Jahre", f"{len(bc)}")
+            d2b.metric("Ø Abstand (MAE)", f"{mae_b:.1f} pp")
+            d3b.metric("Konservativ", f"{cons_b}/{len(bc)}")
+            st.caption(
+                "**Was:** je Jahr die gemeldete CET1-Quote (🔴) und die "
+                "Modell-Prognose unter dem realen Schock (🔵, jeweils vom "
+                "Vorjahres-Istwert). **Aussage:** wie nah und auf welcher Seite "
+                "das Modell für diese Bank lag (konservativ = Prognose ≤ Ist)."
+            )
 
     # ====================================================================
     #  Abschnitt 6 · Verdikt
