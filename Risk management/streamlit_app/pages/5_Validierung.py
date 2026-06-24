@@ -289,42 +289,57 @@ with tab_bt:
     d5.metric("Testfenster", f"{win_lo} – {win_hi}", "Walk-Forward", delta_color="off")
 
     cov = backtest_series_coverage(series)
-    cov = cov.loc[cov.sum(axis=1).sort_values(ascending=False).index]   # größte zuerst
+    # „Gemeldete" Klassen je Bank = Klassen, die die Bank in IRGENDEINEM Jahr
+    # offenlegt (ihr eigener A-IRB-Umfang). Strukturell fehlende Klassen
+    # (z. B. kein IRB-Sovereign/QRRE) zählen NICHT als Lücke — die Matrix zeigt
+    # daher Abdeckung relativ zum bank-eigenen Umfang.
+    disc = series.groupby("bank_name")["vasicek_class"].nunique()
+    cov = cov.loc[cov.sum(axis=1).sort_values(ascending=False).index]
+    disc_v = disc.reindex(cov.index)
+    years_lab = [c[:4] for c in cov.columns]
+    zfrac = (cov.div(disc_v, axis=0) * 100.0).values
+    txt = [[f"{int(cov.values[i][j])}/{int(disc_v.iloc[i])}"
+            for j in range(cov.shape[1])] for i in range(cov.shape[0])]
+    have_tot = int(cov.values.sum())
+    disc_tot = int(disc_v.sum() * cov.shape[1])
+    cov_pct = 100.0 * have_tot / disc_tot if disc_tot else 0.0
     fig_cov = go.Figure(go.Heatmap(
-        z=cov.values,
-        x=[c[:4] for c in cov.columns],            # Jahr-Label
-        y=cov.index,
-        text=cov.values,
-        texttemplate="%{text}",
-        textfont=dict(size=11),
-        colorscale=[[0.0, "#F4F4F4"], [0.5, "#9FC0D8"], [1.0, COLORS["mid_blue"]]],
-        zmin=0, zmax=7,
-        showscale=True,
-        colorbar=dict(title="IRB-<br>Klassen", thickness=12, len=0.8),
-        hovertemplate="<b>%{y}</b> · %{x}<br>%{z} IRB-Klassen<extra></extra>",
+        z=zfrac, x=years_lab, y=cov.index,
+        text=txt, texttemplate="%{text}", textfont=dict(size=12),
+        colorscale=[[0.0, "#F4F4F4"], [0.5, "#C9DAE8"], [0.85, "#7FA8C8"],
+                    [1.0, COLORS["mid_blue"]]],
+        zmin=0, zmax=100, showscale=True,
+        colorbar=dict(title="Abdeckung<br>%", thickness=12, len=0.8),
+        hovertemplate="<b>%{y}</b> · %{x}<br>%{z:.0f}% der gemeldeten Klassen<extra></extra>",
         xgap=2, ygap=2,
     ))
     fig_cov.update_layout(
-        title="Abdeckungs-Matrix · Anzahl extrahierter IRB-Klassen je Bank × Pillar-3-Stichtag",
+        title="Abdeckung je Bank × Pillar-3-Stichtag (extrahiert / von der Bank gemeldet)",
         height=360, margin=dict(l=20, r=20, t=56, b=30),
     )
+    fig_cov.update_xaxes(type="category")          # saubere Jahre, keine 2020,5-Ticks
     fig_cov.update_yaxes(autorange="reversed")
     st.plotly_chart(fig_cov, use_container_width=True)
 
     lese(
-        was="Pro Bank (Zeile) und Pillar-3-Jahrgang (Spalte) die Anzahl der "
-            "Kreditklassen, für die wir PD, LGD und EAD aus dem Geschäftsbericht "
-            "extrahiert haben — dunkler = vollständiger (max. 7 Klassen).",
-        befund="10 europäische Großbanken über vier Jahre (2021–2024), fast "
-               "durchgehend dunkelblau. Helle Zellen sind reine Quellgrenzen "
-               "(im PDF gerundete/verschmolzene Werte), keine fehlende Sorgfalt.",
-        modell="Erst diese lückenarme, einheitliche Zeitreihe macht den "
-               "historischen Test überhaupt möglich — ohne sie könnten wir das "
-               "Modell nur am heutigen Stand anwenden, nicht in der Vergangenheit prüfen.",
-        metrik="Quelle &amp; Integrität: jeder Wert ist ein bankpubliziertes "
-               "<em>EU-CR6-A-IRB-Sub-total</em> (EBA-ITS/2020/04, CRR Art. 431-455) "
-               "— kein abgeleiteter, geschätzter oder erfundener Wert; pro Zelle "
-               "gegen FY2024 kalibriert und über RWA/EAD-Dichte geprüft.",
+        was="Je Bank (Zeile) und Pillar-3-Jahrgang (Spalte) der Anteil der "
+            "<em>von der Bank gemeldeten</em> A-IRB-Klassen, für die PD, LGD und "
+            "EAD extrahiert wurden (Zahl = extrahiert / gemeldet). Dunkelblau = "
+            "vollständig.",
+        befund=f"Relativ zum bank-eigenen Meldeumfang sind <strong>{cov_pct:.0f}%</strong> "
+               f"der Zellen abgedeckt ({have_tot} von {disc_tot}). Klassen, die "
+               "eine Bank gar nicht im A-IRB führt (z. B. UniCredit kein separates "
+               "Mortgage; Rabobank/Crédit Mutuel/ING kein QRRE; mehrere kein "
+               "IRB-Sovereign), sind <em>strukturell</em> und zählen nicht als Lücke.",
+        modell="Die wenigen unvollständigen Zellen sind dokumentierte "
+               "<strong>Quellgrenzen</strong>: BNP-Report 2021 rundet die PD auf "
+               "ganze % (0 %/5 %); SocGen 2022 Bank+Sovereign sind im PDF-Text "
+               "verschmolzen; Crédit Mutuel/BPCE-Vorjahre haben mehrdeutige Anker. "
+               "Diese werden <strong>nicht</strong> mit abgeleiteten Werten gefüllt "
+               "(keine Fabrikation) — daher bleiben sie offen statt erfunden.",
+        metrik="Quelle: jeder Wert ist ein bankpubliziertes <em>EU-CR6-A-IRB-"
+               "Sub-total</em> (EBA-ITS/2020/04, CRR Art. 431-455), gegen FY2024 "
+               "kalibriert und über RWA/EAD-Dichte geprüft.",
     )
 
     # ====================================================================
