@@ -777,6 +777,103 @@ def build_pd_backtest(series_df: pd.DataFrame, annual_macro: dict) -> pd.DataFra
     return pd.DataFrame(rows)
 
 
+def build_cet1_backtest(
+    capital_wide: pd.DataFrame,
+    series_df: pd.DataFrame,
+    annual_macro: dict,
+    years=(2022, 2023, 2024),
+) -> pd.DataFrame:
+    """**CET1-Quoten-Backtest — die eigentliche Zielvariable des Modells.**
+
+    Für jede Bank und jedes Jahr Y: wir speisen den *real eingetretenen*
+    Jahres-Schock (ΔBrent, Δr_10y) in das mit der Vintage 31.12.(Y−1)
+    eingefrorene Portfolio (no-look-ahead) und projizieren die gestresste
+    CET1-Quote — über die zwei Kanäle des Modells:
+      • Nenner: RWA_total(Y−1) + ΔRWA_credit  (Kreditrisiko-RWA steigt)
+      • Zähler: CET1(Y−1) − ΔEL              (zusätzliche Erwartungsverluste
+                                              zehren am Kapital)
+    Beide ΔGrößen kommen aus dem 2-Faktor-Modell (capital_bridge_2factor) und
+    werden vom rekonstruierten Portfolio auf die *gemeldete* RWA_credit(Y−1)
+    skaliert (Faktor = RWA_credit_gemeldet / RWA_credit_rekonstruiert).
+
+    Anschließend Vergleich der prognostizierten mit der **tatsächlich
+    gemeldeten** CET1-Quote(Y). Bewusst eine *reine Abwärts-/Risiko-Sicht*:
+    Gewinnthesaurierung und NII-Gegeneffekt werden NICHT gutgeschrieben — die
+    Prognose ist daher eine konservative untere Schranke (Stress-Tool-Logik)."""
+    if capital_wide.empty or series_df.empty or not annual_macro:
+        return pd.DataFrame()
+    names = (series_df.drop_duplicates("LEI").set_index("LEI")["bank_name"].to_dict())
+    rows = []
+    for lei in sorted(series_df["LEI"].dropna().unique()):
+        cw = capital_wide[capital_wide["LEI_Code"] == lei].set_index("Period")
+        bank_vintages = set(series_df.loc[series_df["LEI"] == lei, "vintage_date"])
+        for Y in years:
+            if Y not in annual_macro:
+                continue
+            p0, p1 = (Y - 1) * 100 + 12, Y * 100 + 12
+            if p0 not in cw.index or p1 not in cw.index:
+                continue
+            v = f"{Y - 1}-12-31"
+            if v not in bank_vintages:
+                continue
+            fp = build_frozen_portfolio_series(lei, v, series_df)
+            if fp is None:
+                continue
+            delta = frozen_2factor_delta(
+                fp, annual_macro[Y]["d_brent_log"], annual_macro[Y]["d_r_10y_pp"])
+            if delta is None or delta["rwa_base"] <= 0:
+                continue
+            r0, r1 = cw.loc[p0], cw.loc[p1]
+            cet1_0, rwt_0, rwc_0 = r0.get("cet1"), r0.get("rwa_total"), r0.get("rwa_credit")
+            cet1_1, rwt_1 = r1.get("cet1"), r1.get("rwa_total")
+            if any(pd.isna(x) for x in (cet1_0, rwt_0, rwc_0, cet1_1, rwt_1)) \
+                    or rwt_0 <= 0 or rwt_1 <= 0:
+                continue
+            factor = float(rwc_0) / delta["rwa_base"]
+            d_rwa = delta["delta_rwa"] * factor
+            d_el = delta["delta_el"] * factor
+            pred_rwt = float(rwt_0) + d_rwa
+            pred_cet1 = float(cet1_0) - d_el
+            if pred_rwt <= 0:
+                continue
+            ratio_start = float(cet1_0) / float(rwt_0) * 100.0
+            ratio_pred = pred_cet1 / pred_rwt * 100.0
+            ratio_real = float(cet1_1) / float(rwt_1) * 100.0
+            rows.append({
+                "LEI": lei, "bank_name": names.get(lei, lei), "year": int(Y),
+                "cet1_ratio_start": ratio_start,
+                "cet1_ratio_pred": ratio_pred,
+                "cet1_ratio_real": ratio_real,
+                "error_pp": ratio_pred - ratio_real,
+                "abs_error_pp": abs(ratio_pred - ratio_real),
+                "conservative": bool(ratio_pred <= ratio_real),   # Prognose ≤ Ist = sichere Seite
+                "d_rwa_eur": d_rwa, "d_el_eur": d_el,
+                "d_r_10y_pp": annual_macro[Y]["d_r_10y_pp"],
+                "d_brent_log": annual_macro[Y]["d_brent_log"],
+            })
+    return pd.DataFrame(rows)
+
+
+def cet1_backtest_stats(df: pd.DataFrame) -> dict:
+    """Güte des CET1-Backtests: wie nah (MAE in pp), systematische Richtung
+    (Bias), Konservativ-Anteil, und Vergleich gegen die naive „CET1 bleibt
+    gleich"-Prognose."""
+    if df.empty:
+        return {"n": 0}
+    err = df["error_pp"].to_numpy()
+    mae = float(np.mean(np.abs(err)))
+    mae_naive = float(np.mean(np.abs(df["cet1_ratio_start"] - df["cet1_ratio_real"])))
+    within1 = float(np.mean(np.abs(err) <= 1.0))
+    return {
+        "n":            int(len(df)),
+        "mae_pp":       mae,
+        "bias_pp":      float(np.mean(err)),
+        "mae_naive_pp": mae_naive,
+        "within_1pp":   within1,
+        "conservative_share": float(df["conservative"].mean()),
+    }
+
+
 def pd_backtest_stats(pd_bt: pd.DataFrame) -> dict:
     """Kennzahlen des PD-Backtests: Richtungs-Trefferquote, Korrelation der
     PD-Änderungen, MAE des Modells vs. naive „keine-Änderung"-Prognose."""
