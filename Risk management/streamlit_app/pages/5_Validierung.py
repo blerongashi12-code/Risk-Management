@@ -250,8 +250,8 @@ with tab_bt:
     # --- Einheitliche Lesehilfe unter jeder Grafik (addressatengerecht) ---
     def lese(was, befund, modell, metrik=None):
         rows = [("Was zeigt die Grafik?", was),
-                ("Befund — was sehen wir?", befund),
-                ("Aussage — was heißt das für unser Modell?", modell)]
+                ("Befund", befund),
+                ("Aussage — Bedeutung für das Modell", modell)]
         if metrik:
             rows.append(("Verwendete Kennzahl — einfach erklärt", metrik))
         inner = "".join(
@@ -567,29 +567,35 @@ with tab_bt:
         cpred_change = {int(r["year"]): float(r["pred"] - r["start"])
                         for _, r in cy.iterrows()}
         fig_c = go.Figure()
+        cmps = [cy_real[i] + cpred_change.get(cyrs[i], 0.0) for i in range(len(cyrs))]
+        creal_pos = ["bottom center"] + [
+            "top center" if cy_real[i + 1] >= cmps[i] else "bottom center"
+            for i in range(len(cyrs))]
         fig_c.add_trace(go.Scatter(
             x=cx, y=cy_real, name="🔴 Realität (gemeldete CET1-Quote)",
             mode="lines+markers+text", line=dict(color=COLORS["crimson"], width=3),
             marker=dict(size=11),
-            text=[f"{v:.1f}%" for v in cy_real], textposition="bottom center",
+            text=[f"{v:.1f}%" for v in cy_real], textposition=creal_pos,
             textfont=dict(size=11, color=COLORS["crimson"]),
             hovertemplate="FY%{x}<br><b>Realität</b>: CET1 %{y:.2f} %<extra></extra>"))
         for i, y in enumerate(cyrs):
-            mp = cy_real[i] + cpred_change.get(y, 0.0)
+            mp = cmps[i]
             dr = (annual_macro or {}).get(y, {}).get("d_r_10y_pp", float("nan"))
+            m_pos = "top center" if mp >= cy_real[i + 1] else "bottom center"
             fig_c.add_trace(go.Scatter(
                 x=[cx[i], y], y=[cy_real[i], mp], mode="lines+markers+text",
                 line=dict(color=COLORS["navy"], width=2.5, dash="dot"),
                 marker=dict(size=11, symbol="diamond", color=COLORS["navy"]),
-                text=["", f"{mp:.1f}%"], textposition="top center",
+                text=["", f"{mp:.1f}%"], textposition=m_pos,
                 textfont=dict(size=11, color=COLORS["navy"]),
                 name="🔵 Modell (realer Schock eingespeist)", showlegend=(i == 0),
                 hovertemplate=(f"FY{y} · Zins {dr:+.1f} pp<br>"
                                f"<b>Modell</b>: CET1 %{{y:.2f}} %<extra></extra>")))
             gap = mp - cy_real[i + 1]
             fig_c.add_annotation(
-                x=y, y=min(cy_real[i + 1], mp), yshift=-22, showarrow=False,
-                text=f"Δ {gap:+.1f} pp", font=dict(size=9, color=COLORS["stone"]))
+                x=y, y=(cy_real[i + 1] + mp) / 2, showarrow=False,
+                text=f"Δ {gap:+.1f} pp", font=dict(size=9, color=COLORS["stone"]),
+                xshift=34)
         fig_c.update_layout(
             title="Modell-CET1-Quote vs. Realität (in %, Ø über alle Banken)",
             xaxis_title="Jahr (Modell = Vorjahres-Istwert + realer Schock · zeitlich versetzt)",
@@ -637,7 +643,7 @@ with tab_bt:
                    f"{pd_stats['mae_model']:.2f} / {pd_stats['mae_naive']:.2f} pp",
                    "schlägt 'keine Änderung' nicht", delta_color="off")
         st.caption(
-            "**So liest du die Kennzahlen:** **Trefferquote** = in wie viel % der "
+            "**Kennzahlen — Definition:** **Trefferquote** = in wie viel % der "
             "Fälle die gemeldete PD in die vom Modell vorhergesagte Richtung lief "
             "(50 % = reiner Zufall). **Korrelation** = Gleichlauf von Vorhersage "
             "und Realität, von −1 bis +1 (0 = kein Zusammenhang). **MAE** = "
@@ -663,26 +669,33 @@ with tab_bt:
         d_pred_yr = {int(r["year"]): float(r["model"] - r["base"])
                      for _, r in by_year.iterrows()}
         fig_pa = go.Figure()
+        # Modell-Endpunkte vorab; Label-Seiten so wählen, dass sich Real- und
+        # Modell-Wert je Jahr NICHT überlagern (gegenüberliegende Seiten).
+        mps = [y_real[i] + d_pred_yr.get(yrs_all[i], 0.0) for i in range(len(yrs_all))]
+        real_pos = ["bottom center"] + [
+            "top center" if y_real[i + 1] >= mps[i] else "bottom center"
+            for i in range(len(yrs_all))]
         fig_pa.add_trace(go.Scatter(
             x=x_axis, y=y_real, name="🔴 Realität (gemeldete PD)",
             mode="lines+markers+text", line=dict(color=COLORS["crimson"], width=3),
             marker=dict(size=11),
-            text=[f"{v:.2f}%" for v in y_real], textposition="bottom center",
+            text=[f"{v:.2f}%" for v in y_real], textposition=real_pos,
             textfont=dict(size=11, color=COLORS["crimson"]),
             hovertemplate="FY%{x}<br><b>Realität</b>: PD %{y:.2f} %<extra></extra>",
         ))
         # Modell = 1-Jahres-Vorhersage, jeweils NEU vom Istwert des Vorjahres aus
         # → je Jahr ein blauer Ast, der von der roten Realitäts-Linie abzweigt.
         for i, y in enumerate(yrs_all):
-            mp = y_real[i] + d_pred_yr.get(y, 0.0)
+            mp = mps[i]
             dr = amac.get(y, {}).get("d_r_10y_pp", float("nan"))
             ob = (amac.get(y, {}).get("d_brent_log", 0.0) or 0.0) * 100
+            m_pos = "top center" if mp >= y_real[i + 1] else "bottom center"
             fig_pa.add_trace(go.Scatter(
                 x=[x_axis[i], y], y=[y_real[i], mp],
                 mode="lines+markers+text",
                 line=dict(color=COLORS["navy"], width=2.5, dash="dot"),
                 marker=dict(size=11, symbol="diamond", color=COLORS["navy"]),
-                text=["", f"{mp:.2f}%"], textposition="top center",
+                text=["", f"{mp:.2f}%"], textposition=m_pos,
                 textfont=dict(size=11, color=COLORS["navy"]),
                 name="🔵 Modell (1-Jahres-Vorhersage)", showlegend=(i == 0),
                 hovertemplate=(f"FY{y} · Zins {dr:+.1f} pp · Öl {ob:+.0f} %<br>"
@@ -736,11 +749,11 @@ with tab_bt:
             'border-left:4px solid #C9A227;padding:0.85rem 1.1rem;'
             'border-radius:6px;margin:0.2rem 0 0.9rem 0;color:#051C2C;'
             'font-size:0.88rem;line-height:1.7;">'
-            '<strong>Woran liegt es? — der entscheidende Befund.</strong><br>'
-            'Schau auf <strong>2022</strong>: der Zins sprang um +2,8 pp, und das '
-            'Modell sagt korrekt „PD <em>rauf</em>" (Ø +0,5 pp). Die tatsächlich '
-            'gemeldeten PD gingen aber im Schnitt <em>runter</em>. Kein '
-            'Widerspruch, sondern <strong>zwei verschiedene Größen</strong>:<br>'
+            '<strong>Ursache des Befunds (Schwerpunkt 2022).</strong><br>'
+            '<strong>2022</strong>: der Zins stieg um +2,8 pp; das Modell '
+            'projiziert daraufhin korrekt eine höhere PD (Ø +0,5 pp). Die '
+            'tatsächlich gemeldeten PD sanken im Schnitt jedoch. Das ist kein '
+            'Widerspruch, sondern Ausdruck <strong>zweier verschiedener Größen</strong>:<br>'
             '• Unser Modell projiziert eine <strong>Point-in-Time (PIT)</strong>-'
             'Reaktion — „<em>wenn dieser Schock jetzt einträfe, stiege das '
             'Risiko</em>".<br>'
@@ -766,9 +779,9 @@ with tab_bt:
         'border-radius:8px;padding:1.0rem 1.25rem;margin:0.6rem 0 0.4rem 0;'
         'color:#051C2C;font-size:1.0rem;line-height:1.8;">'
         '<div style="font-size:1.05rem;font-weight:800;color:#A52F4D;'
-        'margin-bottom:0.3rem;">Warum lagen wir 2022 ~2,7 pp daneben? '
+        'margin-bottom:0.3rem;">Ursache der Abweichung 2022 (~2,7 pp) '
         '→ <span style="text-decoration:underline;">PIT vs. TTC</span></div>'
-        '2022 explodierte der Zins (<strong>+2,8 pp</strong>). '
+        '2022 stieg der Zins stark (<strong>+2,8 pp</strong>). '
         '<strong>Unser Modell ist Point-in-Time (PIT)</strong> — es reagiert '
         '<strong>sofort</strong>: „PD&nbsp;rauf → CET1&nbsp;runter". Die '
         '<strong>gemeldeten regulatorischen PD sind aber Through-the-Cycle '
@@ -847,7 +860,7 @@ with tab_bt:
             "**Was:** die echten Eingangswerte dieser Bank — EAD-gewichtete Ø PD "
             "(rot) und Ø LGD (blau) je Pillar-3-Stichtag. **Aussage:** genau diese "
             "Werte friert der Backtest zu jedem Zeitpunkt ein (kein Blick in die "
-            "Zukunft); man sieht hier auch direkt, wie stabil/geglättet (TTC) die "
+            "Zukunft); erkennbar ist zudem, wie stabil bzw. geglättet (TTC) die "
             "gemeldeten Parameter über die Jahre sind."
         )
 
@@ -864,21 +877,26 @@ with tab_bt:
             bx = [anchor] + byrs
             by_real = ([float(bc["cet1_ratio_start"].iloc[0])]
                        + [float(v) for v in bc["cet1_ratio_real"]])
+            bmps = [float(v) for v in bc["cet1_ratio_pred"]]
+            breal_pos = ["bottom center"] + [
+                "top center" if by_real[i + 1] >= bmps[i] else "bottom center"
+                for i in range(len(bmps))]
             fig_bc = go.Figure()
             fig_bc.add_trace(go.Scatter(
                 x=bx, y=by_real, name="🔴 Realität (gemeldet)",
                 mode="lines+markers+text", line=dict(color=COLORS["crimson"], width=3),
                 marker=dict(size=10),
-                text=[f"{v:.1f}%" for v in by_real], textposition="bottom center",
+                text=[f"{v:.1f}%" for v in by_real], textposition=breal_pos,
                 textfont=dict(size=10, color=COLORS["crimson"]),
                 hovertemplate="FY%{x}<br><b>Realität</b>: CET1 %{y:.2f} %<extra></extra>"))
             for i, (_, r) in enumerate(bc.iterrows()):
-                yy = int(r["year"]); mp = float(r["cet1_ratio_pred"])
+                yy = int(r["year"]); mp = bmps[i]
+                m_pos = "top center" if mp >= by_real[i + 1] else "bottom center"
                 fig_bc.add_trace(go.Scatter(
                     x=[bx[i], yy], y=[by_real[i], mp], mode="lines+markers+text",
                     line=dict(color=COLORS["navy"], width=2.5, dash="dot"),
                     marker=dict(size=10, symbol="diamond", color=COLORS["navy"]),
-                    text=["", f"{mp:.1f}%"], textposition="top center",
+                    text=["", f"{mp:.1f}%"], textposition=m_pos,
                     textfont=dict(size=10, color=COLORS["navy"]),
                     name="🔵 Modell (realer Schock)", showlegend=(i == 0),
                     hovertemplate=f"FY{yy}<br><b>Modell</b>: CET1 %{{y:.2f}} %<extra></extra>"))
@@ -901,6 +919,82 @@ with tab_bt:
                 "Vorjahres-Istwert). **Aussage:** wie nah und auf welcher Seite "
                 "das Modell für diese Bank lag (konservativ = Prognose ≤ Ist)."
             )
+
+    # --- PD je Segment pro Bank (Segment wählbar, inkl. "Alle Segmente") ---
+    bank_seg = (pd_bt[pd_bt["LEI"] == sel_lei].copy()
+                if (pd_bt is not None and not pd_bt.empty) else pd.DataFrame())
+    if not bank_seg.empty:
+        st.markdown(f"**{sel_name} · PD je Segment — Modell vs. Realität** "
+                    "(1-Jahres-Vorhersage je Kreditklasse).")
+        classes = sorted(bank_seg["vasicek_class"].unique())
+        seg_choice = st.selectbox("Segment", ["Alle Segmente"] + classes,
+                                  key="dd_seg_choice")
+        if seg_choice == "Alle Segmente":
+            seg_yrs = sorted(int(y) for y in bank_seg["year"].unique())
+            ysel = st.radio("Jahr", seg_yrs, index=len(seg_yrs) - 1,
+                            horizontal=True, key="dd_seg_year")
+            d = bank_seg[bank_seg["year"] == ysel].sort_values("pd_real_pct",
+                                                               ascending=False)
+            fig_ds = go.Figure()
+            fig_ds.add_trace(go.Bar(
+                x=d["vasicek_class"], y=d["pd_real_pct"], name="🔴 Realität (gemeldet)",
+                marker_color=COLORS["crimson"], opacity=0.9,
+                text=[f"{v:.2f}" for v in d["pd_real_pct"]], textposition="outside",
+                textfont=dict(size=9),
+                hovertemplate="%{x}<br>Realität: %{y:.2f} %<extra></extra>"))
+            fig_ds.add_trace(go.Bar(
+                x=d["vasicek_class"], y=d["pd_pred_pct"], name="🔵 Modell",
+                marker_color=COLORS["navy"], opacity=0.9,
+                text=[f"{v:.2f}" for v in d["pd_pred_pct"]], textposition="outside",
+                textfont=dict(size=9),
+                hovertemplate="%{x}<br>Modell: %{y:.2f} %<extra></extra>"))
+            fig_ds.update_layout(
+                title=f"{sel_name} · PD je Segment {ysel}: Realität vs. Modell",
+                xaxis_title="Segment (IRB-Klasse)", yaxis_title="PD [%]",
+                height=380, barmode="group", margin=dict(t=56),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0))
+            st.plotly_chart(fig_ds, use_container_width=True)
+            st.caption(
+                f"Je Kreditklasse für {ysel}: 🔴 gemeldete PD vs. 🔵 Modell-Prognose "
+                f"(PD {ysel-1} + realer Schock {ysel}). Liegt 🔵 über 🔴, stresst das "
+                "Modell die Klasse stärker als die geglättete TTC-Meldung.")
+        else:
+            d = bank_seg[bank_seg["vasicek_class"] == seg_choice].sort_values("year")
+            syrs = [int(y) for y in d["year"]]
+            anchor = syrs[0] - 1
+            sx = [anchor] + syrs
+            s_real = [float(d["pd_base_pct"].iloc[0])] + [float(v) for v in d["pd_real_pct"]]
+            smps = [float(v) for v in d["pd_pred_pct"]]
+            sreal_pos = ["bottom center"] + [
+                "top center" if s_real[i + 1] >= smps[i] else "bottom center"
+                for i in range(len(smps))]
+            fig_ds = go.Figure()
+            fig_ds.add_trace(go.Scatter(
+                x=sx, y=s_real, name="🔴 Realität (gemeldet)", mode="lines+markers+text",
+                line=dict(color=COLORS["crimson"], width=3), marker=dict(size=10),
+                text=[f"{v:.2f}%" for v in s_real], textposition=sreal_pos,
+                textfont=dict(size=10, color=COLORS["crimson"]),
+                hovertemplate="FY%{x}<br>Realität: %{y:.2f} %<extra></extra>"))
+            for i, yy in enumerate(syrs):
+                mp = smps[i]
+                m_pos = "top center" if mp >= s_real[i + 1] else "bottom center"
+                fig_ds.add_trace(go.Scatter(
+                    x=[sx[i], yy], y=[s_real[i], mp], mode="lines+markers+text",
+                    line=dict(color=COLORS["navy"], width=2.5, dash="dot"),
+                    marker=dict(size=10, symbol="diamond", color=COLORS["navy"]),
+                    text=["", f"{mp:.2f}%"], textposition=m_pos,
+                    textfont=dict(size=10, color=COLORS["navy"]),
+                    name="🔵 Modell", showlegend=(i == 0),
+                    hovertemplate=f"FY{yy}<br>Modell: %{{y:.2f}} %<extra></extra>"))
+            fig_ds.update_layout(
+                title=f"{sel_name} · PD {seg_choice}: Realität vs. Modell über die Jahre",
+                xaxis_title="Jahr", yaxis_title="PD [%]", height=380,
+                xaxis=dict(tickmode="array", tickvals=sx),
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0))
+            st.plotly_chart(fig_ds, use_container_width=True)
+            st.caption(
+                f"PD-Entwicklung der Klasse {seg_choice}: 🔴 gemeldet vs. 🔵 Modell "
+                "(Vorjahres-Istwert + realer Schock, 1-Jahres-Vorhersage).")
 
     # ====================================================================
     #  Abschnitt 6 · Verdikt
