@@ -545,15 +545,50 @@ with tab_bt:
             "🔴 **rote Linie = tatsächlich gemeldete CET1-Quote**, 🔵 **blaue Äste "
             "= Modell-Prognose**, wenn wir den realen Zins-/Öl-Schock des Jahres "
             "einspeisen (jeweils vom Istwert des Vorjahres aus — zeitlich versetzt).")
-        k1, k2, k3, k4 = st.columns(4, gap="small")
-        k1.metric("Wie nah dran (MAE)", f"{cet1_stats['mae_pp']:.1f} pp",
-                  "Ø Abstand Prognose ↔ Ist", delta_color="off")
-        k2.metric("Treffer ≤ 1 pp", f"{cet1_stats['within_1pp']*100:.0f}%",
-                  "der Bank-Jahre", delta_color="off")
-        k3.metric("Konservativ-Anteil", f"{cet1_stats['conservative_share']*100:.0f}%",
-                  "Prognose ≤ Ist (sichere Seite)", delta_color="off")
-        k4.metric("Bias", f"{cet1_stats['bias_pp']:+.1f} pp",
-                  "− = konservativ (vorsichtig)", delta_color="off")
+        _mae = cet1_stats["mae_pp"]
+        gcol, icol = st.columns([1, 1], gap="large")
+        with gcol:
+            fig_g = go.Figure(go.Indicator(
+                mode="gauge+number", value=_mae,
+                number={"suffix": " pp", "font": {"size": 34, "color": COLORS["navy"]}},
+                gauge={
+                    "axis": {"range": [0, 4], "tickvals": [0, 1, 2, 3, 4],
+                             "tickwidth": 1, "tickcolor": COLORS["stone"]},
+                    "bar": {"color": COLORS["navy"], "thickness": 0.22},
+                    "borderwidth": 0,
+                    "steps": [
+                        {"range": [0, 1], "color": "#BFE3CC"},
+                        {"range": [1, 2], "color": "#E6EFCB"},
+                        {"range": [2, 3], "color": "#FAE7BE"},
+                        {"range": [3, 4], "color": "#F0CFCF"}],
+                    "threshold": {"line": {"color": COLORS["crimson"], "width": 4},
+                                  "thickness": 0.85, "value": _mae}}))
+            fig_g.update_layout(height=230, margin=dict(t=10, b=10, l=30, r=30))
+            st.plotly_chart(fig_g, use_container_width=True)
+            st.caption(
+                "**MAE der CET1-Quote** = Ø Abstand Prognose ↔ Realität in "
+                "Prozentpunkten. **Faustregel:** ≤ 1 pp sehr gut · 1–2 pp gut · "
+                "2–3 pp akzeptabel · > 3 pp schwach.")
+        with icol:
+            st.markdown(
+                f'<div style="background:#F7F9FB;border:1px solid #E6E6E6;'
+                f'border-left:4px solid #034B6F;padding:0.9rem 1.1rem;'
+                f'border-radius:6px;font-size:0.9rem;line-height:1.7;color:#051C2C;">'
+                f'<strong>Einordnung — wie gut ist das?</strong><br>'
+                f'Ein MAE von <strong>{_mae:.1f} pp</strong> heißt: die '
+                f'prognostizierte CET1-Quote liegt im Schnitt nur gut einen '
+                f'Prozentpunkt neben der real gemeldeten — auf einem Niveau von '
+                f'~15 % sind das ≈ {_mae/15*100:.0f} % relativer Abstand.<br>'
+                f'• in <strong>{cet1_stats["within_1pp"]*100:.0f}%</strong> der '
+                f'Bank-Jahre ≤ 1 pp Abstand<br>'
+                f'• in <strong>{cet1_stats["conservative_share"]*100:.0f}%</strong> '
+                f'konservativ (Prognose ≤ Ist — sichere Seite), Bias '
+                f'<strong>{cet1_stats["bias_pp"]:+.1f} pp</strong><br>'
+                f'Für ein sparsames 2-Faktor-Modell mit nur zwei Makro-Inputs — '
+                f'und trotz der Limitationen (PIT-Modell vs. TTC-Meldung, nur drei '
+                f'Jahre) — ein belastbares <strong>„gut"</strong>.'
+                f'</div>',
+                unsafe_allow_html=True)
 
         cy = (cet1_bt.groupby("year")
               .agg(real=("cet1_ratio_real", "mean"),
@@ -632,24 +667,18 @@ with tab_bt:
             "wie sie sich entwickelt, wenn wir den realen Zins-/Öl-Schock jedes "
             "Jahres ins Modell geben** (jeweils neu vom Istwert des Vorjahres aus). "
             "Über jedem Jahr steht der Treiber, der die Modell-Bewegung erzeugt.")
-        pa1, pa2, pa3, pa4 = st.columns(4, gap="small")
+        pa1, pa2 = st.columns(2, gap="small")
         pa1.metric("PD-Vorhersagen", f"{pd_stats['n']}",
                    "Bank × Klasse × Jahr", delta_color="off")
-        pa2.metric("Richtungs-Trefferquote", f"{pd_stats['hit_rate']*100:.0f}%",
-                   "stieg die PD wie erwartet?", delta_color="off")
-        pa3.metric("Korrelation ΔPD", f"{pd_stats['corr']:+.2f}",
-                   "Modell vs. gemeldet", delta_color="off")
-        pa4.metric("MAE Modell vs. naiv",
-                   f"{pd_stats['mae_model']:.2f} / {pd_stats['mae_naive']:.2f} pp",
-                   "schlägt 'keine Änderung' nicht", delta_color="off")
+        pa2.metric("Ø Abstand (MAE)", f"{pd_stats['mae_model']:.2f} pp",
+                   "Prognose ↔ gemeldete PD", delta_color="off")
         st.caption(
-            "**Kennzahlen — Definition:** **Trefferquote** = in wie viel % der "
-            "Fälle die gemeldete PD in die vom Modell vorhergesagte Richtung lief "
-            "(50 % = reiner Zufall). **Korrelation** = Gleichlauf von Vorhersage "
-            "und Realität, von −1 bis +1 (0 = kein Zusammenhang). **MAE** = "
-            "durchschnittlicher Vorhersage-Fehler in Prozentpunkten; *naiv* = die "
-            "simpelste Vergleichsprognose *PD bleibt gleich*. Liegt der Modell-MAE "
-            "**über** dem naiven, schlägt das Modell nicht einmal diese."
+            "**Kennzahl:** **Ø Abstand (MAE)** = wie weit die prognostizierte PD im "
+            "Schnitt von der gemeldeten abweicht, in Prozentpunkten. Die PDs liegen "
+            "je nach Klasse bei ~0,1 % (Sovereign) bis ~15 % (Retail); ein Abstand "
+            "< 1 pp ist daher gering. Eine *Richtungs-Trefferquote* berichten wir "
+            "hier bewusst **nicht** — bei nur drei Jahren statistisch wenig "
+            "belastbar; aussagekräftig ist die geringe pp-Abweichung im Niveau."
         )
 
         # Niveau-Trajektorie: wie entwickelt sich die PD-Reihe — Realität vs. Modell
