@@ -79,8 +79,13 @@ try:
     _kb_cov = coverage_report()
     _kb_verified = _kb_cov.get("verified_banks", [])
     _kb_n_verified = len(_kb_verified)
+    _kb_status = _kb_cov.get("by_status", {})
+    _kb_direct = int(_kb_status.get("pillar3_verified", 0))
+    _kb_eligible = int(_kb_cov.get("n_irb_eligible", _kb_direct))
+    _kb_na = int(_kb_cov.get("n_rows_total", 70)) - _kb_eligible
 except Exception:
     _kb_verified, _kb_n_verified = [], 0
+    _kb_direct, _kb_eligible, _kb_na = 0, 0, 0
 
 st.markdown(
     '<div style="margin:0.4rem 0 1.0rem 0;color:#051C2C;">'
@@ -159,10 +164,12 @@ st.markdown(
     'Macro-Dynamik in den β-Sensitivitäten sitzt.<br><br>'
     f'<strong style="color:#1E7A4E;">Pillar-3-verifiziert '
     f'({_kb_n_verified}/10):</strong> {" · ".join(_kb_verified)}<br>'
-    '<span style="color:#6E6E6E;">93 % der 70 Bank-Klasse-Zellen sind '
-    'direkt bank-spezifisch Pillar-3-verifiziert. Der Status pro Zeile '
-    'steht im CSV <code>data/pillar3_bank_pd_lgd.csv</code> in der '
-    'Spalte <code>status</code>.</span>'
+    f'<span style="color:#6E6E6E;"><strong>{_kb_direct} von '
+    f'{_kb_eligible} IRB-fähigen Bank-Klassen</strong> enthalten PD '
+    f'und LGD direkt aus der jeweiligen EU-CR6-Sub-total-Zeile. '
+    f'{_kb_na} weitere Kombination ist nicht anwendbar: Santander '
+    'Sovereign läuft im Standardansatz und wird aus dem IRB-Kreditbuch '
+    'ausgeschlossen.</span>'
     '</div>',
     unsafe_allow_html=True,
 )
@@ -321,11 +328,11 @@ with st.expander("① PD · Probability of Default · "
         "Pillar-3-verifiziert** mit einheitlichem Stichtag 31.12.2024 "
         "(Deutsche Bank, ING, Société Générale, Rabobank, UniCredit, "
         "Crédit Agricole, Crédit Mutuel, BPCE, BNP Paribas, Santander). "
-        "Rund 93 % der 70 CSV-Zellen sind direkt aus den jeweiligen "
-        "EU-CR6-Sub-totals der Banken extrahiert. Die wenigen "
-        "verbleibenden Country-Proxy-Zellen entstehen, wo eine Bank "
-        "eine bestimmte Klasse nicht als IRB-Sub-total publiziert "
-        "(z. B. Santander Sovereign unter Standardised Approach). "
+        "Alle 69 IRB-fähigen Bank-Klassen-Kombinationen enthalten PD "
+        "und LGD direkt aus den jeweiligen EU-CR6-Sub-totals. "
+        "Santander Sovereign ist nicht IRB-fähig, da diese Exposures "
+        "vollständig im Standardansatz laufen; die Position wird aus "
+        "dem IRB-Kreditbuch ausgeschlossen. "
         "Der Status pro Bank × Klasse ist in "
         "`data/pillar3_bank_pd_lgd.csv` Spalte `status` dokumentiert."
     )
@@ -382,12 +389,10 @@ with st.expander("② LGD · Loss Given Default · "
     st.markdown(
         "**Coverage konsistent zur PD:** PD und LGD jeder einzelnen CSV-"
         "Zeile stammen aus *derselben* Quelle (eine `status`-Spalte "
-        "deckt beide ab). Bei den 5 von 70 Zellen, in denen eine Bank "
-        "diese Klasse nicht als IRB-Sub-total publiziert, fällt sowohl "
-        "die PD als auch die LGD gleichermaßen auf den EBA-Country-"
-        "Aggregat (Q4 2024) bzw. den Basel-F-IRB-Default (45 %) zurück. "
-        "Damit ist die LGD-Datenbasis methodisch identisch parallel zur "
-        "PD-Basis."
+        "deckt beide ab). Alle 69 IRB-fähigen Kombinationen stammen "
+        "direkt aus Pillar 3. Santander Sovereign wird nicht mit "
+        "künstlichen PD-/LGD-Werten belegt, sondern wegen des "
+        "Standardansatzes aus dem IRB-Kreditbuch ausgeschlossen."
     )
     st.markdown(
         "**Einheitlicher Stichtag 31.12.2024** für alle 10 Banken — "

@@ -331,24 +331,36 @@ Pillar-3-Report für **31.12.2024** extrahiert und Cell-by-Cell verifiziert
 10 Banken × 7 Klassen, mit Audit-Trail pro Cell: `source_url`,
 `source_page`, `source_period`, `status`).
 
-### 4.1b · Verbleibende Country-Proxy-Einträge (5 von 70 Zellen)
+### 4.1b · Datenabdeckung: 69 von 69 IRB-Klassen direkt aus Pillar 3
 
-Alle 10 Banken sind Pillar-3-verifiziert. **5 von 70 Zellen** verbleiben
-dennoch auf Country-Proxy bzw. F-IRB-Default — nicht weil die Bank fehlt,
-sondern weil die jeweilige Bank für diese Klasse kein dediziertes
-EU-CR6-Sub-Total publiziert:
+Die Datentabelle enthält **70 Bank-Klassen-Kombinationen**:
+10 Banken × 7 Exposure-Klassen. Jede Kombination enthält gemeinsam eine
+PD und eine LGD aus derselben regulatorischen Tabellenzeile.
 
-| Bank | Klasse | Grund |
+Nach erneuter Prüfung der Originalberichte konnten vier frühere
+Übergangswerte ersetzt werden:
+
+| Bank | Klasse | Direkt extrahierter EU-CR6-Sub-total |
 |---|---|---|
-| Crédit Mutuel | QRRE | Klassen-Label in CM-Tabelle 35/36 nicht eindeutig isolierbar |
-| Crédit Mutuel | Bank (Institutions) | CM publiziert Institutions nicht separat als IRB-Subtotal |
-| Groupe BPCE | Mortgage | BPCE Retail-Real-Estate-Sub-totals zeigen ungewöhnlich hohe PDs (vermutlich NPE-incl.) — Mapping unklar |
-| Groupe BPCE | QRRE | BPCE Eligible-Revolving-Sub-total nicht eindeutig isolierbar |
-| Banco Santander | Sovereign | Santander reportet Sovereign-Exposures unter Standardised Approach (kein IRB-CR6-Eintrag) → F-IRB-Default |
+| Groupe BPCE | Mortgage | PD 14,68 % · LGD 10,70 % |
+| Groupe BPCE | QRRE | PD 9,63 % · LGD 33,85 % |
+| Crédit Mutuel | QRRE | PD 3,13 % · LGD 33,00 % |
+| Crédit Mutuel | Bank (Institutions) | PD 0,12 % · LGD 34,00 % |
 
-Diese Einträge nutzen den gleichen Stichtag (31.12.2024) — entweder EBA
-Risk Dashboard Country-Aggregate (Crédit Mutuel QRRE, BPCE Mortgage/QRRE)
-oder Basel-III-F-IRB-Default (CM Bank, Santander Sovereign).
+Damit stammen **alle 69 IRB-fähigen Kombinationen direkt aus den
+jeweiligen Bank-Pillar-3-Berichten**. Die hohen BPCE-Mortgage-PDs werden nicht mehr
+durch ein Länderaggregat ersetzt: Sie sind der ausdrücklich publizierte,
+EAD-gewichtete EU-CR6-Sub-total einschließlich des regulatorischen
+Portfolio-Mixes und werden deshalb konsistent mit den übrigen Banken
+verwendet.
+
+Die einzige strukturelle Ausnahme ist **Banco Santander · Sovereign**.
+Santander weist Central Governments/Central Banks laut CR6-A vollständig
+im Standardansatz aus (100 % SA, 0 % IRB). Eine IRB-PD und IRB-LGD wird
+daher regulatorisch nicht veröffentlicht und kann nicht aus Pillar 3
+extrahiert werden. Die Position wird daher aus dem IRB-Kreditbuchkanal
+ausgeschlossen. Im separaten Sovereign-Marktwertkanal bleibt Santander
+auf Basis der EBA-Bestände und des IFRS-9-Splits vollständig enthalten.
 
 ### 4.1c · Methodische Innovation · Komparativ-Spalten-Extraktion
 
@@ -371,24 +383,19 @@ unverändert in den Folgeperioden mitgeführt (EBA-ITS-Disclosure-Pflicht).
 
 **Coverage-Status:** beim Cockpit-Start emittiert der Loader
 (`backend/eba_pd_loader.py`) automatisch eine Konsolen-Meldung
-`PD/LGD-Tabelle geladen · 70 Zeilen (10/10 Banken Pillar-3-verifiziert,
-93 % der Zeilen verified) · verified=65, country_proxy=3,
-basel_default=2` — der Daten-Reifegrad ist also bei jedem Run sichtbar.
+`PD/LGD-Tabelle geladen · 70 Zeilen · verified=69 · country_proxy=0 ·
+basel_default=0 · standardised_na=1`. Damit ist direkt sichtbar, dass
+alle 69 IRB-fähigen Kombinationen bankpubliziert sind und eine weitere
+Kombination regulatorisch nicht zum IRB-Kanal gehört.
 
-### 4.1d · Quelle der Übergangs-Werte für 5 Klassen-Zellen: EBA Risk Dashboard
+### 4.1d · Standardansatz-Ausnahme: Santander Sovereign
 
-Für die 5 Zellen (von 70), die auf Country-Proxy bleiben (z. B. Santander
-Sovereign unter Standardised Approach, BPCE Mortgage Mapping unklar),
-nutzen wir die Country-Aggregate aus:
-
-**Quelle:** European Banking Authority, "Risk Dashboard — Credit Risk
-Parameters Annex Q4 2024", veröffentlicht März 2025 (gleicher Stichtag
-31.12.2024 wie die Pillar-3-Disclosures).
-**URL:** https://www.eba.europa.eu/risk-and-data-analysis/risk-analysis/risk-dashboard
-**Lokale Datei:** Diese Übergangs-Werte sind direkt in
-`data/pillar3_bank_pd_lgd.csv` enthalten und dort in der Spalte `status`
-mit `country_proxy_pending_pillar3` markiert (eine separate Legacy-CSV gibt
-es nicht mehr — Single Source of Truth ist `pillar3_bank_pd_lgd.csv`).
+Santanders offizieller CR6-A-Scope weist Central Governments/Central
+Banks zum 31.12.2024 vollständig dem Standardansatz zu. Die zugehörige
+CR4-Tabelle publiziert Exposures und Risikogewichte, aber keine IRB-PD
+oder IRB-LGD. Deshalb wird kein künstlicher Ersatzwert verwendet:
+Santander Sovereign ist im IRB-Kreditbuch nicht anwendbar, bleibt aber
+im Marktwert-/Duration-Kanal des Sovereign-Buchs enthalten.
 
 ### 4.2 · EBA Transparency Exercise 2025
 
@@ -540,10 +547,10 @@ Die geänderten Werte wirken sofort und global auf alle Charts.
 
 | ID | Annahme | Wert | Quelle / Begründung |
 |---|---|---|---|
-| A-01 | PD pro Bank × Klasse | **bank-spezifisch** aus Pillar-3 EU-CR6-Subtotals (**10/10 Banken Pillar-3-verifiziert**, 93 % der 70 Zellen direkt aus Bank-Pillar-3; 5 Zellen mit Country-Aggregate weil Bank diese spezifische Klasse nicht als IRB-Sub-total publiziert) | CRR Art. 180 (A-IRB-Schätzung) + EBA ITS on Disclosure ITS/2020/04 (Pillar-3-Disclosure-Pflicht) |
-| A-01b | **Einheitlicher Stichtag aller PDs/LGDs** | **31.12.2024** für alle 70 CSV-Zeilen (7 Pillar-3 + 3 Country-Proxy) — Loader-Test `_test_vintage_consistency` erzwingt diese Konsistenz | EBA Stress Test 2025 Methodology Note (uniformer Forward-Stress-Startpunkt); BCBS d155 Sound Stress Testing Principles |
+| A-01 | PD pro Bank × Klasse | **bank-spezifisch** aus Pillar-3 EU-CR6-Subtotals: 69/69 IRB-fähige Bank-Klassen direkt publiziert; Santander Sovereign ist Standardansatz und aus dem IRB-Kanal ausgeschlossen | CRR Art. 180 + EBA ITS on Disclosure ITS/2020/04 |
+| A-01b | **Einheitlicher Stichtag aller PDs/LGDs** | **31.12.2024** für alle 70 CSV-Zeilen — Loader-Test `_test_vintage_consistency` erzwingt diese Konsistenz | EBA Stress Test 2025 Methodology Note; BCBS d155 |
 | A-01c | **PD-Baseline für 5-Jahres-Backtest 2020–2024** | 31.12.2024-PDs gelten als Baseline-Proxy für alle historischen Quartale — Macro-Dynamik (Brent, Δr) wird über die zwei Faktoren modelliert, nicht über das PD-Level | CRR Art. 180 Abs. 2 (TTC-Glättung über ≥ 5 Jahre Default-Daten → A-IRB-PDs sind quartalweise quasi-stabil mit ±0,1–0,3 pp Drift); analog zur EBA-Stress-Test-Backtest-Methodik |
-| A-02 | LGD pro Bank × Klasse | analog zu A-01 — bank-spezifisch wo Pillar-3 verfügbar, sonst Country-Aggregate / F-IRB-Default (45 % Senior Unsecured) | CRR Art. 181 (Downturn-LGD-Konvention) + CRR Art. 161 (F-IRB-Fallback) |
+| A-02 | LGD pro Bank × Klasse | analog zu A-01 — 69/69 IRB-fähige Kombinationen direkt aus derselben EU-CR6-Zeile wie die PD; Santander Sovereign nicht anwendbar | CRR Art. 181 |
 | A-03 | EAD pro Bank × Klasse | EBA Transparency 2025, Item 2520522, post-CCF | EBA Implementing Technical Standards ITS 680/2014 |
 | A-04 | β-/γ-Sensitivitäten | siehe Abschnitt 6 | EBA ST 2025 + akademische Literatur |
 | A-05 | Asset-Korrelation ρ | Basel-Funktion gemäß CRR Art. 153 (Corporate/Bank/Sovereign), feste Werte für Mortgage (0,15) und QRRE (0,04) | BCBS d424, Art. 153–154 |
@@ -776,11 +783,11 @@ dokumentiert. Falls für eine spätere Vintage neu extrahiert wird:
 sämtliche 10 Banken konsistent auf den neuen Stichtag bringen (sonst
 schlägt der Loader-Test `_test_vintage_consistency` fehl).
 
-**EBA Risk Dashboard Q4 2024 (Übergangs-Werte für die Country-Proxy-Zellen):**
-Diese Country-Aggregate (Stichtag 31.12.2024, gleiche Vintage wie die
-Pillar-3-Daten) sind direkt in `data/pillar3_bank_pd_lgd.csv` integriert und
-über die Spalte `status = country_proxy_pending_pillar3` gekennzeichnet —
-eine separate CSV existiert nicht mehr.
+**EBA Risk Dashboard Q4 2024 (Plausibilisierung):**
+Die Länderaggregate werden weiterhin als externer Plausibilitätsvergleich
+vorgehalten, sind aber nicht mehr als aktive PD/LGD-Fallbacks in der
+Top-10-Tabelle erforderlich. Der einzige aktive Fallback ist Santander
+Sovereign, weil hierfür regulatorisch keine IRB-PD/LGD publiziert wird.
 
 ### 10.3 · Cockpit starten
 

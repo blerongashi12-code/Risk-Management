@@ -150,9 +150,14 @@ try:
     _pd_cov = coverage_report()
     _n_verified = len(_pd_cov.get("verified_banks", []))
     _verified_list = _pd_cov.get("verified_banks", [])
+    _status_counts = _pd_cov.get("by_status", {})
+    _direct_cells = int(_status_counts.get("pillar3_verified", 0))
+    _eligible_cells = int(_pd_cov.get("n_irb_eligible", _direct_cells))
+    _na_cells = int(_pd_cov.get("n_rows_total", 70)) - _eligible_cells
 except Exception:
     _n_verified = 0
     _verified_list = []
+    _direct_cells, _eligible_cells, _na_cells = 0, 0, 0
 
 _verified_html = " · ".join(_verified_list) if _verified_list else "—"
 # Compute pending banks (all banks where NO row is pillar3_verified)
@@ -210,19 +215,19 @@ st.markdown(
     f'<strong style="color:{("#A52F4D" if _pending_banks else "#1E7A4E")};">'
     f'Banken vollständig auf Country-Aggregat '
     f'({len(_pending_banks)}/10):</strong> {_pending_html}<br>'
-    f'<span style="color:#6E6E6E;">→ Selbst bei den 10 Pillar-3-'
-    f'verifizierten Banken bleiben einzelne Klassen-Zellen '
-    f'auf EBA-Country-Aggregat (Q4 2024) bzw. Basel-F-IRB-Default, '
-    f'wenn die jeweilige Bank diese Klasse nicht als IRB-Sub-total '
-    f'publiziert (z. B. Santander Sovereign unter Standardised '
-    f'Approach). Anteil verifizierter Zellen liegt bei rund 93 % '
-    f'von 70 Zellen.</span></td></tr>'
+    f'<span style="color:#6E6E6E;">→ {_direct_cells} von '
+    f'{_eligible_cells} IRB-fähigen Bank-Klassen enthalten PD und LGD '
+    f'direkt aus der bankeigenen EU-CR6-Tabelle. {_na_cells} Kombination '
+    f'ist nicht anwendbar: Santander Sovereign läuft zu 100 % im '
+    f'Standardansatz und wird aus dem IRB-Kreditbuch ausgeschlossen.'
+    f'</span></td></tr>'
 
     # --- Zeile 5: Stichtag ---
     f'<tr><td style="padding:0.5rem 0.6rem 0.5rem 0;color:#6E6E6E;'
     f'vertical-align:top;">Stichtag · Baseline-PD</td>'
-    f'<td><strong>31.12.2024 einheitlich</strong> für alle 10 Banken (auch '
-    f'Country-Proxy-Zeilen). Methodisch im EBA-Stress-Test-2025-Standard '
+    f'<td><strong>31.12.2024 einheitlich</strong> für alle 10 Banken und '
+    f'alle 70 Bank-Klassen-Kombinationen. Methodisch im '
+    f'EBA-Stress-Test-2025-Standard '
     f'verankert: ein <em>uniformer „Heute"-Snapshot</em> ist der Ausgangs-'
     f'punkt, von dem aus der Macro-Schock (ΔBrent + Δr_10y) als '
     f'Forward-Stress simuliert wird. Vintage-Mix wäre methodisch '

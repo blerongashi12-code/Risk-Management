@@ -1686,6 +1686,27 @@ def _test_filter_keeps_all_10_curated_banks():
     assert u.n_banks == 10, f"Erwartet 10 gefilterte Banken, gefunden {u.n_banks}"
 
 
+def _test_santander_sovereign_excluded_from_irb_book():
+    """Santander Sovereign ist 100 % Standardansatz und darf daher nicht
+    als künstliches IRB-Segment in EL/RWA eingehen. Der separate
+    Sovereign-Marktwertkanal bleibt davon unberührt."""
+    from eba_pd_loader import filter_universe_to_top10
+    try:
+        u = load_eba_universe(vintage="2025", top_n=10)
+    except Exception:
+        u = from_synthetic("2025")
+    filter_universe_to_top10(u)
+    santander = next(
+        pf for pf in u.banks.values()
+        if (getattr(pf, "lei", "") or "") == "5493006QMFDDMYWIAM13"
+        or "santander" in pf.name.lower()
+    )
+    classes = {seg.exposure_class for seg in santander.segments}
+    assert "sovereign" not in classes, (
+        "Santander Sovereign darf nicht im IRB-Kreditbuch enthalten sein"
+    )
+
+
 def _test_curated_leis_in_bank_dir():
     """Alle 10 kuratierten LEIs müssen EXAKT im EBA-Bank-Directory liegen.
     Sonst fallen Banken aus den cap_df-/Sovereign-/Walk-Forward-Joins
@@ -1748,6 +1769,7 @@ if __name__ == "__main__":
         ("Exposure mapping complete",         _test_exposure_mapping_complete),
         ("Real loader smoke (if files present)", _test_real_loader_if_files_present),
         ("Filter keeps all 10 curated banks", _test_filter_keeps_all_10_curated_banks),
+        ("Santander Sovereign excluded from IRB", _test_santander_sovereign_excluded_from_irb_book),
         ("Curated LEIs match EBA directory",  _test_curated_leis_in_bank_dir),
         ("Sovereign effective < gross MtM",   _test_sovereign_effective_lt_gross),
     ]
