@@ -1019,19 +1019,17 @@ button[aria-label="Open sidebar"] {
 
 
 /* =====================================================================
-   Loading · sleek Boot-Overlay + schlanke Ladeleiste (statt Icons)
+   Loading · Live-Ladeleiste im Hauptbereich (Sidebar bleibt sichtbar)
    ---------------------------------------------------------------------
-   Konzept: Solange Streamlit noch Element-Skeletons rendert (= erste
-   Ladephase), liegt ein ruhiger Vollbild-Screen über der App — Wortmarke
-   + dezente Fortschrittslinie. Erst wenn ALLE Elemente fertig sind,
-   erscheint das Modell. Beim SEITENWECHSEL setzt der Nav-Hook (theme.py) die Klasse .mc-nav
-   auf stApp → gleiches Overlay bis der Run fertig ist. Slider-Re-Runs
-   zeigen nur die 3px-Leiste — kein Overlay, keine Icons.
+   Der Nav-Hook (theme.py) verwaltet einen echten Loader-DIV in stMain:
+   Wortmarke + Track + Live-Prozent (gerenderte / erwartete Elemente).
+   Er erscheint beim Boot und bei Tab-Wechseln NUR ueber dem Hauptbereich
+   — die Tab-Navigation links bleibt voll sichtbar und bedienbar.
+   Widget-Re-Runs (Slider) zeigen nur die 3px-Leiste am oberen Rand.
    ===================================================================== */
 
-/* 1) Default-Ladeindikatoren + komplette Toolbar oben rechts aus */
-/* ACHTUNG: stScreencast NIE ausblenden — das ist in Streamlit >=1.5x ein
-   WRAPPER um die gesamte App (Vorfahr von stApp), kein Icon! */
+/* 1) Default-Ladeindikatoren + Toolbar oben rechts aus.
+   ACHTUNG: stScreencast NIE ausblenden — Wrapper um die gesamte App! */
 [data-testid="stSpinner"],
 [data-testid="stStatusWidget"],
 [data-testid="stToolbar"],
@@ -1039,16 +1037,16 @@ button[aria-label="Open sidebar"] {
 [data-testid="stMainMenu"] {
   display: none !important;
 }
-/* Unsichtbarer Nav-Hook-iframe: Layout-Slot entfernen */
-[data-testid="stElementContainer"]:has(iframe[data-testid="stIFrame"]) {
-  display: none !important;
-}
 [data-testid="stSkeleton"],
 [data-testid="stAppSkeleton"] {
   visibility: hidden !important;
 }
+/* Unsichtbarer Nav-Hook-iframe: Layout-Slot entfernen */
+[data-testid="stElementContainer"]:has(iframe[data-testid="stIFrame"]) {
+  display: none !important;
+}
 
-/* 2) Schlanke Ladeleiste oben — läuft bei jedem Script-Run (auch Boot) */
+/* 2) Schlanke Ladeleiste oben — laeuft bei jedem Script-Run */
 [data-testid="stApp"][data-test-script-state="running"]::before {
   content: "";
   position: fixed;
@@ -1067,29 +1065,53 @@ button[aria-label="Open sidebar"] {
   100% { background-position: 165% 0; }
 }
 
-/* 3) Boot-Overlay — nur solange Element-Skeletons existieren */
-[data-testid="stApp"]:has([data-testid="stSkeleton"])::after,
-[data-testid="stApp"]:has([data-testid="stAppSkeleton"])::after,
-[data-testid="stApp"].mc-nav::after {
-  content: "CREDIT STRESS COCKPIT";
-  position: fixed;
+/* 3) Live-Loader (DIV, verwaltet vom Nav-Hook) — deckt NUR stMain ab */
+[data-testid="stMain"] { position: relative; }
+.mc-loader {
+  position: absolute;
   inset: 0;
-  z-index: 999999;
-  display: flex;
+  z-index: 99999;
+  display: none;               /* Hook schaltet auf flex */
   align-items: center;
   justify-content: center;
-  /* Track-Linie unter der Wortmarke + ruhiges Canvas */
-  background:
-    linear-gradient(90deg, #E3E9ED, #E3E9ED)
-      center calc(50% + 36px) / 220px 2px no-repeat,
-    #FBFCFD;
-  color: #051C2C;
+  background: #FBFCFD;
+  pointer-events: none;
+}
+.mc-loader-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  transform: translateY(-6vh);
+}
+.mc-loader-word {
   font-family: "Inter", -apple-system, "Segoe UI", sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.24em;
+  color: #051C2C;
   animation: mc-boot-pulse 2.4s ease-in-out infinite;
-  pointer-events: none;
+}
+.mc-loader-track {
+  width: 260px;
+  height: 3px;
+  background: #E3E9ED;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.mc-loader-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #2251FF, #034B6F);
+  border-radius: 2px;
+  transition: width 0.25s ease;
+}
+.mc-loader-pct {
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: #6E6E6E;
+  font-variant-numeric: tabular-nums;
 }
 @keyframes mc-boot-pulse {
   0%, 100% { color: #051C2C; }

@@ -141,11 +141,90 @@ def _inject_css() -> None:
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
-# Nav-Hook: setzt beim Klick auf einen Sidebar-Link die Klasse `mc-nav` auf
-# stApp (→ Boot-Overlay aus mckinsey.css erscheint) und entfernt sie, sobald
-# der Script-Run beendet ist. Läuft im Parent-Dokument (same-origin-iframe);
-# Guard `__mcNavHook` verhindert Doppel-Registrierung über Seitenwechsel.
-# Klicks auf den bereits aktiven Tab (aria-current="page") lösen nichts aus.
+# Nav-Hook + Live-Loader: Ein ins PARENT-Dokument injiziertes Skript
+# (Komponenten-iframes sterben beim Seitenwechsel — Timer/Closures muessen
+# im Parent-Realm leben!) verwaltet einen Loader-DIV in stMain:
+#   - erscheint beim Boot (Element-Skeletons vorhanden) und bei Klicks auf
+#     Sidebar-Nav-Links (Klasse mc-nav) — NUR ueber dem Hauptbereich, die
+#     Tab-Sidebar bleibt sichtbar
+#   - zeigt den LIVE-Fortschritt: gerenderte / erwartete Elemente in %
+#     (monoton steigend, 100 % erst wenn Run fertig UND keine Skeletons)
+# Widget-Re-Runs (Slider) setzen kein mc-nav → nur die 3px-Leiste oben.
+_PARENT_JS = r"""
+(function () {
+  var prev = 0, active = false, t0 = 0, sawRun = false;
+  function q(sel)  { return document.querySelector(sel); }
+  function qa(sel) { return document.querySelectorAll(sel); }
+  function loader() {
+    var m = q('[data-testid="stMain"]');
+    if (!m) return null;
+    var L = m.querySelector(':scope > .mc-loader');
+    if (!L) {
+      L = document.createElement('div');
+      L.className = 'mc-loader';
+      L.innerHTML = '<div class="mc-loader-inner">'
+        + '<div class="mc-loader-word">CREDIT STRESS COCKPIT</div>'
+        + '<div class="mc-loader-track"><div class="mc-loader-fill"></div></div>'
+        + '<div class="mc-loader-pct">0 %</div></div>';
+      m.appendChild(L);
+    }
+    return L;
+  }
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest
+            ? e.target.closest('[data-testid="stSidebarNavLink"]') : null;
+    if (!a || a.getAttribute('aria-current') === 'page') return;
+    var app = q('[data-testid="stApp"]');
+    if (app) { app.classList.add('mc-nav'); }
+    var m = q('[data-testid="stMain"]');
+    if (m) { m.scrollTop = 0; }
+  }, true);
+  setInterval(function () {
+    var app = q('[data-testid="stApp"]');
+    if (!app) return;
+    var running = app.getAttribute('data-test-script-state') === 'running';
+    var sk = qa('[data-testid="stSkeleton"], [data-testid="stAppSkeleton"]').length;
+    var nav = app.classList.contains('mc-nav');
+    var should = nav || sk > 0;
+    var L = loader();
+    if (!L) return;
+    if (should && !active) { active = true; prev = 4; t0 = Date.now(); sawRun = false; }
+    if (!active) return;
+    if (running) { sawRun = true; }
+    // Ende: Run wurde gesehen und ist beendet, keine Skeletons mehr.
+    // Fallback: Nav-Klick ohne folgenden Run (z. B. gleiche Seite) nach 4 s.
+    var finished = !running && sk === 0 && (sawRun || Date.now() - t0 > 4000);
+    if (finished && nav) { app.classList.remove('mc-nav'); nav = false; }
+    var total = qa('[data-testid="stElementContainer"]').length;
+    var pct;
+    if (sk > 0 && total > 0) {
+      pct = Math.round(100 * (total - sk) / total);      // echter Live-Stand
+    } else if (sawRun && running) {
+      pct = Math.max(prev, 60) + 1;                      // Elemente da, Rechnung läuft aus
+      pct = Math.min(pct, 97);
+    } else {
+      pct = 4 + Math.round((Date.now() - t0) / 160);     // Anlauf, noch nichts messbar
+      pct = Math.min(pct, 18);
+    }
+    pct = Math.max(prev, Math.min(pct, 99));
+    prev = pct;
+    if (finished) { pct = 100; }
+    L.querySelector('.mc-loader-fill').style.width = pct + '%';
+    L.querySelector('.mc-loader-pct').textContent = pct + ' %';
+    L.style.display = 'flex';
+    if (finished) {
+      active = false; prev = 0;
+      var el = L;
+      setTimeout(function () { if (!active) el.style.display = 'none'; }, 350);
+    }
+  }, 150);
+})();
+"""
+
+import json as _json
+
+# json.dumps macht aus _PARENT_JS ein sicher escaptes JS-String-Literal —
+# so übersteht der Code die srcdoc-Einbettung des Komponenten-iframes.
 _NAV_HOOK_JS = """
 <script>
 (function () {
@@ -153,29 +232,8 @@ _NAV_HOOK_JS = """
     var P = window.parent, D = P.document;
     if (P.__mcNavHook) return;
     P.__mcNavHook = true;
-    // WICHTIG: Die Logik muss im PARENT-Realm leben — dieser Komponenten-
-    // iframe wird bei jedem Seitenwechsel zerstoert (Timer/Closures aus dem
-    // iframe-Realm sterben mit). Darum ein <script> ins Parent-Dokument.
-    var code = [
-      "(function () {",
-      "  var t0 = 0;",
-      "  document.addEventListener('click', function (e) {",
-      "    var a = e.target && e.target.closest",
-      "            ? e.target.closest('[data-testid=\\"stSidebarNavLink\\"]') : null;",
-      "    if (!a || a.getAttribute('aria-current') === 'page') return;",
-      "    var app = document.querySelector('[data-testid=\\"stApp\\"]');",
-      "    if (app) { app.classList.add('mc-nav'); t0 = Date.now(); }",
-      "  }, true);",
-      "  setInterval(function () {",
-      "    var app = document.querySelector('[data-testid=\\"stApp\\"]');",
-      "    if (!app || !app.classList.contains('mc-nav')) return;",
-      "    var running = app.getAttribute('data-test-script-state') === 'running';",
-      "    if (!running && Date.now() - t0 > 900) app.classList.remove('mc-nav');",
-      "  }, 250);",
-      "})();"
-    ].join("\\n");
     var s = D.createElement("script");
-    s.textContent = code;
+    s.textContent = """ + _json.dumps(_PARENT_JS) + """;
     D.head.appendChild(s);
   } catch (err) { /* nie die App blockieren */ }
 })();
@@ -184,8 +242,8 @@ _NAV_HOOK_JS = """
 
 
 def _inject_nav_hook() -> None:
-    """0-Pixel-Komponenten-iframe, dessen Skript den Seitenwechsel-Overlay
-    steuert (st.markdown führt kein JS aus, Komponenten-iframes schon; der
+    """0-Pixel-Komponenten-iframe, dessen Skript den Live-Loader steuert
+    (st.markdown führt kein JS aus, Komponenten-iframes schon; der
     Layout-Slot wird per CSS ausgeblendet)."""
     from streamlit.components.v1 import html as _html
     _html(_NAV_HOOK_JS, height=0)
