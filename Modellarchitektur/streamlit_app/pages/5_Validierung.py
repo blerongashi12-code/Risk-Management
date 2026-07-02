@@ -77,7 +77,7 @@ hero(
          "realisierte Entwicklung geprüft — Zielgröße ist die CET1-Quote. "
          "Outcomes-Analysis nach SR 11-7, Governance nach EBA GL 14. "
          "Annahmen & Methodik vollständig dokumentiert in "
-         "Praesentation_Abgabe/Abgabedokumente/Modellannahmen.docx "
+         "Abgabe-Files/Abgabedokumente/Modellannahmen.docx "
          "(Quelle: docs/MODEL_ASSUMPTIONS.md).",
 )
 
@@ -1166,6 +1166,6 @@ Timmermann (1992, *JBES*). Governance: SR 11-7 (Outcomes Analysis), EBA GL 2014/
         f"{cet1_stats.get('conservative_share', 0)*100:.0f}% konservativ · "
         f"Datenbasis: pillar3_backtest_pdlgd.csv ({n_points} EU-CR6-Punkte) + "
         f"EBA Transparency 2020-2025 + Brent (ICE) + Bundesbank-Svensson · "
-        f"Annahmen & Methodik: Modellannahmen.docx (Praesentation_Abgabe/"
+        f"Annahmen & Methodik: Modellannahmen.docx (Abgabe-Files/"
         f"Abgabedokumente) bzw. docs/MODEL_ASSUMPTIONS.md"
     )

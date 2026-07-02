@@ -7,14 +7,14 @@
 | Ordner | Inhalt |
 |---|---|
 | [`Modellarchitektur/`](./Modellarchitektur/) | Das komplette Modell: Engines (`backend/`), Streamlit-Cockpit (`streamlit_app/`), Datenbasis (`data/`), Extraktions-Tools (`tools/`), Annahmen-Dokumentation (`docs/`) |
-| [`Praesentation_Abgabe/`](./Praesentation_Abgabe/) | Finale Präsentation (Ablageort) + Abgabedokumente (Word) |
+| [`Abgabe-Files/`](./Abgabe-Files/) | Finale Präsentation (Ablageort) + Abgabedokumente (Word) |
 
 ## Start
 
-| System | Aufruf |
-|---|---|
-| **Windows** | Doppelklick auf [`Start/Start_Cockpit_Windows.bat`](./Start/) |
-| **macOS** | Doppelklick auf [`Start/Start_Cockpit_Mac.command`](./Start/) *(beim ersten Mal: Rechtsklick → „Öffnen" wegen Gatekeeper)* |
+**Doppelklick auf `START_COCKPIT`** im Hauptordner — Windows nutzt automatisch
+`START_COCKPIT.bat`, macOS `START_COCKPIT.command` *(dort beim ersten Mal:
+Rechtsklick → „Öffnen" wegen Gatekeeper)*. Bei ausgeblendeten Datei-Endungen
+erscheint auf beiden Systemen schlicht „START_COCKPIT".
 
 Beide Launcher installieren beim ersten Start die Pakete (`requirements.txt`), beenden alte
 Cockpit-Prozesse, leeren den Bytecode-Cache und öffnen das Cockpit im Browser.

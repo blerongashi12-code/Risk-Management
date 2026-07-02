@@ -8,7 +8,7 @@ Ein früher eigenständiger Page-View lebt als einbettbare Render-Funktion:
 Die früheren Sub-Tabs render_annahmen_tab()/render_methodology_tab()
 (Validierung) wurden entfernt — die Annahmen-Dokumentation lebt vollständig
 in docs/MODEL_ASSUMPTIONS.md bzw. der daraus generierten Word-Abgabefassung
-(Praesentation_Abgabe/Abgabedokumente/Modellannahmen.docx).
+(Abgabe-Files/Abgabedokumente/Modellannahmen.docx).
 
 Voraussetzung: aufrufender Code muss bereits apply_theme() + render_sidebar()
 ausgeführt haben.

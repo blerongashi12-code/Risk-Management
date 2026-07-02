@@ -1,0 +1,1 @@
+# Dokument-Generator: 1) python make_figures.py  2) python build_modellannahmen.py (erzeugt Abgabe-Files/Abgabedokumente/Modellannahmen.docx; danach oeffnen und Inhaltsverzeichnis mit F9 aktualisieren)

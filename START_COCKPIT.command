@@ -6,7 +6,7 @@
 #  Gleiche Logik wie Start_Cockpit.bat (Windows).
 # ============================================================
 set -u
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")"
 
 # --- 1) Python vorhanden? ---
 PY="$(command -v python3 || command -v python || true)"

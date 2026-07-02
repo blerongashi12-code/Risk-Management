@@ -3,8 +3,8 @@
 > **Single Source of Truth** für alle Modell-Annahmen, Datenquellen,
 > mathematischen Formeln und ihre ökonomische Begründung.
 > Stand: Juli 2026 · Version 2.1 (2-Faktor-Modell + CET1-Walk-Forward-Backtest)
-> Abgabefassung (Word, aus dieser Datei generiert):
-> `Praesentation_Abgabe/Abgabedokumente/Modellannahmen.docx`
+> Kuratierte Abgabefassung (Word, mit Schaubildern):
+> `Abgabe-Files/Abgabedokumente/Modellannahmen.docx`
 
 ---
 

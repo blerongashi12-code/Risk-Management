@@ -5,7 +5,7 @@ REM  Einfach doppelklicken. Der Browser oeffnet sich automatisch.
 REM  Beim allerersten Start werden fehlende Pakete installiert.
 REM ============================================================
 setlocal
-cd /d "%~dp0.."
+cd /d "%~dp0"
 
 REM --- 1) Python vorhanden? ---
 where python >nul 2>&1
@@ -34,6 +34,16 @@ REM  __pycache__-Ordner, BEVOR frisch gestartet wird.
 echo [Reset] Beende evtl. laufende Cockpit-Server und leere den Bytecode-Cache ...
 powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'python.exe' -and $_.CommandLine -like '*streamlit run*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
 for /d /r . %%d in (__pycache__) do @if exist "%%d" rd /s /q "%%d" >nul 2>&1
+
+REM --- 2c) Ordner-Farbicons aktivieren (idempotent, nur Windows) ---
+REM  desktop.ini + .folder.ico liegen im Repo; Explorer zeigt sie nur bei
+REM  gesetzten Attributen (nach frischem Clone noetig).
+attrib +r "Modellarchitektur" >nul 2>&1
+attrib +r "Abgabe-Files" >nul 2>&1
+attrib +h +s "Modellarchitektur\desktop.ini" >nul 2>&1
+attrib +h "Modellarchitektur\.folder.ico" >nul 2>&1
+attrib +h +s "Abgabe-Files\desktop.ini" >nul 2>&1
+attrib +h "Abgabe-Files\.folder.ico" >nul 2>&1
 
 REM --- 3) Entry-Datei per Muster finden ------------------------
 REM  Der Dateiname enthaelt einen Umlaut (Einfuehrung_in_das_Modell).
