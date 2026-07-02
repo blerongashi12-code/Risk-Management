@@ -1030,12 +1030,13 @@ button[aria-label="Open sidebar"] {
    ===================================================================== */
 
 /* 1) Default-Ladeindikatoren + komplette Toolbar oben rechts aus */
+/* ACHTUNG: stScreencast NIE ausblenden — das ist in Streamlit >=1.5x ein
+   WRAPPER um die gesamte App (Vorfahr von stApp), kein Icon! */
 [data-testid="stSpinner"],
 [data-testid="stStatusWidget"],
 [data-testid="stToolbar"],
 [data-testid="stAppDeployButton"],
-[data-testid="stMainMenu"],
-[data-testid="stScreencast"] {
+[data-testid="stMainMenu"] {
   display: none !important;
 }
 /* Unsichtbarer Nav-Hook-iframe: Layout-Slot entfernen */
