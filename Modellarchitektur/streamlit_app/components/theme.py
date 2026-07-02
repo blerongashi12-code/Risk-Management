@@ -315,7 +315,7 @@ def tab_breadcrumb(current: int) -> None:
         ("4", "Eigenkapital",
          "2-Kanal · CET1-Quote · Schwellen"),
         ("5", "Validierung",
-         "Walk-Forward-Backtest · Annahmen"),
+         "Walk-Forward-Backtest · CET1-Kern-Test"),
     ]
     items = []
     for idx, (num, name, sub) in enumerate(tabs, start=1):

@@ -63,33 +63,31 @@ from backtesting_walkforward import (                              # type: ignor
 from two_factor_stress import SENSITIVITY_MATRIX, get_economic_logic  # type: ignore
 
 
-st.set_page_config(page_title="Validierung & Methodologie", layout="wide")
+st.set_page_config(page_title="Validierung", layout="wide")
 apply_theme()
 render_sidebar()
 
 hero(
-    "Validierung & Methodologie",
-    eyebrow="Tab 5 · Pillar-3-Walk-Forward-Backtest · Annahmen · Methodologie",
+    "Validierung",
+    eyebrow="Tab 5 · Pillar-3-Walk-Forward-Backtest · CET1-Kern-Test",
     deck="Walk-Forward-Backtest auf der vollständigen Pillar-3-EU-CR6-PD/LGD-"
          "Zeitreihe (10 Banken · 2021-2024): das Modell wird an jedem "
          "historischen Stichtag mit den damals bekannten Risikoparametern "
          "eingefroren (kein Look-ahead) und in drei Ebenen gegen die "
-         "realisierte Entwicklung geprüft. Plus 3-Layer-Annahmen-Disclosure "
-         "und vollständige Methodologie. Outcomes-Analysis nach SR 11-7, "
-         "Governance nach EBA GL 14.",
+         "realisierte Entwicklung geprüft — Zielgröße ist die CET1-Quote. "
+         "Outcomes-Analysis nach SR 11-7, Governance nach EBA GL 14. "
+         "Annahmen & Methodik vollständig dokumentiert in "
+         "Praesentation_Abgabe/Abgabedokumente/Modellannahmen.docx "
+         "(Quelle: docs/MODEL_ASSUMPTIONS.md).",
 )
 
 
 
 tab_breadcrumb(5)
-# Top-level tabs · Backtesting + Annahmen + Methodologie
-from components.legacy_views import render_annahmen_tab, render_methodology_tab
-
-tab_bt, tab_an, tab_md = st.tabs([
-    "1 · Backtesting · Pillar-3-Walk-Forward",
-    "2 · Annahmen & Datenbasis (Governance)",
-    "3 · Methodologie (MODEL_ASSUMPTIONS.md)",
-])
+# Die früheren Unter-Tabs „Annahmen“ und „Methodologie“ wurden entfernt —
+# die Annahmen-Dokumentation lebt vollständig in docs/MODEL_ASSUMPTIONS.md
+# bzw. der daraus generierten Word-Abgabefassung (Modellannahmen.docx).
+tab_bt = st.container()
 
 with tab_bt:
     # ====================================================================
@@ -1167,11 +1165,7 @@ Timmermann (1992, *JBES*). Governance: SR 11-7 (Outcomes Analysis), EBA GL 2014/
         f"{cet1_stats.get('within_1pp', 0)*100:.0f}% ≤ 1 pp · "
         f"{cet1_stats.get('conservative_share', 0)*100:.0f}% konservativ · "
         f"Datenbasis: pillar3_backtest_pdlgd.csv ({n_points} EU-CR6-Punkte) + "
-        f"EBA Transparency 2020-2025 + Brent (ICE) + Bundesbank-Svensson"
+        f"EBA Transparency 2020-2025 + Brent (ICE) + Bundesbank-Svensson · "
+        f"Annahmen & Methodik: Modellannahmen.docx (Praesentation_Abgabe/"
+        f"Abgabedokumente) bzw. docs/MODEL_ASSUMPTIONS.md"
     )
-
-with tab_an:
-    render_annahmen_tab()
-
-with tab_md:
-    render_methodology_tab()

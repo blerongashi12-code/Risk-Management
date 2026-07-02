@@ -2,7 +2,9 @@
 
 > **Single Source of Truth** für alle Modell-Annahmen, Datenquellen,
 > mathematischen Formeln und ihre ökonomische Begründung.
-> Stand: Mai 2026 · Version 2.0 (2-Faktor-Modell nach Professor-Review)
+> Stand: Juli 2026 · Version 2.1 (2-Faktor-Modell + CET1-Walk-Forward-Backtest)
+> Abgabefassung (Word, aus dieser Datei generiert):
+> `Praesentation_Abgabe/Abgabedokumente/Modellannahmen.docx`
 
 ---
 
@@ -127,9 +129,12 @@ unter den F-IRB-Standardwerten von 45 %.
 **Was:** Für die Out-of-Sample-Validierung (Walk-Forward) muss das
 Portfolio an jedem historischen Stichtag T0 mit den *damals gültigen*
 PD/LGD eingefroren werden — **kein Look-ahead** aus dem 2024-Snapshot.
-Dazu führt `data/pillar3_bank_pd_lgd.csv` zusätzlich zu 31.12.2024 ältere
-Jahresend-Stichtage (31.12.2021 / 2022 / 2023) im **Long-Format** (eine
-Zeile je `LEI × vasicek_class × vintage_date`).
+Dafür existiert eine eigene **Roh-Reihe `data/pillar3_backtest_pdlgd.csv`**:
+**10 Banken × FY2021–FY2024, 225 Datenpunkte**, je Zeile
+`LEI × vasicek_class × vintage_date` mit **PD, LGD und EAD aus derselben
+EU-CR6-Vintage**. Das Live-Modell nutzt weiterhin den kuratierten
+31.12.2024-Snapshot (`data/pillar3_bank_pd_lgd.csv`) — beide Reihen sind
+bewusst getrennt (kuratierte Werte ≠ rohe Sub-totals bei einigen Banken).
 
 **Harte Quellen-Vorgabe:** Diese historischen PD/LGD stammen **ausschließlich
 aus den Pillar-3-EU-CR6-Tabellen** der jeweiligen Bank — identische Logik wie
@@ -146,23 +151,42 @@ T0 real verfügbar war (`vintage_for_period`, `lag_years=1`). Der gewählte
 Jahresend-Wert gilt flach über alle vier Quartale des Jahres; eine feinere
 Interpolation wäre nicht quellengestützt.
 
-**Frozen-Portfolio = vollständig Pillar-3:** Für den Backtest stammen **PD, LGD
-UND EAD je Klasse** aus derselben EU-CR6-Vintage (`data/pillar3_portfolio_
-timeseries.csv` liefert EAD/Restlaufzeit, A-02c die PD/LGD). Damit ist die
-gesamte *Input-Seite* des eingefrorenen Portfolios Pillar-3 (nichts aus
-Transparency); Transparency liefert nur die realisierte RWA_credit zum Vergleich
-und den Macro-Schock. Aus diesem Portfolio rechnet das echte 2-Faktor-/IRB-K-
-Modell (`vasicek.py`) die stress-bedingte RWA-Skalierung, die auf die
-*gemeldete* RWA_credit angewandt wird (`build_pdlgd_walkforward`).
+**Frozen-Portfolio = vollständig Pillar-3, Transmission = 2-Faktor:** PD, LGD
+**und** EAD je Klasse stammen aus derselben EU-CR6-Vintage der Roh-Reihe; die
+Restlaufzeit ist dort nicht offengelegt → Basel-Default 2,5 Jahre (konstant
+über alle Jahrgänge, daher zeitvergleichs-neutral). Die gesamte *Input-Seite*
+des eingefrorenen Portfolios ist Pillar-3; EBA-Transparency liefert nur die
+*realisierte* Vergleichsseite (CET1, RWA) und die Markt-Historie den Schock.
+Der realisierte Jahres-Schock (ΔBrent, Δr_10y) läuft durch **dasselbe
+2-Faktor-Modell wie das Live-Cockpit** (`two_factor_stress.
+capital_bridge_2factor` via `frozen_2factor_delta`; sektor-differenzierte β,
+kein Single-Faktor-Aggregat) und durch die IRB-K-Formel (`vasicek.py`); der
+relative Effekt wird auf die *gemeldeten* Größen skaliert
+(`build_pdlgd_panel`, `build_cet1_backtest`).
 
-**Validierungs-Befund (DB, 19 Quartals-Paare):** Das Modell **überschätzt** die
-realisierten Quartals-RWA-Bewegungen deutlich (große positive Bias,
-`skill_vs_rw < 0`, Vorzeichen-Trefferquote ≈ 0,5). Das ist methodisch erwartet
-und **bestätigt §6 quantitativ**: realisierte Quartals-RWA wird von
-Nicht-Macro-Faktoren dominiert (IRB-Modell-Updates, Rating-Migrationen,
-Output-Floor, FX), die ein bewusst sauberes 2-Faktor-Stressmodell nicht
-abbildet. Der Backtest taugt daher als **Konservativitäts-/Frühwarn-Nachweis
-(obere Schranke)**, nicht als Beleg für Quartals-Punktprognosegüte.
+**Validierungs-Befund (CET1-Kern-Test, 29 Bank-Jahre 2022–2024):** Die
+**Zielgröße des Backtests ist die CET1-Quote** (Solvenz-Kennzahl), nicht die
+RWA-Änderung. Methode: realer Jahres-Schock ins Ende-Vorjahr eingefrorene
+Portfolio → gestresste CET1-Quote über zwei Kanäle (Nenner: RWA_total +
+ΔRWA_credit; Zähler: CET1 − ΔEL) → Vergleich mit der tatsächlich gemeldeten
+CET1-Quote. Bewusst **konservative Abwärts-Sicht**: Gewinnthesaurierung und
+Zinsüberschuss (NII) werden *nicht* gegengerechnet. **Ergebnis:** MAE ≈ 1,3 pp
+(auf ~15 %-Niveau ≈ 9 % relativ), 65 % der Bank-Jahre ≤ 1 pp Abstand, 72 %
+konservativ (Prognose ≤ Ist), Bias −1,0 pp; im Zinsschock-Jahr 2022 ~2,7 pp
+zu konservativ, weil Banken am Zinsanstieg verdienten (NII-Gegeneffekt,
+modellseitig bewusst ausgeklammert).
+
+**Ehrliche Grenze (PIT vs. TTC):** Die einzelnen Kanäle (gemeldete PD,
+Kredit-RWA) sind **nicht punktprognostizierbar** (Richtungs-Trefferquote ≈
+Zufall). Ursache ist eine Daten-Eigenschaft, kein Modellfehler: das Modell
+projiziert eine **Point-in-Time**-Reaktion, die gemeldeten A-IRB-Parameter
+sind **Through-the-Cycle** — regulatorisch geglättet und antizyklisch
+(CRR Art. 180) sowie management-getrieben (CRM, Rekalibrierung, IRB↔SA).
+Beleg 2022: Zins +2,8 pp → Modell-PD +0,5 pp, gemeldete PD −0,2 pp. Ein
+sauberer PIT-Test bräuchte realisierte Ausfallraten je Segment (bank-intern,
+nicht offengelegt; EBA-NPE-Panel erst ab 2024Q3). Das Modell ist damit als
+**konservatives Solvenz-/Frühwarn-Instrument** validiert (im CET1-Niveau nah
+und auf der sicheren Seite), nicht als Punktprognose einzelner Melde-Kanäle.
 
 **Default-Band inklusive (geflaggt):** Die publizierte EU-CR6-Sub-total-Ø-PD
 **enthält das 100 %-(Default)-Band** — exakt dieselbe Definition wie der
@@ -185,17 +209,20 @@ existiert erst seit der CRR2-Offenlegungs-ITS (Stichtage ab ~Mitte 2021).
 Saubere, konsistente Reihen daher für **FY2021–FY2024**; FY2020 (Alt-Template)
 ist bewusst ausgeklammert.
 
-**Status:** Deutsche Bank vollständig (FY2021–2024, kalibrierungs- und
-dichte-verifiziert) als **Muster**. Die übrigen neun Banken werden
-schrittweise in dieselbe CSV nachgezogen (bespoke Report-Layouts: BNP
-„Table 39 IRBA by PD scale", Crédit Mutuel französisch, Rabobank
-bild-basierte Tabellen → ggf. OCR). Bis zum Backfill nutzt der Walk-Forward
-für noch nicht historisierte Banken den 2024-Wert (dokumentierte Limitation).
+**Status (abgeschlossen):** Alle **10 Banken** sind extrahiert — 225
+Datenpunkte, **88 % Abdeckung relativ zum bank-eigenen Meldeumfang**
+(strukturell nicht geführte Klassen — z. B. kein IRB-Sovereign/QRRE bei
+einzelnen Häusern — zählen nicht als Lücke). Die 31 verbleibenden Zellen sind
+dokumentierte **Quellgrenzen** (BNP 2021: PD auf ganze % gerundet; SocGen
+2022: Bank+Sovereign im PDF-Text verschmolzen; Crédit-Mutuel-/BPCE-Vorjahre:
+mehrdeutige Anker) und werden **nicht** mit abgeleiteten Werten gefüllt.
+Detail-Protokoll: `tools/pillar3_backfill/STATUS.md` +
+`VERIFICATION_REPORT.json` (adversariale 9-Agenten-Quellprüfung).
 
-**Loader:** `load_pd_table(vintage="YYYY-MM-DD")` bzw. `load_pd_panel()`
-(siehe `backend/eba_pd_loader.py`). Das Live-Modell ist unberührt: der Default
-`vintage="latest"` liefert weiterhin genau den 31.12.2024-Snapshot
-(eine Zeile je LEI×Klasse).
+**Loader:** Backtest-Reihe über `backtesting_walkforward.load_backtest_series()`
+(+ `build_pdlgd_panel`, `build_cet1_backtest`, `build_pd_backtest`);
+Live-Snapshot unverändert über `load_pd_table(vintage="latest")`
+(`backend/eba_pd_loader.py`) — eine Zeile je LEI×Klasse zum 31.12.2024.
 
 ---
 
@@ -561,6 +588,7 @@ Punkt 9 (Korrelations-Analyse).
 | Zinslogik | Pauschal "hoch = schlecht" | Sektor-spezifisch (Bank-Klasse β < 0) |
 | Universe | 67 IRB-Banken (gemischte Datenqualität) | 10 IRB-Banken (einheitlich) |
 | EAD-Nenner für DR | Original Exposure | EAD post-CCF (Restschuld-konform) |
+| Backtest | — (nicht vorhanden) | **CET1-Walk-Forward** auf eigener Pillar-3-Roh-Reihe (10 Banken × 2021–2024, no-look-ahead, PIT-vs-TTC-Grenze dokumentiert) |
 
 ---
 
@@ -605,9 +633,16 @@ Punkt-Prognose.
 - EBA GL 14 (ICAAP / Stress-Testing).
 - ECB (2024). *Financial Stability Review, Mai 2024* (Energie-/
   Lebenshaltungskosten-Schock → Belastung der Haushalte; Sektor-Heterogenität).
+- Hyndman, R. J. & Athanasopoulos, G. (2021). *Forecasting: Principles
+  and Practice*, 3. Aufl., Kap. 5.8 (Punktprognose-Evaluation, MAE).
 - Konietschke, P., Metzler, J. & Ponte Marques, A. (2026). *A quantile
   probability model for sectoral corporate defaults in Europe*. ECB
   Working Paper 3207.
+- Board of Governors / OCC (2011). *SR 11-7: Supervisory Guidance on
+  Model Risk Management* (Outcomes Analysis).
+- Pesaran, M. H. & Timmermann, A. (1992). *A Simple Nonparametric Test
+  of Predictive Performance*. Journal of Business & Economic Statistics.
+- Vasicek, O. (2002). *Loan Portfolio Value*. Risk Magazine, Dezember.
 - Lo Duca, M., Moccero, D. & Parlapiano, F. (2024). *The impact of
   macroeconomic and monetary policy shocks on credit risk in the euro
   area corporate sector*. ECB Working Paper 2897.
