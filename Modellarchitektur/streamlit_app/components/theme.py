@@ -141,6 +141,56 @@ def _inject_css() -> None:
     st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
+# Nav-Hook: setzt beim Klick auf einen Sidebar-Link die Klasse `mc-nav` auf
+# stApp (→ Boot-Overlay aus mckinsey.css erscheint) und entfernt sie, sobald
+# der Script-Run beendet ist. Läuft im Parent-Dokument (same-origin-iframe);
+# Guard `__mcNavHook` verhindert Doppel-Registrierung über Seitenwechsel.
+# Klicks auf den bereits aktiven Tab (aria-current="page") lösen nichts aus.
+_NAV_HOOK_JS = """
+<script>
+(function () {
+  try {
+    var P = window.parent, D = P.document;
+    if (P.__mcNavHook) return;
+    P.__mcNavHook = true;
+    // WICHTIG: Die Logik muss im PARENT-Realm leben — dieser Komponenten-
+    // iframe wird bei jedem Seitenwechsel zerstoert (Timer/Closures aus dem
+    // iframe-Realm sterben mit). Darum ein <script> ins Parent-Dokument.
+    var code = [
+      "(function () {",
+      "  var t0 = 0;",
+      "  document.addEventListener('click', function (e) {",
+      "    var a = e.target && e.target.closest",
+      "            ? e.target.closest('[data-testid=\\"stSidebarNavLink\\"]') : null;",
+      "    if (!a || a.getAttribute('aria-current') === 'page') return;",
+      "    var app = document.querySelector('[data-testid=\\"stApp\\"]');",
+      "    if (app) { app.classList.add('mc-nav'); t0 = Date.now(); }",
+      "  }, true);",
+      "  setInterval(function () {",
+      "    var app = document.querySelector('[data-testid=\\"stApp\\"]');",
+      "    if (!app || !app.classList.contains('mc-nav')) return;",
+      "    var running = app.getAttribute('data-test-script-state') === 'running';",
+      "    if (!running && Date.now() - t0 > 900) app.classList.remove('mc-nav');",
+      "  }, 250);",
+      "})();"
+    ].join("\\n");
+    var s = D.createElement("script");
+    s.textContent = code;
+    D.head.appendChild(s);
+  } catch (err) { /* nie die App blockieren */ }
+})();
+</script>
+"""
+
+
+def _inject_nav_hook() -> None:
+    """0-Pixel-Komponenten-iframe, dessen Skript den Seitenwechsel-Overlay
+    steuert (st.markdown führt kein JS aus, Komponenten-iframes schon; der
+    Layout-Slot wird per CSS ausgeblendet)."""
+    from streamlit.components.v1 import html as _html
+    _html(_NAV_HOOK_JS, height=0)
+
+
 # =====================================================================
 # 4. Public API
 # =====================================================================
@@ -151,6 +201,7 @@ def apply_theme() -> None:
     """Idempotent — erst CSS, dann Plotly-Template registrieren."""
     _register_plotly_template()
     _inject_css()
+    _inject_nav_hook()
     st.session_state[_THEME_APPLIED_KEY] = True
 
 

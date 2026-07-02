@@ -1024,13 +1024,22 @@ button[aria-label="Open sidebar"] {
    Konzept: Solange Streamlit noch Element-Skeletons rendert (= erste
    Ladephase), liegt ein ruhiger Vollbild-Screen über der App — Wortmarke
    + dezente Fortschrittslinie. Erst wenn ALLE Elemente fertig sind,
-   erscheint das Modell. Bei späteren Re-Runs (Slider etc.) zeigt nur
-   eine 3px-Leiste am oberen Rand Aktivität — kein Overlay, keine Icons.
+   erscheint das Modell. Beim SEITENWECHSEL setzt der Nav-Hook (theme.py) die Klasse .mc-nav
+   auf stApp → gleiches Overlay bis der Run fertig ist. Slider-Re-Runs
+   zeigen nur die 3px-Leiste — kein Overlay, keine Icons.
    ===================================================================== */
 
-/* 1) Default-Ladeindikatoren komplett aus */
+/* 1) Default-Ladeindikatoren + komplette Toolbar oben rechts aus */
 [data-testid="stSpinner"],
-[data-testid="stStatusWidget"] {
+[data-testid="stStatusWidget"],
+[data-testid="stToolbar"],
+[data-testid="stAppDeployButton"],
+[data-testid="stMainMenu"],
+[data-testid="stScreencast"] {
+  display: none !important;
+}
+/* Unsichtbarer Nav-Hook-iframe: Layout-Slot entfernen */
+[data-testid="stElementContainer"]:has(iframe[data-testid="stIFrame"]) {
   display: none !important;
 }
 [data-testid="stSkeleton"],
@@ -1059,7 +1068,8 @@ button[aria-label="Open sidebar"] {
 
 /* 3) Boot-Overlay — nur solange Element-Skeletons existieren */
 [data-testid="stApp"]:has([data-testid="stSkeleton"])::after,
-[data-testid="stApp"]:has([data-testid="stAppSkeleton"])::after {
+[data-testid="stApp"]:has([data-testid="stAppSkeleton"])::after,
+[data-testid="stApp"].mc-nav::after {
   content: "CREDIT STRESS COCKPIT";
   position: fixed;
   inset: 0;
