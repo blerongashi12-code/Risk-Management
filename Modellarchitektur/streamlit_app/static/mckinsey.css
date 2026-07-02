@@ -1019,67 +1019,68 @@ button[aria-label="Open sidebar"] {
 
 
 /* =====================================================================
-   Loading-States · dezent, schlicht, high-end (statt Default-Spinner)
+   Loading · sleek Boot-Overlay + schlanke Ladeleiste (statt Icons)
+   ---------------------------------------------------------------------
+   Konzept: Solange Streamlit noch Element-Skeletons rendert (= erste
+   Ladephase), liegt ein ruhiger Vollbild-Screen über der App — Wortmarke
+   + dezente Fortschrittslinie. Erst wenn ALLE Elemente fertig sind,
+   erscheint das Modell. Bei späteren Re-Runs (Slider etc.) zeigt nur
+   eine 3px-Leiste am oberen Rand Aktivität — kein Overlay, keine Icons.
    ===================================================================== */
-/* Cache-/st.spinner-Container: schmale Karte mit Hairline + Navy-Akzent */
-[data-testid="stSpinner"] {
-  background: #FFFFFF !important;
-  border: 1px solid #ECECEC !important;
-  border-left: 3px solid #034B6F !important;
-  border-radius: 4px !important;
-  padding: 0.55rem 0.95rem !important;
-  box-shadow: 0 1px 3px rgba(5, 28, 44, 0.05) !important;
-  max-width: 460px;
-  position: relative;
-  overflow: hidden;
+
+/* 1) Default-Ladeindikatoren komplett aus */
+[data-testid="stSpinner"],
+[data-testid="stStatusWidget"] {
+  display: none !important;
 }
-/* feiner Shimmer-Lauf ueber die Karte — ruhig und unaufdringlich */
-[data-testid="stSpinner"]::after {
+[data-testid="stSkeleton"],
+[data-testid="stAppSkeleton"] {
+  visibility: hidden !important;
+}
+
+/* 2) Schlanke Ladeleiste oben — läuft bei jedem Script-Run (auch Boot) */
+[data-testid="stApp"][data-test-script-state="running"]::before {
   content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(100deg,
-              transparent 20%,
-              rgba(3, 75, 111, 0.045) 50%,
-              transparent 80%);
-  transform: translateX(-100%);
-  animation: mc-shimmer 2.2s ease-in-out infinite;
+  position: fixed;
+  top: 0; left: 0;
+  height: 3px; width: 100%;
+  z-index: 1000001;
+  background: linear-gradient(90deg,
+              transparent 0%, #2251FF 35%, #034B6F 65%, transparent 100%);
+  background-size: 45% 100%;
+  background-repeat: no-repeat;
+  animation: mc-bar 1.15s ease-in-out infinite;
   pointer-events: none;
 }
-@keyframes mc-shimmer {
-  to { transform: translateX(100%); }
+@keyframes mc-bar {
+  0%   { background-position: -60% 0; }
+  100% { background-position: 165% 0; }
 }
-/* Spinner-Ring: klein, duenn, markenfarben */
-[data-testid="stSpinner"] i,
-[data-testid="stSpinner"] svg,
-[data-testid="stSpinner"] > div > div:first-child {
-  width: 14px !important;
-  height: 14px !important;
-  border-width: 2px !important;
-  border-color: #E3E9ED !important;
-  border-top-color: #034B6F !important;
+
+/* 3) Boot-Overlay — nur solange Element-Skeletons existieren */
+[data-testid="stApp"]:has([data-testid="stSkeleton"])::after,
+[data-testid="stApp"]:has([data-testid="stAppSkeleton"])::after {
+  content: "CREDIT STRESS COCKPIT";
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Track-Linie unter der Wortmarke + ruhiges Canvas */
+  background:
+    linear-gradient(90deg, #E3E9ED, #E3E9ED)
+      center calc(50% + 36px) / 220px 2px no-repeat,
+    #FBFCFD;
+  color: #051C2C;
+  font-family: "Inter", -apple-system, "Segoe UI", sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  animation: mc-boot-pulse 2.4s ease-in-out infinite;
+  pointer-events: none;
 }
-/* Lade-Text: klein, grau, gesperrt — wirkt wie ein Status-Chip */
-[data-testid="stSpinner"] p,
-[data-testid="stSpinner"] div[data-testid="stMarkdownContainer"] p {
-  color: #6E6E6E !important;
-  font-size: 0.78rem !important;
-  font-weight: 600 !important;
-  letter-spacing: 0.05em !important;
-  text-transform: uppercase !important;
-  margin: 0 !important;
+@keyframes mc-boot-pulse {
+  0%, 100% { color: #051C2C; }
+  50%      { color: #34586E; }
 }
-/* Sidebar-Variante: noch kompakter */
-[data-testid="stSidebar"] [data-testid="stSpinner"] {
-  padding: 0.45rem 0.7rem !important;
-  max-width: 100%;
-}
-/* Status-Widget oben rechts ("Running…"): dezent statt auffaellig */
-[data-testid="stStatusWidget"] {
-  opacity: 0.55;
-  transform: scale(0.9);
-  transform-origin: top right;
-}
-[data-testid="stStatusWidget"] label { color: #6E6E6E !important; }
-/* Initial-Skeleton der App: ruhiges Canvas statt Weissblitz */
-[data-testid="stAppSkeleton"], .stSkeleton { background: #F7F9FB !important; }

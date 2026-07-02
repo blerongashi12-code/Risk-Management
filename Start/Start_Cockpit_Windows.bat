@@ -5,7 +5,7 @@ REM  Einfach doppelklicken. Der Browser oeffnet sich automatisch.
 REM  Beim allerersten Start werden fehlende Pakete installiert.
 REM ============================================================
 setlocal
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 REM --- 1) Python vorhanden? ---
 where python >nul 2>&1

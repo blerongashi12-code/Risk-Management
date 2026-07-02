@@ -13,8 +13,8 @@
 
 | System | Aufruf |
 |---|---|
-| **Windows** | Doppelklick auf `Start_Cockpit.bat` |
-| **macOS** | Doppelklick auf `Start_Cockpit.command` *(beim ersten Mal: Rechtsklick → „Öffnen" wegen Gatekeeper)* |
+| **Windows** | Doppelklick auf [`Start/Start_Cockpit_Windows.bat`](./Start/) |
+| **macOS** | Doppelklick auf [`Start/Start_Cockpit_Mac.command`](./Start/) *(beim ersten Mal: Rechtsklick → „Öffnen" wegen Gatekeeper)* |
 
 Beide Launcher installieren beim ersten Start die Pakete (`requirements.txt`), beenden alte
 Cockpit-Prozesse, leeren den Bytecode-Cache und öffnen das Cockpit im Browser.
