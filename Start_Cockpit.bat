@@ -40,7 +40,7 @@ REM  Der Dateiname enthaelt einen Umlaut (Einfuehrung_in_das_Modell).
 REM  Damit die .bat unabhaengig von der Windows-Codepage laeuft, wird
 REM  die Datei ueber ein Wildcard-Muster gesucht statt fest getippt
 REM  (ein direkt getippter Umlaut wuerde je nach Codepage scheitern).
-cd "Risk management"
+cd "Modellarchitektur"
 set "ENTRY="
 for %%F in ("streamlit_app\Einf*_Modell.py") do set "ENTRY=%%~fF"
 

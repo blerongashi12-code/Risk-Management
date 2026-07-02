@@ -15,16 +15,16 @@ __pycache__/
 .streamlit/secrets.toml
 
 # Large EBA raw files (kept locally only — too big for git, ~1.3 GB total)
-Risk management/data/tr_cre.csv
-Risk management/data/tr_sov.csv
-Risk management/data/tr_oth.csv
-Risk management/data/tr_mrk.csv
-Risk management/data/SDD.xlsx
-Risk management/data/TR_Metadata.xlsx
-Risk management/data/2025 EU-wide stress test - Templates.xlsx
+Modellarchitektur/data/tr_cre.csv
+Modellarchitektur/data/tr_sov.csv
+Modellarchitektur/data/tr_oth.csv
+Modellarchitektur/data/tr_mrk.csv
+Modellarchitektur/data/SDD.xlsx
+Modellarchitektur/data/TR_Metadata.xlsx
+Modellarchitektur/data/2025 EU-wide stress test - Templates.xlsx
 
 # Historical EBA Transparency vintages 2020-2024 (for backtesting)
-Risk management/data/transparency_*/
+Modellarchitektur/data/transparency_*/
 
 # Defensive: never commit raw EBA artefacts at any path
 **/tr_cre.csv
@@ -40,4 +40,4 @@ Thumbs.db
 *.log
 
 # Pillar-3 source PDFs (large, ~210MB) — co-located with project, not committed
-Risk management/data/pillar3_reports/
+Modellarchitektur/data/pillar3_reports/
