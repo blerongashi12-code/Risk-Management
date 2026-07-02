@@ -5,7 +5,7 @@ der zehn größten EU-IRB-Banken.
 
 > **Autor.** Bleron Gashi · HS Düsseldorf · `bleron.gashi@study.hs-duesseldorf.de`
 > **Single Source of Truth.** [`docs/MODEL_ASSUMPTIONS.md`](./docs/MODEL_ASSUMPTIONS.md) (Methodik-Detail)
-> · [`BACKTESTING_WALKFORWARD_KONZEPT.docx`](../Praesentation_Abgabe/Abgabedokumente/BACKTESTING_WALKFORWARD_KONZEPT.docx) (Backtest-Konzept)
+>
 
 Dieses README ist als **Stand-Alone-Dokumentation** geschrieben — alle Formeln, Annahmen,
 Quellen und Parameter sind hier zitiert, sodass ein Kollege jeden einzelnen Bestandteil

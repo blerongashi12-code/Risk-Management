@@ -158,14 +158,14 @@ with tab_bt:
     # ====================================================================
     #  Daten laden (cached)
     # ====================================================================
-    @st.cache_data(ttl=24*3600, show_spinner="Lade historisches EBA-Panel …")
+    @st.cache_data(ttl=24*3600, show_spinner="Historisches EBA-Panel wird geladen")
     def _load_panel():
         panel = load_historical_capital_panel(EBA_RAW_DIR)
         wide = panel_to_wide(panel)
         bank_dir = load_bank_directory(EBA_RAW_DIR / "TR_Metadata.xlsx")
         return panel, wide, bank_dir
 
-    @st.cache_data(ttl=24*3600, show_spinner="Trailing-1Y-Macro-Status …")
+    @st.cache_data(ttl=24*3600, show_spinner="Makro-Status wird berechnet")
     def _compute_macro(periods: tuple[int, ...]):
         data = load_data_layer()
         if data["brent"] is None or data["svensson"] is None:
@@ -175,7 +175,7 @@ with tab_bt:
         macro = attach_m_factor(macro, cov_factors=fs["sigma"])
         return macro, fs
 
-    @st.cache_data(ttl=24*3600, show_spinner="Quartals-Macro-Schocks …")
+    @st.cache_data(ttl=24*3600, show_spinner="Quartals-Schocks werden berechnet")
     def _compute_macro_quarterly(periods: tuple[int, ...]):
         data = load_data_layer()
         if data["brent"] is None or data["svensson"] is None:
@@ -185,13 +185,13 @@ with tab_bt:
         mq = attach_m_factor_quarterly(mq, cov_factors=fs["sigma"])
         return mq, fs
 
-    @st.cache_data(ttl=24*3600, show_spinner="Frozen-Portfolio-Walk-Forward läuft …")
+    @st.cache_data(ttl=24*3600, show_spinner="Walk-Forward-Backtest wird berechnet")
     def _build_series(_wide, _macro_q):
         series = load_backtest_series()
         panel = build_pdlgd_panel(_wide, _macro_q, series_df=series)
         return series, panel
 
-    @st.cache_data(ttl=24*3600, show_spinner="2-Faktor-Zins-Antwortkurven je Bank …")
+    @st.cache_data(ttl=24*3600, show_spinner="Zins-Antwortkurven werden berechnet")
     def _rate_response(_series):
         """Prognostizierte ΔRWA_credit (% der Baseline) als Funktion eines
         Δr_10y-Schocks (Brent fix = 0) je Bank — die 2-Faktor-Antwort des
@@ -213,7 +213,7 @@ with tab_bt:
             out[name] = {"grid": grid, "pct": ys, "vintage": v}
         return out
 
-    @st.cache_data(ttl=24*3600, show_spinner="PD-Backtest (PIT vs. TTC) …")
+    @st.cache_data(ttl=24*3600, show_spinner="PD-Backtest wird berechnet")
     def _build_pd_bt(_series):
         data = load_data_layer()
         if data["brent"] is None or data["svensson"] is None:
@@ -240,7 +240,7 @@ with tab_bt:
     pd_bt, annual_macro = _build_pd_bt(series)
     pd_stats = pd_backtest_stats(pd_bt) if pd_bt is not None else {"n": 0}
 
-    @st.cache_data(ttl=24*3600, show_spinner="CET1-Quoten-Backtest …")
+    @st.cache_data(ttl=24*3600, show_spinner="CET1-Backtest wird berechnet")
     def _build_cet1(_wide, _series, _amac):
         return build_cet1_backtest(_wide, _series, _amac or {})
 
@@ -1159,32 +1159,6 @@ IRB-K: Vasicek (2002); BCBS (2017, *Basel III: Finalising post-crisis reforms*).
 Backtest-Evaluation: Hyndman & Athanasopoulos (2021, Kap. 5.8); Pesaran &
 Timmermann (1992, *JBES*). Governance: SR 11-7 (Outcomes Analysis), EBA GL 2014/14.
 """)
-
-    # ====================================================================
-    #  Methodik-Konzeptdokument zum Download
-    # ====================================================================
-    st.divider()
-    # Konzeptpapier liegt im Abgabe-Ordner (Repo-Root/Praesentation_Abgabe/...)
-    _repo_root = Path(__file__).resolve().parent.parent.parent.parent
-    _docx_path = (_repo_root / "Praesentation_Abgabe" / "Abgabedokumente"
-                  / "BACKTESTING_WALKFORWARD_KONZEPT.docx")
-    if _docx_path.exists():
-        dl_l, dl_r = st.columns([3, 2], gap="medium")
-        with dl_l:
-            st.markdown(
-                "Das vollständige Konzeptpapier zum Walk-Forward-Backtest liegt "
-                "als Word-Datei im Projekt-Root."
-            )
-        with dl_r:
-            with open(_docx_path, "rb") as fh:
-                st.download_button(
-                    label="📄  BACKTESTING_WALKFORWARD_KONZEPT.docx",
-                    data=fh.read(),
-                    file_name="BACKTESTING_WALKFORWARD_KONZEPT.docx",
-                    mime=("application/vnd.openxmlformats-officedocument."
-                          "wordprocessingml.document"),
-                    use_container_width=True,
-                )
 
     footer(
         f"Pillar-3-Walk-Forward-Backtest · {n_banks_bt} Banken × {n_vintages} "

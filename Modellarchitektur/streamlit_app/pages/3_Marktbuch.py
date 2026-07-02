@@ -92,7 +92,7 @@ tab_breadcrumb(3)
 delta_r_pp = float(config["d_r_10y_pp"])
 
 
-@st.cache_data(ttl=24 * 3600, show_spinner="Loading EBA Sovereign-data ...")
+@st.cache_data(ttl=24 * 3600, show_spinner="Sovereign-Daten werden geladen")
 def _load_data():
     sov_raw = parse_sovereign_csv(EBA_RAW_DIR / "tr_sov.csv", period=202506)
     bank_dir = load_bank_directory(EBA_RAW_DIR / "TR_Metadata.xlsx")

@@ -99,7 +99,7 @@ st.markdown(
 
 tab_breadcrumb(4)
 # === Load data + macro shock =========================================
-@st.cache_data(ttl=24*3600, show_spinner="Loading EBA capital + RWA data …")
+@st.cache_data(ttl=24*3600, show_spinner="EBA-Kapitaldaten werden geladen")
 def _load_capital(top_n: int):
     cap = parse_capital_overview(EBA_RAW_DIR / "tr_oth.csv", period=202506)
     bank_dir = load_bank_directory(EBA_RAW_DIR / "TR_Metadata.xlsx")
@@ -114,7 +114,7 @@ def _load_universe(top_n: int):
     return filter_universe_to_top10(u)
 
 
-@st.cache_data(ttl=24*3600, show_spinner="Loading sovereign IFRS-9 split …")
+@st.cache_data(ttl=24*3600, show_spinner="IFRS-9-Split wird geladen")
 def _load_sov_acct():
     # Bank-individuell GEMELDETER IFRS-9-Split (EBA tr_sov Items
     # 2520812-2520815) — Datenbasis des Sovereign-Kanals. Nur die zum
@@ -630,7 +630,7 @@ st.markdown(
 
 
 # --- 2-Faktor-Sensitivity-Scan: vary Δr, hold ΔBrent fixed ---------
-@st.cache_data(ttl=24*3600, show_spinner="Berechne 2-Faktor-Sensitivity-Curve …")
+@st.cache_data(ttl=24*3600, show_spinner="Sensitivitätskurve wird berechnet")
 def _two_factor_sensitivity(
     selected_bank_names: tuple,
     d_brent_fixed: float,

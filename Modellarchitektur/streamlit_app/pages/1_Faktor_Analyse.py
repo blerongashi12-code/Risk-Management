@@ -92,7 +92,7 @@ def _load_factor_layer():
     return data, fr, stats
 
 
-@st.cache_data(ttl=24*3600, show_spinner="Loading EBA Top-10 universe …")
+@st.cache_data(ttl=24*3600, show_spinner="Bankuniversum wird geladen")
 def _load_full_universe():
     """Loads the Top-10 IRB-bank universe with regulatory PDs from
     the bank-specific Pillar-3 EU-CR6 disclosures at 31.12.2024
@@ -427,7 +427,7 @@ from factor_correlation import (                                  # type: ignore
     yearly_correlation_table,
 )
 
-@st.cache_data(ttl=24*3600, show_spinner="Berechne 5-Jahres-Korrelations-Analyse …")
+@st.cache_data(ttl=24*3600, show_spinner="Korrelationsanalyse wird berechnet")
 def _run_correlation_analysis():
     _data = load_data_layer()
     if _data["brent"] is None or _data["svensson"] is None:

@@ -18,7 +18,7 @@ from config import CACHE_DIR  # type: ignore
 # ----------------------------------------------------------------------
 # 1. Static cache (Brent + Svensson only)
 # ----------------------------------------------------------------------
-@st.cache_data(ttl=24 * 3600, show_spinner="Loading data layer …")
+@st.cache_data(ttl=24 * 3600, show_spinner="Marktdaten werden geladen")
 def load_data_layer() -> dict:
     """Reads Brent + Svensson parquet files from data/cache/."""
     out = {}

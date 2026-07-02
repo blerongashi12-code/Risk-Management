@@ -1017,3 +1017,69 @@ button[aria-label="Open sidebar"] {
   transform: none !important;
 }
 
+
+/* =====================================================================
+   Loading-States · dezent, schlicht, high-end (statt Default-Spinner)
+   ===================================================================== */
+/* Cache-/st.spinner-Container: schmale Karte mit Hairline + Navy-Akzent */
+[data-testid="stSpinner"] {
+  background: #FFFFFF !important;
+  border: 1px solid #ECECEC !important;
+  border-left: 3px solid #034B6F !important;
+  border-radius: 4px !important;
+  padding: 0.55rem 0.95rem !important;
+  box-shadow: 0 1px 3px rgba(5, 28, 44, 0.05) !important;
+  max-width: 460px;
+  position: relative;
+  overflow: hidden;
+}
+/* feiner Shimmer-Lauf ueber die Karte — ruhig und unaufdringlich */
+[data-testid="stSpinner"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg,
+              transparent 20%,
+              rgba(3, 75, 111, 0.045) 50%,
+              transparent 80%);
+  transform: translateX(-100%);
+  animation: mc-shimmer 2.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes mc-shimmer {
+  to { transform: translateX(100%); }
+}
+/* Spinner-Ring: klein, duenn, markenfarben */
+[data-testid="stSpinner"] i,
+[data-testid="stSpinner"] svg,
+[data-testid="stSpinner"] > div > div:first-child {
+  width: 14px !important;
+  height: 14px !important;
+  border-width: 2px !important;
+  border-color: #E3E9ED !important;
+  border-top-color: #034B6F !important;
+}
+/* Lade-Text: klein, grau, gesperrt — wirkt wie ein Status-Chip */
+[data-testid="stSpinner"] p,
+[data-testid="stSpinner"] div[data-testid="stMarkdownContainer"] p {
+  color: #6E6E6E !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  margin: 0 !important;
+}
+/* Sidebar-Variante: noch kompakter */
+[data-testid="stSidebar"] [data-testid="stSpinner"] {
+  padding: 0.45rem 0.7rem !important;
+  max-width: 100%;
+}
+/* Status-Widget oben rechts ("Running…"): dezent statt auffaellig */
+[data-testid="stStatusWidget"] {
+  opacity: 0.55;
+  transform: scale(0.9);
+  transform-origin: top right;
+}
+[data-testid="stStatusWidget"] label { color: #6E6E6E !important; }
+/* Initial-Skeleton der App: ruhiges Canvas statt Weissblitz */
+[data-testid="stAppSkeleton"], .stSkeleton { background: #F7F9FB !important; }

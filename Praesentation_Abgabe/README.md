@@ -6,16 +6,9 @@ Deliverables des Projekts — getrennt von der Modellarchitektur.
 
 ```
 Praesentation_Abgabe/
-├── Praesentation/
-│   ├── Risk_Management_Modell_und_Faktoranalyse_12_Slides_EDITIERBAR_V5.pptx   ← aktuelle Fassung
-│   ├── Risk_Management_Prozess_und_Datenbasis.pptx
-│   ├── Risk_Management_Prozess_und_Datenbasis_EDITIERBAR.pptx
-│   ├── Prozessmap/            ← Gesamtmodell-Prozessgrafik (PNG/SVG + Build-Skript)
-│   └── Archiv/                ← ältere Foliensatz-Versionen (V1–V4)
+├── Praesentation/          ← Ablageort für die finale Präsentation (wird manuell hochgeladen)
 └── Abgabedokumente/
-    ├── Modellannahmen.docx                       ← strukturierte Annahmen-Doku (aus MODEL_ASSUMPTIONS.md)
-    ├── BACKTESTING_WALKFORWARD_KONZEPT.docx      ← Konzeptpapier Walk-Forward-Backtest
-    └── Umsetzung_Professorenfeedback.docx        ← Dokumentation der Feedback-Umsetzung
+    └── Modellannahmen.docx ← strukturierte Annahmen-Doku (generiert aus MODEL_ASSUMPTIONS.md)
 ```
 
 ## Hinweis zur Quelle der Annahmen

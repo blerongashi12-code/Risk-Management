@@ -179,7 +179,7 @@ st.markdown(
 # dem bank-spezifische Pillar-3 EU-CR6 (31.12.2024)). League-Table, Bridge-Dropdown und alle
 # Drilldowns operieren ausschließlich auf diesen 10 Banken — einheitliche
 # Datenqualität, keine Defaulted/Original-Schätzung mehr.
-@st.cache_data(ttl=24*3600, show_spinner="Loading EBA Top-10 universe …")
+@st.cache_data(ttl=24*3600, show_spinner="Bankuniversum wird geladen")
 def _load_universe():
     from eba_pd_loader import filter_universe_to_top10                # type: ignore
     u = load_eba_universe(vintage="2025", top_n=None, prefer_real=True)
