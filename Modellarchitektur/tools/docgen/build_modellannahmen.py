@@ -152,7 +152,7 @@ doc.add_page_break()
 
 # ================= 1 · Das Modell auf einen Blick =================
 h1("1 · Das Modell auf einen Blick")
-body("Das Cockpit beantwortet eine einzige, aufsichtlich zentrale Frage: "
+body("Das Cockpit beantwortet eine aufsichtlich zentrale Frage: "
      "**Wie stünde die harte Kernkapitalquote (CET1) der zehn größten "
      "EU-IRB-Banken, wenn ein Ölpreis- und/oder Zinsschock einträte?** "
      "Die CET1-Quote ist die Solvenz-Kennzahl der Bankenaufsicht — fällt sie "
@@ -209,7 +209,8 @@ table(
       "**Vergleichsseite** — realisierte Werte für die Validierung; nie "
       "PD/LGD-Quelle"],
      ["Brent (ICE), täglich", "Ölpreis-Historie", "Faktor 1"],
-     ["Bundesbank-Svensson-Parameter", "Zinsstrukturkurve, täglich",
+     ["Bundesbank-Svensson-Parameter", "Zinsstrukturkurve, täglich "
+      "(Nelson/Siegel 1987, erweitert um Svensson 1994)",
       "Faktor 2 (10-J-Zins)"],
      ["EBA IFRS-9-Split", "HfT/FVTPL/FVOCI-Anteile der Staatsanleihen",
       "Sovereign-Kanal (CET1-wirksamer Anteil)"]],
@@ -217,14 +218,15 @@ table(
 
 # ================= 3 · Stress-Transmission =================
 h1("3 · Sektor-differenzierte Stress-Transmission")
-body("Kern des Modells ist die Übersetzung der Schocks in Risikoparameter — "
-     "**je Kreditklasse eigene Sensitivitäten** (Annahme A-04):")
+body("Kern des Modells ist die Übersetzung der beiden Schocks in "
+     "Risikoparameter — **mit eigenen Sensitivitäten je Kreditklasse** "
+     "(Annahme A-04):")
 body("ΔPD [pp] = β_Öl · ΔBrent + β_Zins · Δr_10y      "
      "ΔLGD [pp] = γ_Öl · ΔBrent + γ_Zins · Δr_10y",
      size=10.5, color=MID)
-body("Die gestressten Werte werden begrenzt (PD: Floor 0,03 %, Cap 50 %; "
-     "LGD: Floor 5 %, Cap 100 %), damit keine ökonomisch unplausiblen "
-     "Extremwerte entstehen.")
+body("Die gestressten Werte werden begrenzt (PD: Untergrenze 0,03 %, "
+     "Obergrenze 50 %; LGD: 5 % bis 100 %), damit keine ökonomisch "
+     "unplausiblen Extremwerte entstehen.")
 figure("fig2_beta.png", 14.5,
        "Abb. 2 · Die Sensitivitäts-Matrix als Bild: Jede Zelle ist eine "
        "dokumentierte Annahme — rot = Risiko steigt mit dem Schock, blau = "
@@ -253,8 +255,9 @@ rows = []
 for c in ["corporate", "sme_corporate", "mortgage", "qrre",
           "other_retail", "bank", "sovereign"]:
     m = SENSITIVITY_MATRIX[c]
-    rows.append([c, f"{m['pd_rate']:+.2f}", f"{m['pd_oil']:+.2f}",
-                 f"{m['lgd_rate']:+.2f}", f"{m['lgd_oil']:+.2f}", _logik[c]])
+    fmt = lambda v: f"{v:+.2f}".replace(".", ",")
+    rows.append([c, fmt(m['pd_rate']), fmt(m['pd_oil']),
+                 fmt(m['lgd_rate']), fmt(m['lgd_oil']), _logik[c]])
 table(["Klasse", "β PD·Zins", "β PD·Öl", "γ LGD·Zins", "γ LGD·Öl",
        "Ökonomische Logik (Kurzform)"],
       rows, [14, 9, 9, 10, 9, 49], fontsize=8.5)
@@ -276,10 +279,16 @@ body("K = [ LGD · N( (N⁻¹(PD) + √ρ · N⁻¹(0,999)) / √(1−ρ) ) − 
      "      →      RWA = K · 12,5 · EAD", size=10, color=MID)
 body("Dabei ist ρ die Basel-Asset-Korrelation je Klasse (Corporates "
      "PD-abhängig 12–24 %, Hypotheken 15 %, QRRE 4 %), MA das "
-     "Laufzeit-Adjustment und N die Standardnormalverteilung. Der "
-     "**Sovereign-Kanal** bewertet parallel die Staatsanleihebestände: "
-     "ΔMtM = −Duration · Δr · Exposure, CET1-wirksam nur für den "
-     "FVOCI/FVTPL-Anteil je Bank (EBA-IFRS-9-Split, Annahme A-06).")
+     "Laufzeit-Adjustment und N die Standardnormalverteilung. Die "
+     "theoretische Fundierung des ASRF-Rahmens liefern Vasicek (1991, "
+     "2002) und Gordy (2003). Der **Sovereign-Kanal** bewertet parallel "
+     "die Staatsanleihebestände: ΔMtM = −Duration · Δr · Exposure, "
+     "CET1-wirksam nur für den FVOCI/FVTPL-Anteil je Bank "
+     "(EBA-IFRS-9-Split, Annahme A-06; Durationslogik nach Tuckman/Serrat "
+     "2012). Die begleitenden Marktbuch-Analysen des Cockpits — "
+     "Staaten-Banken-Verflechtung (Doom Loop) und latente Bewertungs-"
+     "verluste — stützen sich auf Brunnermeier et al. (2016), "
+     "Acharya/Drechsler/Schnabl (2014) und Jiang et al. (2023).")
 figure("fig3_bridge.png", 15.8,
        "Abb. 3 · Die CET1-Bridge: Das Kreditbuch erhöht den Nenner (ΔRWA) "
        "und senkt über erwartete Verluste den Zähler (ΔEL); der "
@@ -360,7 +369,7 @@ table(
 # ================= 7 · Validierung =================
 h1("7 · Validierung: der CET1-Walk-Forward-Backtest")
 body("Das Modell wird nicht an dem Datenstand geprüft, mit dem es gebaut "
-     "wurde, sondern **rollierend in der Vergangenheit**: Für jedes Jahr "
+     "wurde, sondern **rollierend durch die Vergangenheit**: Für jedes Jahr "
      "wird das Portfolio mit den damals bekannten Pillar-3-Parametern des "
      "Vorjahres eingefroren, der tatsächlich eingetretene Öl-/Zins-Schock "
      "des Jahres eingespeist und die prognostizierte CET1-Quote mit der "
@@ -418,29 +427,82 @@ body("Verwendungs-Scope: ICAAP-Validierungs-Übung und Lehre/Demonstration. "
 
 # ================= 9 · Bibliographie =================
 h1("9 · Bibliographie")
+body("Vollständige Liste aller im Modell verwendeten Quellen — gegliedert "
+     "nach Regulatorik, wissenschaftlicher Literatur und Datenquellen. Jede "
+     "Quelle ist an der Stelle ihrer Verwendung im Dokument bzw. im "
+     "Modell-Code referenziert.")
+h2("Regulatorische Quellen")
 for b in [
-    "BCBS (2017). Basel III: Finalising post-crisis reforms. §272–284.",
-    "Bandoni, Fourné & Jarmulska (2025). Mortgage loan rates and the "
-    "defaults of variable rate mortgages. ECB WP 3112.",
-    "Board of Governors / OCC (2011). SR 11-7: Supervisory Guidance on "
-    "Model Risk Management.",
-    "EBA (2024). 2025 EU-wide Stress Test — Methodological Note, §2.4.2.",
-    "EBA/ESRB (2025). 2025 EU-wide Stress Test — Macro-financial scenario.",
-    "EBA (2025). 2025 EU-wide Stress Test — Results, Fig. 22.",
-    "EBA (2025). Report on the 2024 Credit Risk Benchmarking Exercise.",
-    "EBA (2025). EU-wide Transparency Exercise — Public Disclosure.",
-    "EBA GL 2014/14 (ICAAP / Stress-Testing).",
-    "ECB (2024). Financial Stability Review, Mai 2024.",
-    "Hyndman & Athanasopoulos (2021). Forecasting: Principles and "
-    "Practice, 3. Aufl., Kap. 5.8.",
-    "Konietschke, Metzler & Ponte Marques (2026). A quantile probability "
-    "model for sectoral corporate defaults in Europe. ECB WP 3207.",
-    "Lo Duca, Moccero & Parlapiano (2024). The impact of macroeconomic and "
-    "monetary policy shocks on credit risk. ECB WP 2897.",
-    "Pesaran & Timmermann (1992). A Simple Nonparametric Test of "
-    "Predictive Performance. JBES.",
-    "Tuckman & Serrat (2012). Fixed Income Securities, 3rd ed.",
-    "Vasicek (2002). Loan Portfolio Value. Risk Magazine.",
+    "BCBS (2017). Basel III: Finalising post-crisis reforms. Basel Committee "
+    "on Banking Supervision, §272–284 (IRB-Kapitalformel, Asset-Korrelationen).",
+    "Board of Governors / OCC (2011). SR 11-7: Supervisory Guidance on Model "
+    "Risk Management (Outcomes-Analysis des Backtests).",
+    "EBA (2020). ITS/2020/04 — Implementing Technical Standards on public "
+    "disclosures (EU-CR6-Template, Pillar-3-Datenbasis).",
+    "EBA (2024). 2025 EU-wide Stress Test — Methodological Note, §2.4.2 "
+    "(sektorale Sensitivitäten als aufsichtlicher Projektionsansatz).",
+    "EBA/ESRB (2025). 2025 EU-wide Stress Test — Macro-financial Scenario, "
+    "§4.1.6 (adverse Zinspfade als Plausibilitätsanker).",
+    "EBA (2025). 2025 EU-wide Stress Test — Results, Fig. 22 (relative "
+    "Verlustquoten je Portfolio als Quervalidierung der β-Struktur).",
+    "EBA (2025). Report on the 2024 Credit Risk Benchmarking Exercise "
+    "(PD-/LGD-Niveaus je IRB-Klasse).",
+    "EBA GL 2014/14. Guidelines on ICAAP/Stress-Testing (Governance-Rahmen).",
+    "Verordnung (EU) Nr. 575/2013 (CRR) — insb. Art. 153/154 "
+    "(IRB-Risikogewichte), Art. 180/181 (PD-/LGD-Schätzung, TTC-Charakter), "
+    "Art. 431–455 (Offenlegung).",
+]:
+    bullet(b)
+h2("Wissenschaftliche Literatur")
+for b in [
+    "Acharya, V., Drechsler, I. & Schnabl, P. (2014). A Pyrrhic Victory? "
+    "Bank Bailouts and Sovereign Credit Risk. Journal of Finance "
+    "(Staaten-Banken-Verflechtung, Marktbuch-Analyse).",
+    "Bandoni, E., Fourné, M. & Jarmulska, B. (2025). Mortgage loan rates and "
+    "the defaults of variable rate mortgages. ECB Working Paper 3112 "
+    "(Zins-Sensitivität der Hypotheken-PD).",
+    "Brunnermeier, M. et al. (2016). The Sovereign-Bank Diabolic Loop and "
+    "ESBies. American Economic Review P&P (Doom-Loop, Marktbuch-Analyse).",
+    "Gordy, M. (2003). A Risk-Factor Model Foundation for Ratings-Based Bank "
+    "Capital Rules. Journal of Financial Intermediation (ASRF-Fundierung).",
+    "Hyndman, R. J. & Athanasopoulos, G. (2021). Forecasting: Principles and "
+    "Practice, 3. Aufl., Kap. 5.8 (Prognose-Evaluation, MAE).",
+    "Jiang, E., Matvos, G., Piskorski, T. & Seru, A. (2023). Monetary "
+    "Tightening and U.S. Bank Fragility. NBER Working Paper 31048 (latente "
+    "Bewertungsverluste, Marktbuch-Analyse).",
+    "Konietschke, P., Metzler, J. & Ponte Marques, A. (2026). A quantile "
+    "probability model for sectoral corporate defaults in Europe. ECB "
+    "Working Paper 3207 (Sektor-Heterogenität der Unternehmens-PD).",
+    "Lo Duca, M., Moccero, D. & Parlapiano, F. (2024). The impact of "
+    "macroeconomic and monetary policy shocks on credit risk in the euro "
+    "area corporate sector. ECB Working Paper 2897 (Corporate-/KMU-β).",
+    "Nelson, C. & Siegel, A. (1987). Parsimonious Modeling of Yield Curves. "
+    "Journal of Business (Zinsstrukturmodell).",
+    "Pesaran, M. H. & Timmermann, A. (1992). A Simple Nonparametric Test of "
+    "Predictive Performance. Journal of Business & Economic Statistics "
+    "(Richtungs-Trefferquote).",
+    "Svensson, L. (1994). Estimating and Interpreting Forward Interest "
+    "Rates: Sweden 1992–1994. NBER Working Paper 4871 "
+    "(Zinsstrukturmodell der Bundesbank-Parameter).",
+    "Tuckman, B. & Serrat, A. (2012). Fixed Income Securities, 3. Aufl. "
+    "(Modified Duration, Sovereign-Kanal).",
+    "Vasicek, O. (1991). Limiting Loan Loss Probability Distribution. KMV "
+    "Working Paper (Portfolio-Verlustverteilung).",
+    "Vasicek, O. (2002). Loan Portfolio Value. Risk Magazine, Dezember "
+    "(geschlossene Form der IRB-Formel).",
+    "ECB (2024). Financial Stability Review, Mai 2024 (Energie-/Lebens"
+    "haltungskosten-Wirkung auf Haushalte; Retail-β).",
+]:
+    bullet(b)
+h2("Datenquellen")
+for b in [
+    "Pillar-3-Berichte (EU CR6) der zehn Banken, FY2021–FY2024 — "
+    "Risikoparameter PD/LGD/EAD (je Zeile mit Seiten-/URL-Beleg).",
+    "EBA EU-wide Transparency Exercise (Vintages 2020–2025) — realisierte "
+    "CET1- und RWA-Werte, IFRS-9-Split der Staatsanleihen.",
+    "ICE Brent Crude (täglich) — Ölpreis-Faktor.",
+    "Deutsche Bundesbank — täglich geschätzte Svensson-Parameter der "
+    "Zinsstrukturkurve (10-Jahres-Zins-Faktor).",
 ]:
     bullet(b)
 

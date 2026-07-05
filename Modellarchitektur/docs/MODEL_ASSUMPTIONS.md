@@ -643,6 +643,23 @@ Punkt-Prognose.
 - Pesaran, M. H. & Timmermann, A. (1992). *A Simple Nonparametric Test
   of Predictive Performance*. Journal of Business & Economic Statistics.
 - Vasicek, O. (2002). *Loan Portfolio Value*. Risk Magazine, Dezember.
+- Vasicek, O. (1991). *Limiting Loan Loss Probability Distribution*. KMV WP.
+- Gordy, M. (2003). *A Risk-Factor Model Foundation for Ratings-Based Bank
+  Capital Rules*. Journal of Financial Intermediation.
+- Svensson, L. (1994). *Estimating and Interpreting Forward Interest Rates:
+  Sweden 1992–1994*. NBER WP 4871 (Bundesbank-Zinsstrukturparameter).
+- Nelson, C. & Siegel, A. (1987). *Parsimonious Modeling of Yield Curves*.
+  Journal of Business.
+- Brunnermeier, M. et al. (2016). *The Sovereign-Bank Diabolic Loop and
+  ESBies*. AER P&P (Marktbuch: Doom-Loop-Analyse).
+- Acharya, V., Drechsler, I. & Schnabl, P. (2014). *A Pyrrhic Victory? Bank
+  Bailouts and Sovereign Credit Risk*. Journal of Finance (Marktbuch).
+- Jiang, E., Matvos, G., Piskorski, T. & Seru, A. (2023). *Monetary
+  Tightening and U.S. Bank Fragility*. NBER WP 31048 (Marktbuch: latente
+  Bewertungsverluste).
+- EBA (2020). *ITS/2020/04 — Implementing Technical Standards on public
+  disclosures* (EU-CR6-Template).
+- Verordnung (EU) Nr. 575/2013 (CRR) — Art. 153/154, 180/181, 431–455.
 - Lo Duca, M., Moccero, D. & Parlapiano, F. (2024). *The impact of
   macroeconomic and monetary policy shocks on credit risk in the euro
   area corporate sector*. ECB Working Paper 2897.
