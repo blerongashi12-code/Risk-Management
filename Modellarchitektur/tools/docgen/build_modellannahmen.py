@@ -15,7 +15,8 @@ from docx.oxml import OxmlElement
 
 import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "backend"))
-from two_factor_stress import SENSITIVITY_MATRIX
+from two_factor_stress import SENSITIVITY_MATRIX, stress_pd, stress_lgd
+from vasicek import irb_capital_requirement
 
 FIGS = os.path.dirname(os.path.abspath(__file__)) + "/figs"
 OUT = str(pathlib.Path(__file__).resolve().parents[3] / "Abgabe-Files" / "Abgabedokumente" / "Modellannahmen.docx")
@@ -224,9 +225,16 @@ body("Kern des Modells ist die Übersetzung der beiden Schocks in "
 body("ΔPD [pp] = β_Öl · ΔBrent + β_Zins · Δr_10y      "
      "ΔLGD [pp] = γ_Öl · ΔBrent + γ_Zins · Δr_10y",
      size=10.5, color=MID)
-body("Die gestressten Werte werden begrenzt (PD: Untergrenze 0,03 %, "
-     "Obergrenze 50 %; LGD: 5 % bis 100 %), damit keine ökonomisch "
-     "unplausiblen Extremwerte entstehen.")
+body("Die gestressten Werte werden begrenzt — jede Grenze hat einen "
+     "Grund: Die **PD-Untergrenze von 0,03 %** ist der regulatorische "
+     "Basel-Floor (CRR Art. 160/163 — keine Bank darf einem lebenden "
+     "Portfolio eine geringere Ausfallwahrscheinlichkeit zuweisen). Die "
+     "**PD-Obergrenze von 50 %** dient der numerischen Stabilität: jenseits "
+     "davon wäre ein Portfolio faktisch im Ausfallstatus und die "
+     "IRB-Formel nicht mehr die richtige Linse. Die **LGD-Untergrenze von "
+     "5 %** verhindert unplausibel verlustfreie Ausfälle selbst bei bester "
+     "Besicherung; die **Obergrenze 100 %** ist definitorisch (mehr als "
+     "das Exposure kann nicht verloren gehen).")
 figure("fig2_beta.png", 14.5,
        "Abb. 2 · Die Sensitivitäts-Matrix als Bild: Jede Zelle ist eine "
        "dokumentierte Annahme — rot = Risiko steigt mit dem Schock, blau = "
@@ -269,6 +277,38 @@ body("Quellen der Kalibrierung: EBA (2024) *2025 EU-wide Stress Test — "
      "2024 (Haushalte). Die β sind als belegte, per Regler übersteuerbare "
      "Defaults ausgewiesen — Konfidenzklasse [estimate].", size=9.5,
      italic=True)
+
+h2("Durchgerechnetes Beispiel: ein Schock läuft durch das Modell")
+# Live aus der Engine gerechnet — keine handgepflegten Zahlen.
+_pd0, _lgd0 = 0.025, 0.35
+_dr, _db = 2.0, 0.30
+_pd1 = stress_pd(_pd0, _db, _dr, "corporate")
+_lgd1 = stress_lgd(_lgd0, _db, _dr, "corporate")
+_r0 = irb_capital_requirement(_pd0, _lgd0, "corporate", maturity_years=2.5)
+_r1 = irb_capital_requirement(_pd1, _lgd1, "corporate", maturity_years=2.5)
+_g = lambda v, d=2: f"{v:.{d}f}".replace(".", ",")
+body("Angenommen wird ein Corporate-Segment mit PD = 2,50 % und "
+     "LGD = 35,00 %; als Szenario tritt ein Zinsanstieg von +2,0 "
+     "Prozentpunkten bei gleichzeitig +30 % Ölpreis ein. Dann rechnet das "
+     "Modell in drei Schritten:")
+bullet("**Schritt 1 — PD-Transmission:** ΔPD = 0,20 · 2,0 + 0,30 · 0,30 = "
+       f"**+{_g((_pd1-_pd0)*100)} pp** → gestresste PD "
+       f"**{_g(_pd1*100)} %**.")
+bullet("**Schritt 2 — LGD-Transmission:** ΔLGD = 1,00 · 2,0 + 0,50 · 0,30 = "
+       f"**+{_g((_lgd1-_lgd0)*100)} pp** → gestresste LGD "
+       f"**{_g(_lgd1*100)} %**.")
+bullet("**Schritt 3 — Kapitalwirkung (IRB-Formel):** der erwartete Verlust "
+       f"steigt von {_g(_pd0*_lgd0*100, 3)} % auf {_g(_pd1*_lgd1*100, 3)} % "
+       f"des Exposures (**+{_g((_pd1*_lgd1/(_pd0*_lgd0)-1)*100, 0)} %**), "
+       "die RWA-Dichte von "
+       f"{_g(float(_r0['rwa_density'])*100, 1)} % auf "
+       f"{_g(float(_r1['rwa_density'])*100, 1)} % "
+       f"(**+{_g((float(_r1['rwa_density'])/float(_r0['rwa_density'])-1)*100, 1)} %**).")
+body("Auf Portfolioebene wiederholt sich diese Rechnung für jede Bank und "
+     "jede Klasse mit den echten Pillar-3-Parametern; die Summe der "
+     "ΔRWA- und ΔEL-Beiträge speist die CET1-Bridge (Abschnitt 4). Die "
+     "Beispielwerte sind live aus der Modell-Engine gerechnet, nicht "
+     "handgepflegt.", size=9.5, italic=True)
 
 # ================= 4 · Kapitalrechnung =================
 h1("4 · Kapitalrechnung und CET1-Bridge")
@@ -331,7 +371,7 @@ h1("6 · Annahmen-Inventar (A-01 bis A-10)")
 body("Jede Annahme trägt eine Konfidenzklasse: **[published]** = "
      "veröffentlichte Messung · **[estimate]** = belegte Schätzung · "
      "**[approximation]** = strukturelle Vereinfachung · **[assumption]** = "
-     "gesetzte Konvention.")
+     "gesetzte Konvention. Die Tabelle gibt den Überblick; darunter wird jede Annahme einzeln begründet — inklusive der verworfenen Alternative und der Wirkung einer Fehlspezifikation.")
 table(
     ["ID", "Annahme", "Festlegung im Modell", "Klasse", "Quelle/Beleg"],
     [["A-01", "PD-Quelle", "Pillar-3 EU-CR6-Sub-totals je Bank×Klasse, "
@@ -365,6 +405,116 @@ table(
       "Modellierung ohne Kreuzterm", "estimate",
       "eigene Regression, 1 242 Handelstage"]],
     [7, 17, 40, 12, 24], fontsize=8.5)
+
+h2("Die Annahmen im Detail")
+
+def annahme(aid, titel, text):
+    doc.add_paragraph(f"{aid} · {titel}", style="Heading 3")
+    body(text, size=9.5, space_after=9)
+
+annahme("A-01", "PD-Quelle: Pillar-3 EU-CR6 (31.12.2024)",
+    "**Festlegung:** Je Bank und Klasse die EAD-gewichtete Durchschnitts-PD "
+    "aus dem EU-CR6-Sub-total — die regulatorische 1-Jahres-PD nach CRR "
+    "Art. 180, inklusive des 100-%-Default-Bands. **Warum:** Es ist die "
+    "einzige öffentliche, bankindividuelle und geprüfte PD-Quelle mit "
+    "identischer Definition über alle zehn Banken. **Verworfene "
+    "Alternative:** PD-Ableitung aus EBA-Transparency-Ausfallquoten "
+    "(vermischt Bestands- und Flussgrößen, keine 1-Jahres-PD) sowie "
+    "Rating-Agentur-PDs (nicht je Bank × Klasse verfügbar). **Wirkung bei "
+    "Fehlspezifikation:** Das PD-Niveau skaliert den erwarteten Verlust "
+    "nahezu proportional, die Kapitalanforderung unterproportional — eine "
+    "Niveauverzerrung verschiebt also Ergebnisse, kippt aber keine "
+    "Richtungsaussage.")
+annahme("A-02", "LGD-Quelle: Pillar-3 EU-CR6 (31.12.2024)",
+    "**Festlegung:** EAD-gewichtete Durchschnitts-LGD aus derselben "
+    "EU-CR6-Tabelle wie A-01. **Warum:** Bankintern geschätzte A-IRB-LGD "
+    "spiegeln die tatsächliche Besicherung des Portfolios wider. "
+    "**Verworfene Alternative:** die pauschale F-IRB-Aufsichts-LGD von "
+    "45 % — sie würde besicherte Portfolien (v. a. Hypotheken) massiv "
+    "überzeichnen. **Wirkung bei Fehlspezifikation:** LGD wirkt linear auf "
+    "erwarteten Verlust und fast linear auf die Kapitalanforderung — der "
+    "direkteste Hebel unter den Parametern.")
+annahme("A-02c", "Backtest-Zeitreihe (nur Pillar-3, no-look-ahead)",
+    "**Festlegung:** Eigene Roh-Reihe über 10 Banken × FY2021–FY2024 (225 "
+    "Punkte); ein Quartal im Jahr Y nutzt ausschließlich den Stichtag "
+    "31.12.(Y−1) — den jüngsten, der damals publiziert war. **Warum:** Nur "
+    "so ist die Validierung echt out-of-sample. **Verworfene Alternative:** "
+    "den 2024-Snapshot rückwirkend anzuwenden (Look-ahead-Verzerrung) oder "
+    "zwischen Stichtagen zu interpolieren (nicht quellengestützt). "
+    "**Wirkung bei Fehlspezifikation:** Mit Look-ahead wäre jedes "
+    "Backtest-Ergebnis systematisch geschönt und wertlos.")
+annahme("A-03", "EAD: EBA Transparency, post-CCF",
+    "**Festlegung:** Exposure at Default je Klasse nach "
+    "Kreditumrechnungsfaktoren (post-CCF; EBA-Item 2520522). **Warum:** "
+    "Post-CCF ist exakt die Bezugsgröße der IRB-Formel. **Verworfene "
+    "Alternative:** Original Exposure — überzeichnet nicht gezogene "
+    "Kreditlinien. **Wirkung bei Fehlspezifikation:** EAD wirkt als "
+    "Portfoliogewicht linear auf Volumeneffekte, verzerrt aber die "
+    "Quoten-Richtung nicht.")
+annahme("A-04", "2-Faktor-Transmission (β/γ je Klasse)",
+    "**Festlegung:** Lineare Übersetzung der Schocks in ΔPD/ΔLGD über die "
+    "Matrix aus Abschnitt 3, mit begründeten Unter-/Obergrenzen. **Warum:** "
+    "Die EBA-Stresstest-Methodik sieht sektorale Sensitivitäten explizit "
+    "vor; die lineare Form ist transparent, prüfbar und per Regler "
+    "übersteuerbar. **Verworfene Alternative:** ein Ein-Faktor-Aggregat "
+    "(verliert die Sektor-Differenzierung und überzeichnete in Tests die "
+    "Magnitude) sowie bankindividuell geschätzte Ökonometrie (Datenlage "
+    "öffentlich nicht ausreichend). **Wirkung bei Fehlspezifikation:** Die "
+    "β sind der größte Unsicherheitsträger des Modells — deshalb "
+    "Konfidenzklasse [estimate] und Sichtbarkeit als eigene Matrix; ein "
+    "Fehler skaliert die Stress-Wirkung in etwa proportional.")
+annahme("A-05", "IRB-Kapitalformel (Basel III / ASRF)",
+    "**Festlegung:** Die unveränderte regulatorische Formel mit α = 99,9 %, "
+    "Basel-Asset-Korrelationen je Klasse und Laufzeit-Adjustment. "
+    "**Warum:** Nur der regulatorische Standard macht Modell-Output und "
+    "gemeldete RWA vergleichbar. **Verworfene Alternative:** interne "
+    "Portfoliomodelle (z. B. Migrationsmatrizen) — nicht gegen die "
+    "CET1-Meldung abgleichbar. **Wirkung bei Fehlspezifikation:** Die "
+    "Formel selbst ist fixiert; das Modellrisiko liegt vollständig in den "
+    "Inputs (A-01 bis A-04).")
+annahme("A-06", "Sovereign-Kanal (Duration-MtM, IFRS-9-Split)",
+    "**Festlegung:** ΔMtM = −Duration · Δr · Exposure; CET1-wirksam nur der "
+    "FVOCI/FVTPL-Anteil je Bank. **Warum:** Das folgt der "
+    "IFRS-9-Bewertungslogik — zu fortgeführten Anschaffungskosten (AC) "
+    "gehaltene Bestände berühren die CET1-Quote laufend nicht. "
+    "**Verworfene Alternative:** volle Marktbewertung aller Bestände "
+    "(überzeichnet) oder Verzicht auf den Kanal (unterschlägt das "
+    "Zinsrisiko). **Wirkung bei Fehlspezifikation:** Latente AC-Verluste "
+    "bleiben unsichtbar — eine bewusste Untererfassung, die das Cockpit "
+    "als separate Analyse ausweist (SVB-Lektion, Jiang et al. 2023).")
+annahme("A-07", "Kein Trading-Book-Kanal",
+    "**Festlegung:** Das Handelsbuch ist kein eigener Stress-Kanal. "
+    "**Warum:** Die Handelsbücher der zehn Banken sind relativ klein, und "
+    "eine belastbare öffentliche FRTB-Kalibrierung existiert nicht — ein "
+    "pauschaler Multiplikator wäre Scheingenauigkeit. **Verworfene "
+    "Alternative:** ein Kanal mit angenommenem Marktrisiko-Multiplikator "
+    "(frühere Version, entfernt). **Wirkung:** Für Banken mit größerem "
+    "Handelsbuch wird der Stress tendenziell unterschätzt — als "
+    "Scope-Grenze dokumentiert (Abschnitt 8).")
+annahme("A-08", "Universum: die 10 größten EU-IRB-Banken",
+    "**Festlegung:** Genau zehn Institute, ausgewählt nach Größe und "
+    "A-IRB-Offenlegungsqualität. **Warum:** Einheitliche, vollständige "
+    "Pillar-3-Daten schlagen eine breite, aber heterogene Abdeckung. "
+    "**Verworfene Alternative:** alle ~67 IRB-Banken der Transparency "
+    "(uneinheitliche Offenlegung, Konzern-/Tochter-Doppelzählungen). "
+    "**Wirkung:** Aussagen gelten für diese Gruppe — nicht für den "
+    "gesamten EU-Bankenmarkt.")
+annahme("A-09", "Klassen-Raster: 7 IRB-Klassen",
+    "**Festlegung:** corporate, sme_corporate, mortgage, qrre, "
+    "other_retail, bank, sovereign — das EU-CR6-Raster. **Warum:** Es ist "
+    "der kleinste gemeinsame Nenner, den alle zehn Banken identisch "
+    "offenlegen. **Verworfene Alternative:** feinere Branchenraster "
+    "(NACE) — öffentlich nicht flächendeckend verfügbar. **Wirkung:** "
+    "Heterogenität innerhalb einer Klasse wird auf den gewichteten "
+    "Durchschnitt gemittelt.")
+annahme("A-10", "Faktor-Unabhängigkeit (kein Kreuzterm)",
+    "**Festlegung:** Öl- und Zinsschock wirken additiv, ohne "
+    "Interaktionsterm. **Warum:** Empirisch sind die Faktoren nahezu "
+    "unkorreliert (ρ = +0,07 über 1 242 Handelstage). **Verworfene "
+    "Alternative:** Copula- oder Interaktionsmodelle — ohne empirischen "
+    "Träger nur zusätzliche Komplexität. **Wirkung bei Fehlspezifikation:** "
+    "Bei gleichzeitigen Extremschocks entstünde ein Effekt zweiter "
+    "Ordnung; im beobachteten Wertebereich ist er vernachlässigbar.")
 
 # ================= 7 · Validierung =================
 h1("7 · Validierung: der CET1-Walk-Forward-Backtest")
