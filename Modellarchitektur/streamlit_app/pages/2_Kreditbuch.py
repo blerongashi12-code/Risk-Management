@@ -27,7 +27,6 @@ from eba_loader import (load_eba_universe,                       # type: ignore
 from macro_factor import (                                       # type: ignore
     anchor_from_eba, factor_stats,
 )
-from vasicek import asset_correlation                            # type: ignore
 from config import KAPPA_DOWNTURN_LGD, EBA_RAW_DIR                # type: ignore
 
 st.set_page_config(page_title="Kreditbuch · Loan Book", layout="wide")
@@ -1090,10 +1089,10 @@ else:
 st.divider()
 
 # === Per-bank drilldown ==============================================
-eyebrow(f"Bank-Drilldown · {bridge_bank} · Exposure-Class-Breakdown")
+eyebrow(f"Bank-Drilldown · {bridge_bank} · Exposure-Klassen-Aufteilung")
 st.caption(
     "Detail-Ansicht für die in der Bank-Auswahl oben gewählte Bank. "
-    "Zeigt Segment-Metriken (EAD, PD, ρ, EL, UL, RWA) und EAD-"
+    "Zeigt Segment-Metriken (EAD, PD, EL, UL, RWA) und EAD-"
     "Komposition pro Exposure-Klasse."
 )
 
@@ -1102,67 +1101,41 @@ with st.expander("Was bedeuten die Segment-Namen? · Exposure-Klassen-Glossar",
                  expanded=False):
     st.markdown(
         "Basel-III IRB unterscheidet sieben Exposure-Klassen. Diese "
-        "Klassen bestimmen nicht nur die Datenaggregation, sondern auch "
-        "die regulatorische Asset-Korrelation **ρ** in der IRB-Formel. "
-        "ρ misst hier **nicht** die Korrelation zwischen Öl und Zins, "
-        "sondern wie stark Schuldner einer Klasse am gemeinsamen "
-        "systematischen Kreditrisikofaktor hängen. Je höher ρ, desto "
-        "stärker reagiert das 99,9-%-Verlustquantil und damit K/RWA auf "
-        "eine Verschlechterung der PD."
+        "Klassen bestimmen, wie die gemeldeten EAD-, PD- und LGD-Werte "
+        "aus Pillar 3 in das Kreditbuch einsortiert werden. Die "
+        "eigentliche Kapitalberechnung erfolgt anschließend einheitlich "
+        "über die Basel-IRB-Formel."
     )
     segment_glossary = pd.DataFrame([
         ("Corporate",
          "Große Nicht-Finanz-Unternehmen (typisch Umsatz > €50 M, "
-         "z.B. Siemens, Total, BASF)",
-         "12 – 24 %"),
+         "z.B. Siemens, Total, BASF)"),
         ("SME-Corporate",
          "Kleine und mittelständische Unternehmen (Umsatz < €50 M); "
-         "Basel-Adjustierung für Größe",
-         "12 – 24 % minus SME-Bonus"),
+         "Basel-Adjustierung für Größe"),
         ("Bank",
          "Forderungen gegen andere Finanzinstitute (Interbank-Loans, "
-         "Korrespondenzbanken, Depot-Forderungen)",
-         "12 – 24 %"),
+         "Korrespondenzbanken, Depot-Forderungen)"),
         ("Sovereign",
          "Forderungen gegen Staaten und Zentralbanken (im IRB-"
-         "Loan-Book; reine Staatsanleihen siehe Tab 3 Marktbuch)",
-         "12 – 24 %"),
+         "Loan-Book; reine Staatsanleihen siehe Tab 3 Marktbuch)"),
         ("Residential Mortgage",
          "Wohnimmobilien-Hypotheken an Privatpersonen — durch Immobilie "
-         "besichert",
-         "15 % (fix)"),
+         "besichert"),
         ("QRRE · Qualifying Revolving Retail",
          "Kreditkartenforderungen + revolvierende Konsumentenkredite "
-         "(Dispokredite) — qualifizieren für eigene Basel-Behandlung",
-         "4 % (fix)"),
+         "(Dispokredite) — qualifizieren für eigene Basel-Behandlung"),
         ("Other Retail",
          "Sonstige Privatkundenforderungen — Auto-Finanzierung, "
-         "Konsumentenkredite, unbesicherte Personal Loans",
-         "3 – 16 %"),
-    ], columns=["Exposure-Klasse", "Was steckt drin?", "Asset-Korrelation ρ"])
+         "Konsumentenkredite, unbesicherte Personal Loans"),
+    ], columns=["Exposure-Klasse", "Was steckt drin?"])
     st.dataframe(segment_glossary, use_container_width=True,
                  hide_index=True, height=280)
-    st.markdown(
-        '<div style="background:#F6FAFC;border:1px solid #D8E6ED;'
-        'border-left:4px solid #034B6F;padding:0.65rem 0.85rem;'
-        'margin-top:0.45rem;color:#051C2C;font-size:0.82rem;'
-        'line-height:1.5;">'
-        '<strong>Sind die Asset-Korrelationen noch gültig?</strong> Ja, '
-        'für unsere Modelllogik sind sie weiterhin die passenden '
-        'Basel-IRB-Parameter. Sie stammen aus der Basel-III/IRB-'
-        'Risikogewichtsfunktion, umgesetzt in CRR Art. 153 für Corporate, '
-        'Bank und Sovereign sowie CRR Art. 154 für Retail-Klassen. '
-        'Sie sind keine neu geschätzten Markt-Korrelationen und werden '
-        'nicht aus unserer Öl-/Zins-Zeitreihe abgeleitet. Ihr Zweck ist '
-        'ausschließlich die Übersetzung von PD/LGD/EAD in K und RWA.'
-        '</div>',
-        unsafe_allow_html=True,
-    )
     st.caption(
         "Klassen-Zuordnung pro Bank-Segment aus dem EBA Transparency "
-        "Exercise 2025 (Exposure-Class-Code in `tr_cre.csv`). ρ-Logik aus "
-        "Basel Framework CRE31 bzw. CRR Art. 153/154; im Code umgesetzt "
-        "in `backend/vasicek.py::asset_correlation`."
+        "Exercise 2025 (Exposure-Class-Code in `tr_cre.csv`). Die "
+        "Kapitalrechnung selbst erfolgt in `backend/vasicek.py` nach "
+        "Basel-IRB/CRR."
     )
 
 sel_bank = bridge_bank  # konsolidierter Filter — same selection als Bridge
@@ -1208,17 +1181,16 @@ else:
 col_a, col_b = st.columns([3, 2], gap="medium")
 
 with col_a:
-    eyebrow(f"{sel_bank} · segment metrics")
-    cols_show = ["name", "exposure_class", "ead", "pd", "rho",
+    eyebrow(f"{sel_bank} · Segment-Metriken")
+    cols_show = ["name", "exposure_class", "ead", "pd",
                  "el_eur", "ul_eur", "rwa"]
     seg_disp = drill_base[cols_show].copy()
     seg_disp["ead"]    = (seg_disp["ead"] / 1e9).round(1)
     seg_disp["pd"]     = (seg_disp["pd"] * 100).round(2).astype(str) + "%"
-    seg_disp["rho"]    = (seg_disp["rho"] * 100).round(1).astype(str) + "%"
     seg_disp["el_eur"] = (seg_disp["el_eur"] / 1e6).round(0).astype(int)
     seg_disp["ul_eur"] = (seg_disp["ul_eur"] / 1e9).round(2)
     seg_disp["rwa"]    = (seg_disp["rwa"] / 1e9).round(1)
-    seg_disp.columns = ["Segment", "Class", "EAD bn", "PD", "ρ",
+    seg_disp.columns = ["Segment", "Class", "EAD bn", "PD",
                         "EL m", "UL bn", "RWA bn"]
     st.dataframe(seg_disp, use_container_width=True, hide_index=True,
                  height=260)

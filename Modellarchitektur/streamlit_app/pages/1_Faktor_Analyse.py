@@ -260,8 +260,8 @@ if abs(rho_mult - 1.0) > 0.01:
         f'padding:0.6rem 1.0rem;border-radius:6px;margin-bottom:1.0rem;'
         f'color:#051C2C;font-size:0.88rem;">'
         f'<strong>⚠ ρ-Override aktiv:</strong> Multiplikator '
-        f'<strong>{rho_mult:.2f}×</strong> auf Basel-formelmäßige '
-        f'Asset-Korrelation. Alle PD- und Capital-Werte unten zeigen das '
+        f'<strong>{rho_mult:.2f}×</strong> auf den regulatorischen '
+        f'IRB-Klassenparameter. Alle PD- und Capital-Werte unten zeigen das '
         f'angepasste Modell ({(abs(rho_mult-1.0))*100:.0f}% {_rho_dir} '
         f'als Basel-Standard) — kein regulatorisches Ergebnis, sondern '
         f'Sensitivity-Analyse.'
@@ -347,8 +347,6 @@ with st.expander("Abkürzungsverzeichnis · Glossar der Fachbegriffe "
 | **CET1** | Common Equity Tier 1 | Hartes Kernkapital — primärer Eigenkapital-Puffer |
 | **β_oil** | Oil-Sensitivität | ΔPD/ΔLGD-Reaktion pro Klasse auf Brent-Schock (NEU im 2-Faktor-Modell) |
 | **β_rate** | Rate-Sensitivität | ΔPD/ΔLGD-Reaktion pro Klasse auf Δr_10y-Schock (z.B. negativ für Bank-Klasse = NIM-Effekt) |
-| **M** | Systemic Factor (legacy) | Vorgänger-Methodik: Vasicek-Systemfaktor — durch 2-Faktor-Modell ersetzt, hier nur Referenz-View in Stage 2-5 |
-| **ρ (rho)** | Asset Correlation | Vermögens-Korrelation pro Exposure-Class (Basel IRB-Formel) |
 | **κ (kappa)** | Downturn-LGD Multiplier | Stress-Faktor für LGD-Uplift (κ = 0.30 EBA 2023) |
 | **IRB** | Internal Ratings Based | Bankinternes Rating-Verfahren (Basel III, Foundation oder Advanced) |
 | **ASRF** | Asymptotic Single Risk Factor | Vasicek-2002-Modell · 1-Faktor-Approximation des Kreditportfolios |
@@ -1061,8 +1059,8 @@ st.markdown(
     'Eingangswerte wechseln: (1) Baseline = PD &amp; LGD wie gemeldet; '
     '(2) + PD-Stress = nur die gestresste PD aus Stufe 2, LGD noch '
     'unverändert; (3) + LGD-Stress = zusätzlich die gestresste LGD aus '
-    'Stufe 3. Asset-Korrelation ρ und Maturity-Adjustment bleiben dabei '
-    'konstant (klassenabhängig).'
+    'Stufe 3. Die regulatorischen IRB-Formelparameter bleiben dabei '
+    'konstant, damit nur die Stresswirkung aus PD und LGD sichtbar wird.'
     '</div>',
     unsafe_allow_html=True,
 )
@@ -1167,7 +1165,7 @@ if _is_stressed:
             r"{\sqrt{1-\rho}}\right) - \text{PD}\right] \cdot \text{MA}"
         )
         st.markdown(
-            "mit Asset-Korrelation ρ (klassenabhängig) und "
+            "mit regulatorischem Klassenparameter ρ und "
             "Maturity-Adjustment MA. K ist der Kapitalbedarf je Euro "
             "Exposure; multipliziert mit EAD ergibt sich der absolute "
             "Kapitalbedarf.\n\n"

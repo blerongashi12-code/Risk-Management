@@ -452,7 +452,7 @@ RWA = K · 12.5 · EAD
 
 mit:
 - α = 0.999 (Konfidenz, Basel III)
-- ρ = Asset-Korrelation per Klasse (CRR Art. 153/154)
+- ρ = regulatorischer IRB-Klassenparameter nach CRR Art. 153/154
 - MA = Maturity-Adjustment für effektive Laufzeit
 
 **Wichtige Klarstellung:** Wir nutzen weiterhin die Vasicek/ASRF-

@@ -1130,7 +1130,8 @@ reines Mengenwachstum bereinigt (Proxy: Wachstum des Nicht-Kredit-RWA), um die
    Ausfall-/NPL-Raten je Segment (bank-intern, nicht offengelegt; EBA-NPE-Panel
    erst ab 2024Q3). Daher Validierung über Treiber-Timing + strukturelle
    Soundness statt Punktprognose.
-4. `mortgage_sme` (nur ING) nutzt die Retail-Mortgage-Korrelation ρ = 0.15.
+4. `mortgage_sme` (nur ING) wird methodisch der Residential-Mortgage-Klasse
+   zugeordnet, weil die Exposures wohnimmobilienbesichert sind.
 
 **Quellen.** Pillar-3-Inputs: EBA-ITS/2020/04 (EU CR6), CRR Art. 431-455
 (inkl. Art. 180 zur PD-Schätzung/TTC). 2-Faktor-β: EBA (2024) *2025 EU-wide

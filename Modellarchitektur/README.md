@@ -189,14 +189,14 @@ RWA = K · 12,5 · EAD
 
 Wobei:
 - **N(·)** = Standard-Normal-CDF, **N⁻¹(·)** = ihre Inverse
-- **ρ** = Asset-Korrelation, abhängig von PD (Basel-Funktion)
+- **ρ** = regulatorischer IRB-Klassenparameter nach CRR Art. 153/154
 - **b(PD)** = Maturity-Adjustment-Slope-Faktor
 - **M** = Effective Maturity in Jahren (im Modell auf Klassen-spezifischen Wert gesetzt)
 - **0,999** = aufsichtsrechtliches Konfidenz-Niveau (99,9 %-Verlust-Quantil)
 - **12,5** = 1 / 8 % Mindest-Kapitalquote (Basel-Standardumrechnung)
 
 Für **Mortgage / Retail** entfallen Maturity-Adjustment (M-Term verschwindet),
-und die Asset-Korrelation ist fest:
+und ρ ist gemäß CRR fest bzw. klassenspezifisch vorgegeben:
 - Mortgage: ρ = 0,15
 - QRRE: ρ = 0,04
 - Other Retail: ρ-Funktion klassen-spezifisch (CRR Art. 154 (3))
@@ -553,7 +553,7 @@ Die geänderten Werte wirken sofort und global auf alle Charts.
 | A-02 | LGD pro Bank × Klasse | analog zu A-01 — 69/69 IRB-fähige Kombinationen direkt aus derselben EU-CR6-Zeile wie die PD; Santander Sovereign nicht anwendbar | CRR Art. 181 |
 | A-03 | EAD pro Bank × Klasse | EBA Transparency 2025, Item 2520522, post-CCF | EBA Implementing Technical Standards ITS 680/2014 |
 | A-04 | β-/γ-Sensitivitäten | siehe Abschnitt 6 | EBA ST 2025 + akademische Literatur |
-| A-05 | Asset-Korrelation ρ | Basel-Funktion gemäß CRR Art. 153 (Corporate/Bank/Sovereign), feste Werte für Mortgage (0,15) und QRRE (0,04) | BCBS d424, Art. 153–154 |
+| A-05 | IRB-Kapitalformel-Parameter | Regulatorische Basel/CRR-Parameter innerhalb der IRB-K-Formel, inkl. ρ nach CRR Art. 153/154 und Laufzeit-Adjustment | BCBS d424, Art. 153–154 |
 | A-06 | Konfidenz-Niveau IRB-Formel | 99,9 % | BCBS d424, Art. 153 (Pillar-1-Standard) |
 | A-07 | Modified Duration Sovereign | gewichteter Bucket-Mittelpunkt: 0,1 / 0,6 / 1,5 / 2,5 / 4,0 / 7,5 / 15,0 Jahre | Tuckman/Serrat (2012) §4.2; EBA-Bucket-Definition Items 2520810ff. |
 | A-08 | IFRS-9-Mix Sovereign | **keine Annahme — bank-individuell gemeldete Daten**: Split pro Bank × Land × Laufzeit aus EBA Transparency 2025, `tr_sov.csv` Items 2520812 (HfT) / 2520813 (FVTPL) / 2520814 (FVOCI) / 2520815 (AC). CET1-wirksam nur HfT+FVTPL+FVOCI; duration-gewichtet ≈ 51 % im 10-Banken-Mittel (Juni 2025). Frühere Stylized-Fact-Annahme 60/40 ersetzt | EBA Transparency Exercise 2025 (Sovereign-Template); IFRS 9 (IASB 2014); Plausibilitäts-Querprüfung: EBA "Implementation of IFRS 9 by EU Banks" Reports (50–65 % Marktwert-Anteil seit 2020) |

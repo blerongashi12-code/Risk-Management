@@ -353,8 +353,8 @@ body("Die gestressten PD/LGD laufen durch die **regulatorische "
      "bewusst der aufsichtliche Standard, keine Eigenkonstruktion:")
 body("K = [ LGD · N( (N⁻¹(PD) + √ρ · N⁻¹(0,999)) / √(1−ρ) ) − PD · LGD ] · MA"
      "      →      RWA = K · 12,5 · EAD", size=10, color=MID)
-body("Dabei ist ρ die Basel-Asset-Korrelation je Klasse (Corporates "
-     "PD-abhängig 12–24 %, Hypotheken 15 %, QRRE 4 %), MA das "
+body("Dabei ist ρ der regulatorische IRB-Klassenparameter nach CRR "
+     "Art. 153/154, MA das "
      "Laufzeit-Adjustment und N die Standardnormalverteilung. Die "
      "theoretische Fundierung des ASRF-Rahmens liefern Vasicek (1991, "
      "2002) und Gordy (2003). Der **Sovereign-Kanal** bewertet parallel "
@@ -427,7 +427,7 @@ table(
       "PD-Floor 3 bp, Cap 50 %; LGD-Floor 5 %", "estimate",
       "EBA 2025 §2.4.2; ECB WP 2897/3112; FSR 5/2024"],
      ["A-05", "Kapitalformel", "Basel-III-IRB (Vasicek/ASRF), α = 99,9 %, "
-      "Basel-ρ je Klasse, Laufzeit-Adjustment", "published",
+      "regulatorische Klassenparameter, Laufzeit-Adjustment", "published",
       "BCBS 2017 §272–284; CRR Art. 153/154"],
      ["A-06", "Sovereign-Kanal", "ΔMtM = −Duration·Δr·Exposure; CET1-wirksam "
       "nur FVOCI/FVTPL-Anteil", "approximation",
@@ -506,7 +506,7 @@ annahme("A-04", "2-Faktor-Transmission (β/γ je Klasse)",
     "Fehler skaliert die Stress-Wirkung in etwa proportional.")
 annahme("A-05", "IRB-Kapitalformel (Basel III / ASRF)",
     "**Festlegung:** Die unveränderte regulatorische Formel mit α = 99,9 %, "
-    "Basel-Asset-Korrelationen je Klasse und Laufzeit-Adjustment. "
+    "CRR-Klassenparametern und Laufzeit-Adjustment. "
     "**Warum:** Nur der regulatorische Standard macht Modell-Output und "
     "gemeldete RWA vergleichbar. **Verworfene Alternative:** interne "
     "Portfoliomodelle (z. B. Migrationsmatrizen) — nicht gegen die "
@@ -631,7 +631,7 @@ body("Vollständige Liste aller im Modell verwendeten Quellen — gegliedert "
 h2("Regulatorische Quellen")
 for b in [
     "BCBS (2017). Basel III: Finalising post-crisis reforms. Basel Committee "
-    "on Banking Supervision, §272–284 (IRB-Kapitalformel, Asset-Korrelationen).",
+    "on Banking Supervision, §272–284 (IRB-Kapitalformel).",
     "Board of Governors / OCC (2011). SR 11-7: Supervisory Guidance on Model "
     "Risk Management (Outcomes-Analysis des Backtests).",
     "EBA (2020). ITS/2020/04 — Implementing Technical Standards on public "
