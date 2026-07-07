@@ -446,6 +446,8 @@ als transparenten Sensitivitätstest.
 ASRF (Asymptotic Single Risk Factor, Vasicek 2002 / BCBS 2017):
 
 ```
+Öl-/Zinsschock → PD_stress, LGD_stress → Basel-IRB-K-Formel → RWA → CET1
+
 K = LGD · [N((N⁻¹(PD) + √ρ · N⁻¹(α)) / √(1−ρ)) − PD] · MA(M_eff)
 RWA = K · 12.5 · EAD
 ```
@@ -454,6 +456,15 @@ mit:
 - α = 0.999 (Konfidenz, Basel III)
 - ρ = regulatorischer IRB-Klassenparameter nach CRR Art. 153/154
 - MA = Maturity-Adjustment für effektive Laufzeit
+
+**Prozessuale Einordnung von ρ:** ρ ist **kein zusätzlicher Modellschritt**
+und kein von uns geschätzter Parameter. Unser Modell verändert PD und LGD über
+die 2-Faktor-Stress-Transmission (A-04). Erst danach wird die regulatorische
+IRB-Kapitalformel angewendet. Innerhalb dieser Formel ist ρ der von
+Basel/CRR vorgegebene Klassenparameter, der festlegt, wie die jeweilige
+Exposure-Klasse in das 99,9%-Verlustquantil übersetzt wird. Wir treffen hier
+also **keine eigene Annahme** und kalibrieren ρ nicht aus der Öl-/Zins-
+Zeitreihe; die Werte folgen direkt aus CRR Art. 153/154.
 
 **Wichtige Klarstellung:** Wir nutzen weiterhin die Vasicek/ASRF-
 IRB-Capital-Formel, weil sie der **regulatorische Standard** ist

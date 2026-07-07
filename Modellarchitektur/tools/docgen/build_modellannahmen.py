@@ -351,6 +351,8 @@ h1("4 · Kapitalrechnung und CET1-Bridge")
 body("Die gestressten PD/LGD laufen durch die **regulatorische "
      "Basel-III-IRB-Kapitalformel** (Vasicek/ASRF; BCBS 2017, §272–284) — "
      "bewusst der aufsichtliche Standard, keine Eigenkonstruktion:")
+body("Öl-/Zinsschock → PD_stress, LGD_stress → Basel-IRB-K-Formel → RWA → CET1",
+     size=10, color=MID)
 body("K = [ LGD · N( (N⁻¹(PD) + √ρ · N⁻¹(0,999)) / √(1−ρ) ) − PD · LGD ] · MA"
      "      →      RWA = K · 12,5 · EAD", size=10, color=MID)
 body("Dabei ist ρ der regulatorische IRB-Klassenparameter nach CRR "
@@ -507,6 +509,10 @@ annahme("A-04", "2-Faktor-Transmission (β/γ je Klasse)",
 annahme("A-05", "IRB-Kapitalformel (Basel III / ASRF)",
     "**Festlegung:** Die unveränderte regulatorische Formel mit α = 99,9 %, "
     "CRR-Klassenparametern und Laufzeit-Adjustment. "
+    "Prozessual: Öl-/Zinsschock → PD_stress/LGD_stress → Basel-IRB-K-Formel "
+    "→ RWA → CET1. Der Parameter ρ ist dabei kein eigener Modellschritt und "
+    "keine von uns geschätzte Annahme, sondern der durch CRR Art. 153/154 "
+    "vorgegebene Klassenparameter innerhalb der Formel. "
     "**Warum:** Nur der regulatorische Standard macht Modell-Output und "
     "gemeldete RWA vergleichbar. **Verworfene Alternative:** interne "
     "Portfoliomodelle (z. B. Migrationsmatrizen) — nicht gegen die "
