@@ -294,21 +294,21 @@ Der Loader (`backend/eba_pd_loader.py`) enthält einen Test
 `_test_vintage_consistency`, der bei jeder Code-Änderung erzwingt, dass
 alle 70 CSV-Zeilen denselben `vintage_date` haben.
 
-**Annahme für den 5-Jahres-Backtest-Horizont (2020–2024).** Für die
-Walk-Forward-Backtest-Periode unterstellen wir, dass die 31.12.2024-PDs
-auch für historische Quartale als Baseline gültig sind. Begründung:
-A-IRB-PDs sind **Through-the-Cycle** (TTC) gemäß CRR Art. 180 Abs. 2 —
-sie werden bewusst über ≥ 5 Jahre historischer Default-Daten geglättet
-und bewegen sich typischerweise nur ±0,1–0,3 pp quartalweise. Die
-echte Macro-Dynamik (Brent, Δr_10y) wird in dem Backtest über die zwei
-Faktoren modelliert, **nicht über die Baseline-PDs**. Ein synthetisches
-historisches PD-Time-Series wäre dieselbe TTC-Glättung wie heute und
-würde nichts hinzufügen — die Information sitzt in den β-Sensitivitäten
-und Macro-Returns, nicht im PD-Level.
+**Backtest-Horizont FY2021–FY2024.** Der Walk-Forward-Backtest nutzt nicht
+mehr den 31.12.2024-Snapshot als Proxy für historische Jahre. Stattdessen
+verwendet er die eigene Rohreihe `data/pillar3_backtest_pdlgd.csv`: je Bank,
+IRB-Klasse und Stichtag werden PD, LGD und EAD aus derselben historischen
+EU-CR6-Pillar-3-Vintage eingefroren. Damit gilt no-look-ahead: Für ein
+Stressjahr Y wird der veröffentlichte Datenstand 31.12.(Y-1) genutzt.
 
-Diese Annahme deckt sich mit der Behandlung in EBA-Stress-Test-Backtests,
-die ebenfalls eine fixe Baseline gegen historische Macro-Realisationen
-testen.
+**Datenstand Juli 2026:** 255 quellenbelegte EU-CR6-Zeilen, davon 253
+modellfähig (`include_in_backtest = 1`). Zwei quellenbelegte Sonderfälle
+bleiben für Audit/Coverage sichtbar, werden aber nicht in die Modellrechnung
+eingespeist: SocGen Sovereign 2022 (gedruckte Null-Platzhalter für PD/LGD)
+und Crédit Agricole SME 2021 (echter A-IRB-Perimeterbruch). Die einzige
+verbleibende Quellgrenze ist Crédit Mutuel Corporate 2021, weil keine zur
+Serienkonvention passende F-IRB-PD/LGD-Zeile veröffentlicht ist. Es werden
+keine Werte aus RWA oder Nachbarjahren abgeleitet.
 
 **Status (Stand Mai 2026):** **10 von 10 Banken** sind aus dem
 Pillar-3-Report für **31.12.2024** extrahiert und Cell-by-Cell verifiziert
@@ -549,7 +549,7 @@ Die geänderten Werte wirken sofort und global auf alle Charts.
 |---|---|---|---|
 | A-01 | PD pro Bank × Klasse | **bank-spezifisch** aus Pillar-3 EU-CR6-Subtotals: 69/69 IRB-fähige Bank-Klassen direkt publiziert; Santander Sovereign ist Standardansatz und aus dem IRB-Kanal ausgeschlossen | CRR Art. 180 + EBA ITS on Disclosure ITS/2020/04 |
 | A-01b | **Einheitlicher Stichtag aller PDs/LGDs** | **31.12.2024** für alle 70 CSV-Zeilen — Loader-Test `_test_vintage_consistency` erzwingt diese Konsistenz | EBA Stress Test 2025 Methodology Note; BCBS d155 |
-| A-01c | **PD-Baseline für 5-Jahres-Backtest 2020–2024** | 31.12.2024-PDs gelten als Baseline-Proxy für alle historischen Quartale — Macro-Dynamik (Brent, Δr) wird über die zwei Faktoren modelliert, nicht über das PD-Level | CRR Art. 180 Abs. 2 (TTC-Glättung über ≥ 5 Jahre Default-Daten → A-IRB-PDs sind quartalweise quasi-stabil mit ±0,1–0,3 pp Drift); analog zur EBA-Stress-Test-Backtest-Methodik |
+| A-01c | **PD/LGD/EAD-Rohreihe für Walk-Forward-Backtest FY2021–FY2024** | `data/pillar3_backtest_pdlgd.csv`: 255 quellenbelegte EU-CR6-Zeilen, davon 253 modellfähig (`include_in_backtest = 1`); no-look-ahead über 31.12.(Y-1)-Vintage je Stressjahr Y | Pillar-3 EU-CR6 je Bank und Jahr; keine Ableitung aus RWA/Nachbarjahren; Sonderfälle per `include_in_backtest = 0` dokumentiert |
 | A-02 | LGD pro Bank × Klasse | analog zu A-01 — 69/69 IRB-fähige Kombinationen direkt aus derselben EU-CR6-Zeile wie die PD; Santander Sovereign nicht anwendbar | CRR Art. 181 |
 | A-03 | EAD pro Bank × Klasse | EBA Transparency 2025, Item 2520522, post-CCF | EBA Implementing Technical Standards ITS 680/2014 |
 | A-04 | β-/γ-Sensitivitäten | siehe Abschnitt 6 | EBA ST 2025 + akademische Literatur |

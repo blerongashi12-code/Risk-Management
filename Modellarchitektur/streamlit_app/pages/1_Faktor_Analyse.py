@@ -26,7 +26,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from components.theme import (tab_breadcrumb, apply_theme, hero, eyebrow, insight, footer,
+from components.theme import (tab_breadcrumb, apply_theme, tab_header, eyebrow, insight, footer,
                               COLORS, PALETTE_DISCRETE)
 from components.sidebar import render_sidebar
 from components.data_loader import load_data_layer
@@ -48,20 +48,20 @@ st.set_page_config(page_title="Faktor-Analyse & Transmission",
 apply_theme()
 config = render_sidebar()
 
-hero(
+tab_header(
     "Faktor-Analyse & Transmission",
-    eyebrow="Tab 1 · empirische Faktor-Validierung + sequentielle "
-            "Stress-Bridge",
-    deck="Zwei Bausteine auf einer Seite. Oben: die <strong>empirische "
-         "Korrelations-Analyse</strong> (5 Jahre tägliche Daten) — "
-         "sie belegt, dass Brent und der 10-Jahres-Zins zwei "
-         "unabhängige Risiko-Faktoren sind und deshalb nicht zu einem "
-         "Einzelfaktor aggregiert werden dürfen. Unten: die "
-         "<strong>sequentielle Stress-Bridge</strong> ΔBrent + Δr_10y → "
-         "ΔPD → ΔLGD → IRB-Capital → CET1, durchgerechnet auf dem "
-         "Top-10-EU-IRB-Universe. Datenbasis: bank-spezifische Pillar-3-"
-         "EU-CR6-Disclosures (10/10 Banken Pillar-3-verifiziert) am "
-         "einheitlichen Stichtag 31.12.2024.",
+    eyebrow="Tab 1 · empirische Faktor-Validierung · Stress-Bridge",
+    deck="Dieser Tab belegt die beiden Markt-Treiber des Modells und zeigt "
+         "die sequentielle Transmission des aktiven Szenarios: ΔBrent und "
+         "Δr_10y laufen getrennt in ΔPD, ΔLGD, IRB-Capital und CET1. "
+         "Die Datenbasis sind bank-spezifische Pillar-3-EU-CR6-Disclosures "
+         "am einheitlichen Stichtag 31.12.2024.",
+    tags=[
+        "Brent + 10J-Zins",
+        "5 Jahre Tagesdaten",
+        ("β/γ Stress-Transmission", "red"),
+        ("CET1 Bridge", "neutral"),
+    ],
 )
 
 tab_breadcrumb(1)
@@ -233,12 +233,12 @@ st.markdown(
     f'Forward-Stress simuliert wird. Vintage-Mix wäre methodisch '
     f'unzulässig.<br>'
     f'<span style="color:#6E6E6E;font-size:0.84rem;">'
-    f'<strong>Backtest-Annahme (2020–2024):</strong> Die 31.12.2024-PDs '
-    f'gelten als Baseline-Proxy für alle historischen Quartale. '
-    f'A-IRB-PDs sind <em>Through-the-Cycle</em> (CRR Art. 180) — '
-    f'glättet sich auf ±0,1–0,3 pp Quartalsdrift. Die Macro-Dynamik '
-    f'des Backtests sitzt in den Brent + Δr-Zeitreihen + β-'
-    f'Sensitivitäten, nicht im PD-Level.</span></td></tr>'
+    f'<strong>Backtest-Zeitreihe (2021–2024):</strong> Für die Validierung '
+    f'wird nicht der 2024-Snapshot rückwirkend verwendet. Stattdessen nutzt '
+    f'der Walk-Forward die historische Pillar-3-Rohreihe '
+    f'<code>pillar3_backtest_pdlgd.csv</code>: 255 quellenbelegte EU-CR6-'
+    f'Zeilen, davon 253 modellfähig. Je Quartal im Jahr Y wird der damals '
+    f'verfügbare Stichtag 31.12.(Y−1) eingefroren — kein Look-ahead.</span></td></tr>'
 
     # --- Zeile 6: Aktuelle Aggregation ---
     f'<tr><td style="padding:0.3rem 0.6rem 0.3rem 0;color:#6E6E6E;'

@@ -130,11 +130,15 @@ unter den F-IRB-Standardwerten von 45 %.
 Portfolio an jedem historischen Stichtag T0 mit den *damals gültigen*
 PD/LGD eingefroren werden — **kein Look-ahead** aus dem 2024-Snapshot.
 Dafür existiert eine eigene **Roh-Reihe `data/pillar3_backtest_pdlgd.csv`**:
-**10 Banken × FY2021–FY2024, 252 Datenpunkte**, je Zeile
+**10 Banken × FY2021–FY2024, 255 quellenbelegte Datenpunkte**, je Zeile
 `LEI × vasicek_class × vintage_date` mit **PD, LGD und EAD aus derselben
 EU-CR6-Vintage**. Das Live-Modell nutzt weiterhin den kuratierten
 31.12.2024-Snapshot (`data/pillar3_bank_pd_lgd.csv`) — beide Reihen sind
 bewusst getrennt (kuratierte Werte ≠ rohe Sub-totals bei einigen Banken).
+Von den 255 quellenbelegten Zeilen sind **253 modellfähig**
+(`include_in_backtest = 1`). Zwei Sonderfälle bleiben für Audit und Abdeckung
+sichtbar, werden aber wegen Quellen-/Perimeterproblemen nicht in die
+Modellrechnung eingespeist (`include_in_backtest = 0`).
 
 **Harte Quellen-Vorgabe:** Diese historischen PD/LGD stammen **ausschließlich
 aus den Pillar-3-EU-CR6-Tabellen** der jeweiligen Bank — identische Logik wie
@@ -211,11 +215,15 @@ existiert erst seit der CRR2-Offenlegungs-ITS (Stichtage ab ~Mitte 2021).
 Saubere, konsistente Reihen daher für **FY2021–FY2024**; FY2020 (Alt-Template)
 ist bewusst ausgeklammert.
 
-**Status (abgeschlossen):** Alle **10 Banken** sind extrahiert — **252
-Datenpunkte, 98 % Abdeckung relativ zum bank-eigenen Meldeumfang** (252 von
-256 gemeldeten Bank×Jahr×Klasse-Zellen; strukturell nicht geführte Klassen —
+**Status (abgeschlossen):** Alle **10 Banken** sind extrahiert — **255
+quellenbelegte Datenpunkte, 99,6 % Abdeckung relativ zum bank-eigenen
+Meldeumfang** (255 von 256 gemeldeten Bank×Jahr×Klasse-Zellen; strukturell
+nicht geführte Klassen —
 z. B. kein IRB-Sovereign/QRRE bei einzelnen Häusern — zählen nicht als
-Lücke). Der Lückenschluss-Sweep (Juli 2026) hat 27 zuvor offene Zellen über
+Lücke). Davon sind **253 Zeilen modellfähig**; zwei quellenbelegte
+Sonderfälle bleiben per `include_in_backtest = 0` ausschließlich als
+Audit-/Coverage-Zeilen sichtbar. Der Lückenschluss-Sweep (Juli 2026) hat die
+zuvor offenen Zellen über
 zwei Wege geschlossen: (a) **Vorjahres-Vergleichsspalten** der
 Folgejahres-Berichte (z. B. BNP-URD 2022 liefert 31.12.2021 mit
 Dezimal-PDs; BPCE-2023-Bericht bestätigt die 2022-Werte doppelt) und
@@ -223,12 +231,18 @@ Dezimal-PDs; BPCE-2023-Bericht bestätigt die 2022-Werte doppelt) und
 verifizierte Nachbarwerte identifiziert, die fehlende Klasse aus demselben
 Block gelesen). Jede Zelle ist wort-wörtlich mit Seitenbeleg erfasst,
 dichte-geprüft (RWA/EAD vs. gedruckte Density ≤ 1 pp) und
-EAD-kontinuitäts-geprüft. Die **4 verbleibenden Zellen** sind endgültige
-**Quellgrenzen**: SocGen Sovereign 2022 (PD/LGD als wörtliche
-„0"-Platzhalter gedruckt, in zwei Publikationen identisch), Crédit Mutuel
-Corporate+SME 2021 (kombinierte NI-Tabelle bricht die A-/F-IRB-Konvention
-der Serie) und Crédit Agricole SME 2021 (echter A-IRB-Perimeterbruch).
-Sie werden **nicht** mit abgeleiteten Werten gefüllt. Detail-Protokoll:
+EAD-kontinuitäts-geprüft.
+
+**Sonderfälle ohne stille Modellwirkung:** SocGen Sovereign 2022 ist als
+EU-CR6-Zeile gedruckt, aber PD/LGD stehen nur als wörtliche
+„0"-Platzhalter; Crédit Agricole SME 2021 ist gedruckt, aber wegen eines
+echten A-IRB-Perimeterbruchs gegenüber 2022+ nicht vergleichbar. Beide
+Zeilen stehen in der Rohreihe mit `quality_flag =
+source_verified_model_excluded` und `include_in_backtest = 0`; es wird
+keine PD/LGD aus RWA oder Nachbarjahren abgeleitet. Die einzige verbleibende
+offene **Quellgrenze** ist Crédit Mutuel Corporate 2021: Der Report enthält
+keine zur 2022–2024-Serienkonvention passende F-IRB-PD/LGD-Zeile, daher wird
+kein Wert erfunden. Detail-Protokoll:
 `tools/pillar3_backfill/STATUS.md` + `VERIFICATION_REPORT.json`
 (adversariale Multi-Agenten-Quellprüfung).
 

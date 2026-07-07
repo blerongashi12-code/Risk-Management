@@ -31,7 +31,7 @@ import streamlit as st
 
 from datetime import datetime, timedelta
 
-from components.theme import (tab_breadcrumb, apply_theme, hero, eyebrow, insight, footer,
+from components.theme import (tab_breadcrumb, apply_theme, tab_header, eyebrow, insight, footer,
                               COLORS)
 from components.sidebar import render_sidebar
 from components.data_loader import load_data_layer
@@ -67,18 +67,22 @@ st.set_page_config(page_title="Validierung", layout="wide")
 apply_theme()
 render_sidebar()
 
-hero(
-    "Validierung",
-    eyebrow="Tab 5 · Pillar-3-Walk-Forward-Backtest · CET1-Kern-Test",
-    deck="Walk-Forward-Backtest auf der vollständigen Pillar-3-EU-CR6-PD/LGD-"
-         "Zeitreihe (10 Banken · 2021-2024): das Modell wird an jedem "
-         "historischen Stichtag mit den damals bekannten Risikoparametern "
-         "eingefroren (kein Look-ahead) und in drei Ebenen gegen die "
-         "realisierte Entwicklung geprüft — Zielgröße ist die CET1-Quote. "
-         "Outcomes-Analysis nach SR 11-7, Governance nach EBA GL 14. "
-         "Annahmen & Methodik vollständig dokumentiert in "
-         "Abgabe-Files/Abgabedokumente/Modellannahmen.docx "
-         "(Quelle: docs/MODEL_ASSUMPTIONS.md).",
+tab_header(
+    "Validierung: Walk-Forward-Backtest und Modellgrenzen",
+    eyebrow="Tab 5 · Validierung · Pillar-3-Walk-Forward",
+    deck="Dieser Tab prüft das Modell ohne Blick in die Zukunft: pro Jahr wird "
+         "das Bankportfolio mit den damals verfügbaren Pillar-3-PD/LGD/EAD "
+         "eingefroren, der real eingetretene Öl-/Zins-Schock eingespeist und "
+         "die modellierte CET1-Quote mit der später gemeldeten Realität "
+         "verglichen. Detailannahmen und Quellen stehen in "
+         "<strong>Abgabe-Files/Abgabedokumente/Modellannahmen.docx</strong> "
+         "bzw. <code>docs/MODEL_ASSUMPTIONS.md</code>.",
+    tags=[
+        "255 EU-CR6-Quellenzeilen",
+        "253 modellfähige Parameter",
+        ("No-look-ahead", "red"),
+        ("CET1-Kern-Test", "neutral"),
+    ],
 )
 
 
@@ -91,64 +95,36 @@ tab_bt = st.container()
 
 with tab_bt:
     # ====================================================================
-    #  Intro · Was macht dieser Backtest? (Klartext + ehrliche Rahmung)
+    #  Intro · kompakter Prozess- und Leserahmen
     # ====================================================================
     st.markdown(
-        '<div style="background:#FFFFFF;border:1px solid #E6E6E6;'
-        'border-left:4px solid #034B6F;padding:0.9rem 1.1rem;'
-        'border-radius:6px;margin:0.4rem 0 1rem 0;color:#051C2C;'
-        'font-size:0.9rem;line-height:1.7;">'
-        '<strong>Was macht dieser Backtest — in einem Satz?</strong> '
-        'Er stellt das Modell zurück in die Vergangenheit, gibt ihm nur das '
-        'damalige Wissen und fragt: <em>„Hätte es sich richtig verhalten?"</em>'
-        '<br><br>'
-        '<strong>Der Ablauf in vier Schritten.</strong><br>'
-        '① <u>Zurückversetzen (T0).</u> Wir stellen uns an einen vergangenen '
-        'Stichtag und geben dem Modell nur, was es damals wusste — die PD, LGD '
-        'und EAD aus dem Pillar-3-Report des Vorjahres '
-        '(<em>no-look-ahead</em>: Quartal in Jahr Y → Stichtag 31.12.(Y−1)).'
-        '<br>'
-        '② <u>Portfolio einfrieren &amp; Schock anwenden.</u> Das Bankportfolio '
-        'wird zu T0 fixiert; dann lassen wir das <strong>2-Faktor-Modell</strong> '
-        '(ΔBrent <em>und</em> Δr₁₀<sub>J</sub> getrennt, sektor-differenzierte '
-        'Sensitivitäten β — identisch zum Live-Cockpit) die Wirkung auf die '
-        '<strong>CET1-Quote</strong> berechnen (RWA steigt, Kapital sinkt durch '
-        'höhere Verluste).<br>'
-        '③ <u>Mit der Realität vergleichen.</u> Gegenüber steht die '
-        '<em>tatsächlich gemeldete CET1-Quote</em> aus dem EBA-Transparency-Panel '
-        '— wie nah war das Modell dran?<br>'
-        '④ <u>Vorwärts laufen.</u> Das rollt über alle Banken &amp; Quartale '
-        '(2022-2025) und ergibt viele Prognose/Ist-Paare.<br><br>'
-        '<strong>Wichtige Einordnung für die Lesart.</strong> Die <strong>Zielgröße '
-        'des Modells ist die CET1-Quote unter Stress</strong> — die Solvenz-'
-        'Kennzahl der Bank, falls ein Schock einträte. Der Kern-Backtest (Ebene 3) '
-        'speist daher die <em>real eingetretenen</em> Risikofaktoren ein und prüft, '
-        'wie nah die prognostizierte CET1-Quote an der <em>tatsächlich gemeldeten</em> '
-        'liegt. Das Modell ist bewusst eine <strong>konservative Abwärts-Sicht</strong> '
-        '(es rechnet Gewinne/Zinsüberschuss nicht gegen) — es soll unter Stress '
-        'nie zu optimistisch sein.'
-        '</div>',
-        unsafe_allow_html=True,
-    )
-
-    st.markdown(
-        '<div style="background:#EAF2F8;border:1px solid #C9DAE8;'
-        'border-left:4px solid #034B6F;padding:0.95rem 1.15rem;border-radius:6px;'
-        'margin:0.1rem 0 1rem 0;color:#051C2C;font-size:0.92rem;line-height:1.75;">'
-        '<strong>Die Kern-Idee — zeitlich versetzt, Jahr für Jahr.</strong> Wir '
-        'verfolgen dieselbe Risiko-Zeitreihe (PD/LGD) auf <strong>zwei Wegen</strong> '
-        'und legen sie übereinander:<br>'
-        '🔴 <strong>Realität</strong> — wie haben sich die <em>tatsächlich '
-        'gemeldeten</em> PD/LGD über die Jahre entwickelt?<br>'
-        '🔵 <strong>Modell</strong> — wie hätten sie sich entwickelt, wenn wir die '
-        '<em>real eingetretenen</em> Zins- und Ölpreis-Bewegungen durch unser '
-        'Modell laufen lassen?<br>'
-        '<strong>Der entscheidende Punkt:</strong> jeder Schritt startet mit den '
-        'PD/LGD/EAD <em>des jeweiligen (Vor-)Jahres</em> — kein Blick in die '
-        'Zukunft. Das Modell sagt also immer nur <strong>ein Jahr voraus</strong> '
-        'und wird dann wieder an den echten Wert angedockt. So sieht man direkt: '
-        'zieht das Modell die Reihe in <em>dieselbe Richtung</em> wie die Realität '
-        '— und ähnlich stark?'
+        '<div style="margin:0.4rem 0 1.0rem 0;color:#051C2C;">'
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,'
+        'minmax(300px,1fr));gap:0.75rem;align-items:stretch;">'
+        '<div style="background:#F6FAFC;border:1px solid #D8E6ED;'
+        'border-left:4px solid #034B6F;padding:0.95rem 1.05rem;">'
+        '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.10em;'
+        'text-transform:uppercase;color:#5F6F79;margin-bottom:0.35rem;">'
+        'Tab-Übersicht · Backtest</div>'
+        '<div style="font-size:0.92rem;line-height:1.58;">'
+        'Der Backtest friert je Jahr das damals verfügbare Pillar-3-Portfolio '
+        'ein, spielt den real eingetretenen Öl-/Zins-Schock durch dasselbe '
+        '2-Faktor-Modell und vergleicht die modellierte CET1-Quote mit der '
+        'später gemeldeten Realität.</div>'
+        '</div>'
+        '<div style="background:#FFFDF8;border:1px solid #E4D8C2;'
+        'border-left:4px solid #B8860B;padding:0.95rem 1.05rem;">'
+        '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.10em;'
+        'text-transform:uppercase;color:#7A6A3A;margin-bottom:0.35rem;">'
+        'Daten- und Modellgrenze</div>'
+        '<div style="font-size:0.86rem;line-height:1.55;">'
+        'Alle öffentlich modellfähigen PD/LGD/EAD-Parameter wurden extrahiert. '
+        'Wenige quellenbelegte Sonderfälle bleiben sichtbar, werden aber wegen '
+        'Perimeterbruch oder gedruckten PD/LGD-Nullplatzhaltern nicht in die '
+        'Rechnung eingespeist. Details: <strong>Modellannahmen.docx</strong>, '
+        'Abschnitt A-02c.</div>'
+        '</div>'
+        '</div>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -266,11 +242,13 @@ with tab_bt:
     #  Abschnitt 1 · Datenbasis greifbar machen
     # ====================================================================
     st.divider()
-    eyebrow("Datenbasis · die Pillar-3-Roh-Reihe, die diesen Backtest erst möglich macht")
+    eyebrow("Datenbasis · modellfähige Pillar-3-Roh-Reihe für den Backtest")
 
     n_banks_series = int(series["LEI"].nunique())
     n_vintages = int(series["vintage_date"].nunique())
     n_points = int(len(series))
+    n_model_points = int(series.get("include_in_backtest", 1).sum()
+                         if "include_in_backtest" in series.columns else n_points)
     n_pairs = int(stats.get("n", 0))
     n_banks_bt = int(panel["LEI_Code"].nunique())
     pe_sorted = panel.sort_values("Period_end")
@@ -280,7 +258,7 @@ with tab_bt:
     d1, d2, d3, d4, d5 = st.columns(5, gap="small")
     d1.metric("Banken", f"{n_banks_series}", "EU-IRB-Großbanken", delta_color="off")
     d2.metric("Pillar-3-Jahrgänge", f"{n_vintages}", "2021 – 2024", delta_color="off")
-    d3.metric("PD/LGD/EAD-Punkte", f"{n_points}", "EU-CR6-A-IRB-Sub-totals",
+    d3.metric("PD/LGD/EAD-Punkte", f"{n_points}", f"{n_model_points} modellfähig",
               delta_color="off")
     d4.metric("Bank-Quartal-Paare", f"{n_pairs}", f"{n_banks_bt} Banken backgetestet",
               delta_color="off")
@@ -324,19 +302,21 @@ with tab_bt:
             "<em>von der Bank gemeldeten</em> A-IRB-Klassen, für die PD, LGD und "
             "EAD extrahiert wurden (Zahl = extrahiert / gemeldet). Dunkelblau = "
             "vollständig.",
-        befund=f"Relativ zum bank-eigenen Meldeumfang sind <strong>{cov_pct:.0f}%</strong> "
-               f"der Zellen abgedeckt ({have_tot} von {disc_tot}). Klassen, die "
+        befund=f"Relativ zum bank-eigenen Meldeumfang sind <strong>{cov_pct:.1f}%</strong> "
+               f"der Quellenzellen abgedeckt ({have_tot} von {disc_tot}); "
+               f"<strong>{n_model_points}</strong> Zeilen sind modellfähig und "
+               "laufen in den Walk-Forward-Backtest. Klassen, die "
                "eine Bank gar nicht im A-IRB führt (z. B. UniCredit kein separates "
                "Mortgage; Rabobank/Crédit Mutuel/ING kein QRRE; mehrere kein "
                "IRB-Sovereign), sind <em>strukturell</em> und zählen nicht als Lücke.",
-        modell="Die vier verbleibenden Zellen sind endgültige, dokumentierte "
-               "<strong>Quellgrenzen</strong>: SocGen Sovereign 2022 druckt "
-               "wörtliche „0“-Platzhalter (in zwei Publikationen identisch); "
-               "Crédit Mutuel Corporate+SME 2021 stehen nur in einer kombinierten "
-               "Tabelle, die die A-/F-IRB-Konvention der Serie bricht; Crédit "
-               "Agricole SME 2021 hat einen echten A-IRB-Perimeterbruch. Diese "
-               "werden <strong>nicht</strong> mit abgeleiteten Werten gefüllt "
-               "(keine Fabrikation) — daher bleiben sie offen statt erfunden.",
+        modell="Alle öffentlich modellfähigen Parameter wurden extrahiert. "
+               "Zwei quellenbelegte Sonderfälle bleiben sichtbar, laufen aber "
+               "<strong>nicht</strong> in die Modellrechnung: SocGen Sovereign "
+               "2022 druckt nur „0“-Platzhalter für PD/LGD; Crédit Agricole SME "
+               "2021 hat einen echten A-IRB-Perimeterbruch. Crédit Mutuel "
+               "Corporate 2021 bleibt die einzige offene Quellgrenze, weil keine "
+               "passende F-IRB-PD/LGD-Zeile veröffentlicht ist. Es wird nichts "
+               "aus RWA oder Nachbarjahren abgeleitet.",
         metrik="Quelle: jeder Wert ist ein bankpubliziertes <em>EU-CR6-A-IRB-"
                "Sub-total</em> (EBA-ITS/2020/04, CRR Art. 431-455), gegen FY2024 "
                "kalibriert und über RWA/EAD-Dichte geprüft.",
@@ -1166,7 +1146,8 @@ Timmermann (1992, *JBES*). Governance: SR 11-7 (Outcomes Analysis), EBA GL 2014/
         f"{cet1_stats.get('mae_pp', 0):.1f} pp · "
         f"{cet1_stats.get('within_1pp', 0)*100:.0f}% ≤ 1 pp · "
         f"{cet1_stats.get('conservative_share', 0)*100:.0f}% konservativ · "
-        f"Datenbasis: pillar3_backtest_pdlgd.csv ({n_points} EU-CR6-Punkte) + "
+        f"Datenbasis: pillar3_backtest_pdlgd.csv ({n_points} EU-CR6-Punkte, "
+        f"{n_model_points} modellfähig) + "
         f"EBA Transparency 2020-2025 + Brent (ICE) + Bundesbank-Svensson · "
         f"Annahmen & Methodik: Modellannahmen.docx (Abgabe-Files/"
         f"Abgabedokumente) bzw. docs/MODEL_ASSUMPTIONS.md"

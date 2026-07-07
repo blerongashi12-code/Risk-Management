@@ -275,6 +275,64 @@ def hero(title: str, *, eyebrow: str | None = None, deck: str | None = None) -> 
     st.markdown("\n".join(parts), unsafe_allow_html=True)
 
 
+def tab_header(
+    title: str,
+    *,
+    eyebrow: str,
+    deck: str,
+    tags: list[str | tuple[str, str]] | None = None,
+) -> None:
+    """Einheitlicher Header fuer alle App-Tabs."""
+    palette = {
+        "blue": ("#034B6F", "#EEF6FA", "#D8E6ED"),
+        "red": ("#7A1F38", "#FAEEF2", "#E8CAD4"),
+        "gold": ("#7A6A3A", "#FFFDF8", "#E4D8C2"),
+        "neutral": ("#051C2C", "#F4F4F4", "#E0E0E0"),
+    }
+    chips = []
+    for item in tags or []:
+        if isinstance(item, tuple):
+            label, variant = item
+        else:
+            label, variant = item, "blue"
+        fg, bg, border = palette.get(variant, palette["blue"])
+        chips.append(
+            '<span style="font-size:0.70rem;font-weight:700;'
+            f'color:{fg};background:{bg};border:1px solid {border};'
+            'padding:0.25rem 0.45rem;">'
+            f'{label}</span>'
+        )
+
+    tag_html = ""
+    if chips:
+        tag_html = (
+            '<div style="display:flex;gap:0.45rem;flex-wrap:wrap;'
+            'margin-top:0.65rem;">'
+            + "".join(chips)
+            + "</div>"
+        )
+
+    st.markdown(
+        '<div style="margin:0.35rem 0 0.75rem 0;padding:0.95rem 1.1rem;'
+        'background:#FFFFFF;border:1px solid #E6E6E6;'
+        'border-left:4px solid #051C2C;border-top:4px solid #2251FF;'
+        'color:#051C2C;">'
+        '<div style="font-size:0.68rem;font-weight:700;letter-spacing:0.12em;'
+        'text-transform:uppercase;color:#6E6E6E;margin-bottom:0.25rem;">'
+        f'{eyebrow}</div>'
+        '<div style="font-size:1.28rem;font-weight:800;line-height:1.2;'
+        'font-family:Inter,-apple-system,Segoe UI,sans-serif;'
+        'letter-spacing:0.005em;margin-bottom:0.35rem;">'
+        f'{title}</div>'
+        '<div style="font-size:0.90rem;line-height:1.55;color:#3A4A57;'
+        'max-width:1080px;">'
+        f'{deck}</div>'
+        f'{tag_html}'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+
 def eyebrow(text: str) -> None:
     """Kleine Section-Überschrift im Eyebrow-Stil (UPPERCASE)."""
     st.markdown(

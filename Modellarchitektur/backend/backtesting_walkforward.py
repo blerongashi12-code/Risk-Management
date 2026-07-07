@@ -12,6 +12,14 @@ historischen T0 mit den *damals gültigen* Pillar-3-PD/LGD eingefroren
 (`vintage_for_period` → Jahresend-Vintage, hold-flat über die 4 Quartale
 des Jahres). Quelle der PD/LGD ist ausschließlich Pillar-3 (siehe
 MODEL_ASSUMPTIONS A-02c); kein Look-ahead aus dem 2024-Snapshot.
+Stand Juli 2026: alle öffentlich modellfähigen Parameter der FY2021-FY2024-
+Rohreihe sind extrahiert. `pillar3_backtest_pdlgd.csv` enthält 255
+quellenbelegte EU-CR6-Zeilen, davon 253 modellfähig
+(`include_in_backtest = 1`). Zwei quellenbelegte Sonderfälle bleiben für
+Audit/Coverage sichtbar, werden aber per `include_in_backtest = 0` aus der
+Modellrechnung ausgeschlossen (Perimeterbruch bzw. gedruckte PD/LGD-
+Nullplatzhalter). Die einzige offene Quellgrenze ist Credit Mutuel Corporate
+2021; es wird nichts aus RWA oder Nachbarjahren abgeleitet.
 
 Für jedes Quartal-Paar (t → t+1) in den historischen EBA-Vintages 2019-2025
 und für jede der 67 IRB-Banken:
@@ -482,13 +490,25 @@ def load_backtest_series(path=None) -> pd.DataFrame:
     """Die rohe EU-CR6-AIRB-Backtest-Reihe (PD + LGD + EAD je LEI × Klasse ×
     Stichtag) — die einzige Eingangsquelle für den series-driven
     Frozen-Portfolio-Walk-Forward. Spalten: LEI, bank_name, vasicek_class,
-    vintage_date, pd_pct, lgd_pct, ead_eur_m, source, note."""
+    vintage_date, pd_pct, lgd_pct, ead_eur_m, source, note.
+
+    Optional markiert include_in_backtest=0 quellenbelegte Sonderfaelle, die
+    fuer Audit/Coverage sichtbar bleiben, aber nicht in die Modellrechnung
+    laufen."""
     p = Path(path) if path else _BACKTEST_CSV
     df = pd.read_csv(p)
     df["pd_pct"]  = pd.to_numeric(df["pd_pct"],  errors="coerce")
     df["lgd_pct"] = pd.to_numeric(df["lgd_pct"], errors="coerce")
     df["ead_eur"] = pd.to_numeric(df["ead_eur_m"], errors="coerce") * 1e6
     df["vintage_date"] = df["vintage_date"].astype(str)
+    if "include_in_backtest" not in df.columns:
+        df["include_in_backtest"] = 1
+    df["include_in_backtest"] = (
+        pd.to_numeric(df["include_in_backtest"], errors="coerce")
+          .fillna(1).astype(int)
+    )
+    if "quality_flag" not in df.columns:
+        df["quality_flag"] = "source_verified"
     return df
 
 
@@ -502,6 +522,8 @@ def build_frozen_portfolio_series(lei: str, vintage: str,
     from vasicek import PortfolioSegment, BankPortfolio
     sub = series_df[(series_df["LEI"] == lei)
                     & (series_df["vintage_date"] == vintage)]
+    if "include_in_backtest" in sub.columns:
+        sub = sub[sub["include_in_backtest"].fillna(1).astype(int) == 1]
     if sub.empty:
         return None
     segs = []
@@ -756,6 +778,10 @@ def build_pd_backtest(series_df: pd.DataFrame, annual_macro: dict) -> pd.DataFra
     if series_df.empty or not annual_macro:
         return pd.DataFrame()
     s = series_df.copy()
+    if "include_in_backtest" in s.columns:
+        s = s[s["include_in_backtest"].fillna(1).astype(int) == 1]
+    if s.empty:
+        return pd.DataFrame()
     s["yr"] = s["vintage_date"].str[:4].astype(int)
     rows = []
     for (lei, cls, name), g in s.groupby(["LEI", "vasicek_class", "bank_name"]):

@@ -48,8 +48,12 @@ aus den offiziellen Pillar-3-Reports der Banken. Quelle ausschließlich Pillar-3
   Schuldnerzahlen → andere Quelle); Roh-Reihe nutzt die Report-Subtotals.
 
 ## Stand (nach Lückenschluss-Sweep Juli 2026)
-Authoritative Reihe: `data/pillar3_backtest_pdlgd.csv` — **252 Zeilen,
-98 % Abdeckung** (252 von 256 gemeldeten Bank×Jahr×Klasse-Zellen).
+Authoritative Reihe: `data/pillar3_backtest_pdlgd.csv` — **255
+quellenbelegte Zeilen, 99,6 % Abdeckung** (255 von 256 gemeldeten
+Bank×Jahr×Klasse-Zellen). Davon sind **253 Zeilen modellfähig**
+(`include_in_backtest = 1`); zwei quellenbelegte Sonderfälle bleiben für
+Audit/Coverage sichtbar, laufen aber wegen Quellen-/Perimeterproblemen nicht
+in die Backtest-Rechnung (`include_in_backtest = 0`).
 Der Sweep hat 27 zuvor offene Zellen geschlossen; Methoden: (a)
 **Vorjahres-Vergleichsspalten** der Folgejahres-Berichte (BNP-URD 2022 →
 31.12.2021 mit Dezimal-PDs; bpce_2023 → 2022-Doppelbestätigung; socgen_2023
@@ -62,18 +66,20 @@ Jede Zelle wort-wörtlich + Seitenbeleg + Dichte-Check + EAD-Kontinuität.
 |---|---|---|---|
 | Deutsche Bank | 7/7 | 2021–2024 | ✅ komplett |
 | ING Groep | 6/7 | 2021–2024 | ✅ alle 4 Jahre. **„qrre" → `mortgage_sme` umbenannt** (Verifikation: ING hat KEINEN QRRE-A-IRB-Block; die Zeilen sind „Retail – Secured by immovable property SME"). Retail-Other-non-SME nicht separat erfasst (Lücke) |
-| Société Générale | 7/7 (2021·2023·2024) · 6/7 (2022) | 2021–2024 | ✅ bank 2022 = 38.844/1,24/25,01 im Sweep ergänzt (socgen_2022 S.145, doppelt belegt via socgen_2023 S.147 — die CR6-Seiten 145–149 sind lesbar, nur andere Teile CID-verstümmelt). **sovereign 2022 = endgültige Quellgrenze**: PD/LGD/Dichte als wörtliche „0"-Platzhalter gedruckt, in beiden Publikationen identisch (zeichenweise geprüft) |
+| Société Générale | 7/7 | 2021–2024 | ✅ bank 2022 = 38.844/1,24/25,01 im Sweep ergänzt (socgen_2022 S.145, doppelt belegt via socgen_2023 S.147). sovereign 2022 ist jetzt als Quellenzeile erfasst (EAD 271.679), aber wegen wörtlicher „0"-Platzhalter für PD/LGD mit `include_in_backtest=0` aus der Modellrechnung ausgeschlossen. Keine Ableitung aus RWA/Nachbarjahren. |
 | UniCredit | 6/7 (ohne mortgage) | 2021–2024 | ✅ alle 4 Jahre komplett. 2021 sovereign + other_retail via Verifikation aus Quelle ergänzt (p134/p138, dichte-verifiziert). „sovereign" = Central-gov-Zeile (relabel) |
 | Groupe BPCE | 7/7 | 2021–2024 | ✅ **komplett** (Sweep: corporate/sme/qrre 2021–2023 + mortgage 2021 via Block-Anker-Matching; 2021 aus H1-2022-Update S.81–85 mit umbrochenen Labels, 2022 doppelt belegt via bpce_2023 S.157–161, 2023 aus bpce_2023 S.149–153). Corporate-PD 17,90 (2022) → 4,07 (2023) wie-gemeldet in beiden Publikationen (Note in CSV) |
-| Crédit Mutuel | 5/5 (2022–2024) · 3/5 (2021) | 2021–2024 | 🟢 Sweep: bank 2021/2022/2023 (F-IRB-„Etablissements"-Zeile = Serienkonvention, CM meldet Institute nur F-IRB; 2024-Anker 30.410 kontinuierlich), sme 2022, other_retail 2021/2022 („Clientèle de détail"-Subtotal). **corporate+sme 2021 = Quellgrenze** (kombinierte NI-Tabelle bricht A-/F-IRB-Konvention). Kein IRB-sovereign (Standardansatz) |
+| Crédit Mutuel | 5/5 (2022–2024) · 4/5 (2021) | 2021–2024 | 🟢 Sweep: bank 2021/2022/2023 (F-IRB-„Etablissements"-Zeile = Serienkonvention, CM meldet Institute nur F-IRB; 2024-Anker 30.410 kontinuierlich), **sme 2021** (A-IRB-Entreprises-Zeile 134.578/4,17/29,00, S.52), sme 2022, other_retail 2021/2022 („Clientèle de détail"-Subtotal). **corporate 2021 = einzige verbleibende Quellgrenze**: keine zur 2022–2024-Konvention passende F-IRB-PD/LGD-Zeile veröffentlicht. Kein IRB-sovereign (Standardansatz). |
 | BNP Paribas | 7/7 | **2021–2024** | ✅ **komplett** (Sweep: alle 7 Klassen 31.12.2021 aus den Vergleichsspalten der URD 2022, S.411–423, mit Dezimal-PDs — löst die Ganze-%-Rundung der 2021-Primärseiten). `sme_corporate` korrigiert (echtes „SME corporates", p441-verifiziert) |
-| Crédit Agricole S.A. | 7/7 (2022·2023·2024) · 6/7 (2021) | 2021–2024 | ✅ **CA S.A.** (LEI F0HUI…, im Transparency-Panel; NICHT CA Group). Sweep: qrre 2022 aus ca_sa_2023h1 S.42 (31.12.2022-Komparativ). **sme 2021 = Quellgrenze**: Wert 3.074/26,43 wörtlich bestätigt, aber echter A-IRB-Perimeterbruch → per Kontinuitätsregel ausgeschlossen |
+| Crédit Agricole S.A. | 7/7 | 2021–2024 | ✅ **CA S.A.** (LEI F0HUI…, im Transparency-Panel; NICHT CA Group). Sweep: qrre 2022 aus ca_sa_2023h1 S.42 (31.12.2022-Komparativ). sme 2021 ist als Quellenzeile erfasst (3.074/26,43/33,29, ca_sa_2022h1 S.40), aber wegen echtem A-IRB-Perimeterbruch mit `include_in_backtest=0` aus der Modellrechnung ausgeschlossen. |
 | Banco Santander | 6/6 IRB | 2021–2024 | ✅ 4 Jahre komplett (keine sovereign = Standardised); label+jahr-getrieben, Dichte-verifiziert. bank/corporate-AIRB-EAD schrumpft 2022→2023 (realer IRB-Rollback zu FIRB, verifiziert) |
 | Rabobank | 6/6 | 2021–2024 | ✅ **komplett** (Sweep: bank 2024 = 55/2,23/10,65, A-IRB-Residuum nach Rollback 5.783→465→55, S.76 wörtlich + dichte-verifiziert; other_retail 2024 = 1.771/5,38/24,00, S.82 — Parse-Lücke geschlossen) |
 
-**Verbleibende 4 Zellen = endgültige Quellgrenzen** (werden nicht mit
-abgeleiteten Werten gefüllt): SocGen sovereign 2022 („0"-Platzhalter),
-CM corporate+sme 2021 (kombinierte Tabelle), CA sme 2021 (Perimeterbruch).
+**Verbleibende echte Quellgrenze:** Crédit Mutuel Corporate 2021. Der Report
+veröffentlicht keine zur 2022–2024-Serienkonvention passende F-IRB-PD/LGD-Zeile;
+es wird kein Wert aus RWA oder Nachbarjahren abgeleitet. Zwei weitere
+Sonderfälle (SocGen Sovereign 2022, CA SME 2021) sind quellenbelegt in der CSV,
+aber mit `include_in_backtest=0` aus der Modellrechnung ausgeschlossen.
 
 ## Adversariale Verifikation (8-Banken-Workflow, je 1 Prüf-Agent gegen Quell-PDFs)
 Ergebnis: **die Zahl-Extraktion ist durchgängig korrekt** (jeder stichprobenartig
@@ -92,7 +98,7 @@ Als **real disclosed** (kein Fehler) bestätigt: DB-Institutions-PD-Spitzen
 BPCE-Retail-PDs (Default-Band). Voller Report: `VERIFICATION_REPORT.json`.
 Der Lückenschluss-Sweep (Juli 2026, Multi-Agenten-Workflow + unabhängiger
 Stichproben-Audit von 8 Werten gegen die Quell-PDFs) hat die damals offenen
-Lücken bis auf die 4 dokumentierten Quellgrenzen geschlossen;
+Lücken bis auf die eine dokumentierte Quellgrenze geschlossen;
 ING-Retail-Other-non-SME bleibt strukturell nicht separat erfasst
 (zählt nicht als Lücke im Meldeumfang).
 

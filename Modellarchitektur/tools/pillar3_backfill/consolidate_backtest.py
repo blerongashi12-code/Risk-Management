@@ -233,6 +233,9 @@ add(RABO, "Rabobank", "other_retail", "2024-12-31", 5.38, 24.00, 1771,
 add(CM, "Credit Mutuel", "bank", "2021-12-31", 0.16, 30.00, 27374,
     "Credit Mutuel Pilier 3 2021 EU CR6 NI (S.52, quellverifiziert)",
     "F-IRB-Zeile (Serienkonvention: CM meldet Institute nur F-IRB)")
+add(CM, "Credit Mutuel", "sme_corporate", "2021-12-31", 4.17, 29.00, 134578,
+    "Credit Mutuel Pilier 3 2021 EU CR6 A-IRB Entreprises (S.52, quellverifiziert)",
+    "A-IRB-Entreprises-Zeile; Serienkonvention wie 2022/2023/2024")
 add(CM, "Credit Mutuel", "other_retail", "2021-12-31", 2.55, 17.00, 361722,
     "Credit Mutuel Pilier 3 2021 EU CR6 (S.52, quellverifiziert)")
 add(CM, "Credit Mutuel", "bank", "2022-12-31", 0.19, 35.00, 25423,
@@ -250,6 +253,17 @@ add(CM, "Credit Mutuel", "bank", "2023-12-31", 0.19, 35.00, 29543,
 #     (ca_sa_2023h1.pdf S.42), Dichte-Check bestanden. ---
 add(CASA, "Credit Agricole SA", "qrre", "2022-12-31", 5.13, 79.12, 11827,
     "Credit Agricole S.A. Pillar 3 H1-2023, 31.12.2022 EU CR6 A-IRB Vergleich (S.42, quellverifiziert)")
+add(CASA, "Credit Agricole SA", "sme_corporate", "2021-12-31", 26.43, 33.29, 3074,
+    "Credit Agricole S.A. Pillar 3 H1-2022, 31.12.2021 EU CR6 A-IRB Vergleich (S.40, quellverifiziert)",
+    "MODEL_EXCLUDED: echter A-IRB-Perimeterbruch; ab 2022 werden >1m-SME-Exposures aus Retail nach Corporates-SME umklassifiziert")
+
+# --- SocGen sovereign 2022: source row exists, but PD/LGD/Density are printed as
+#     literal zero placeholders in the 2022 report. Keep the source data point for
+#     audit/coverage, but exclude it from model input instead of inferring PD/LGD
+#     from RWA or neighbouring years. ---
+add(SG, "Societe Generale", "sovereign", "2022-12-31", 0.00, 0.00, 271679,
+    "SocGen Pillar 3 2022 EU CR6 AIRB Central governments subtotal (S.145, gedruckte 0-Platzhalter)",
+    "MODEL_EXCLUDED: PD/LGD nur als gedruckte 0-Platzhalter; keine Ableitung aus RWA/Nachbarjahren")
 
 # --- BPCE corporate/sme/qrre 2021-2023: Block-Anker-Matching. 2021 aus dem
 #     H1-2022-Update (31.12.2021-Vergleich, S.81-85, umbrochene Subtotal-Labels);
@@ -282,6 +296,11 @@ for r in rows:
         r["note"] = (r.get("note") or "") + " [ING SRE-SME, nicht QRRE: umbenannt]"
 
 df = pd.DataFrame(rows).drop_duplicates(subset=["LEI", "vasicek_class", "vintage_date"], keep="first")
+df["include_in_backtest"] = 1
+df["quality_flag"] = "source_verified"
+excluded = df["note"].fillna("").str.contains("MODEL_EXCLUDED", regex=False)
+df.loc[excluded, "include_in_backtest"] = 0
+df.loc[excluded, "quality_flag"] = "source_verified_model_excluded"
 df = df.sort_values(["bank_name", "vintage_date", "vasicek_class"])
 out = RM + "pillar3_backtest_pdlgd.csv"
 df.to_csv(out, index=False)

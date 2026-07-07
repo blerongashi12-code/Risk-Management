@@ -5,7 +5,8 @@ Nur das AKTUELLE Modell (2-Faktor + CET1-Walk-Forward), granular aber
 übersichtlich, mit vier didaktischen Schaubildern. Quelle der Fachinhalte:
 docs/MODEL_ASSUMPTIONS.md (V2.1) + live SENSITIVITY_MATRIX.
 """
-import sys, os, datetime
+import sys, os, datetime, math
+from statistics import NormalDist
 from docx import Document
 from docx.shared import Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -16,7 +17,42 @@ from docx.oxml import OxmlElement
 import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "backend"))
 from two_factor_stress import SENSITIVITY_MATRIX, stress_pd, stress_lgd
-from vasicek import irb_capital_requirement
+
+_NORMAL = NormalDist()
+
+
+def irb_capital_requirement(pd_value, lgd, exposure_class, *, maturity_years=2.5):
+    """Scalar Basel-IRB helper for the document's illustrative example."""
+    pd_value = min(max(float(pd_value), 1e-12), 1.0 - 1e-12)
+    lgd = min(max(float(lgd), 1e-4), 1.0)
+    if exposure_class in ("corporate", "bank", "sovereign"):
+        r = (1.0 - math.exp(-50.0 * pd_value)) / (1.0 - math.exp(-50.0))
+        rho = 0.12 * r + 0.24 * (1.0 - r)
+    elif exposure_class == "sme_corporate":
+        r = (1.0 - math.exp(-50.0 * pd_value)) / (1.0 - math.exp(-50.0))
+        rho = 0.12 * r + 0.24 * (1.0 - r) - 0.04
+    elif exposure_class == "mortgage":
+        rho = 0.15
+    elif exposure_class == "qrre":
+        rho = 0.04
+    else:
+        r = (1.0 - math.exp(-35.0 * pd_value)) / (1.0 - math.exp(-35.0))
+        rho = 0.03 * r + 0.16 * (1.0 - r)
+    rho = min(max(rho, 1e-4), 0.999)
+    z_alpha = _NORMAL.inv_cdf(0.999)
+    cond_pd = _NORMAL.cdf(
+        (_NORMAL.inv_cdf(pd_value) + math.sqrt(rho) * z_alpha)
+        / math.sqrt(1.0 - rho)
+    )
+    el = pd_value * lgd
+    if exposure_class in ("corporate", "sme_corporate", "bank", "sovereign"):
+        m = min(max(float(maturity_years), 1.0), 5.0)
+        b = (0.11852 - 0.05478 * math.log(pd_value)) ** 2
+        ma = (1.0 + (m - 2.5) * b) / (1.0 - 1.5 * b)
+    else:
+        ma = 1.0
+    k = max((lgd * cond_pd - el) * ma, 0.0)
+    return {"K": k, "rwa_density": k * 12.5}
 
 FIGS = os.path.dirname(os.path.abspath(__file__)) + "/figs"
 OUT = str(pathlib.Path(__file__).resolve().parents[3] / "Abgabe-Files" / "Abgabedokumente" / "Modellannahmen.docx")
@@ -347,16 +383,16 @@ body("**70 Parameter-Zeilen** = 10 Banken × 7 IRB-Klassen zum einheitlichen "
      "ausgenommen.")
 h2("Historische Backtest-Reihe")
 body("Für die Validierung existiert eine eigene Roh-Reihe: **10 Banken × "
-     "FY2021–FY2024, 252 Datenpunkte** (PD, LGD und EAD je Klasse aus "
-     "derselben Report-Vintage). Das entspricht **98 % Abdeckung relativ "
-     "zum bank-eigenen Meldeumfang** (252 von 256 gemeldeten Zellen) — "
-     "Klassen, die eine Bank gar nicht im A-IRB führt, zählen nicht als "
-     "Lücke. Geschlossen wurden die Lücken über die Vorjahres-"
-     "Vergleichsspalten der Folgejahres-Berichte und über Block-Anker-"
-     "Matching im Quell-PDF; jede Zelle ist wort-wörtlich mit Seitenbeleg "
-     "erfasst. Die vier verbleibenden Zellen sind endgültige Quellgrenzen "
-     "(z. B. druckt Société Générale für Sovereign 2022 wörtliche "
-     "„0“-Platzhalter) und werden **nicht** mit geschätzten Werten gefüllt.")
+     "FY2021–FY2024, 255 quellenbelegte Datenpunkte** (PD, LGD und EAD je "
+     "Klasse aus derselben Report-Vintage). Das entspricht **99,6 % "
+     "Abdeckung relativ zum bank-eigenen Meldeumfang** (255 von 256 "
+     "gemeldeten Zellen) - Klassen, die eine Bank gar nicht im A-IRB "
+     "führt, zählen nicht als Lücke. Davon sind **253 Zeilen "
+     "modellfähig**; zwei quellenbelegte Sonderfälle bleiben für Audit "
+     "und Abdeckung sichtbar, werden aber wegen Quellen-/Perimeterproblemen "
+     "nicht in die Modellrechnung eingespeist (`include_in_backtest = 0`). "
+     "Die einzige verbleibende Quellgrenze ist Credit Mutuel Corporate "
+     "2021: kein Wert wird aus RWA oder Nachbarjahren abgeleitet.")
 h2("Vier Integritäts-Sicherungen je Datenpunkt")
 bullet("**Kalibrier-Anker:** Jeder Extraktions-Parser muss zunächst alle "
        "hand-verifizierten 2024-Werte exakt reproduzieren, bevor Vorjahre "
@@ -383,7 +419,7 @@ table(
      ["A-02", "LGD-Quelle", "identisch A-01 (EU-CR6-LGD)", "published",
       "wie A-01"],
      ["A-02c", "Backtest-Zeitreihe", "eigene Pillar-3-Roh-Reihe, 10 Banken × "
-      "FY2021–2024 (252 Punkte, 98 %), strikt no-look-ahead", "published",
+      "FY2021–2024 (255 Quellenzeilen, 253 modellfähig), strikt no-look-ahead", "published",
       "Bank-Pillar-3-Reports FY2021–2024"],
      ["A-03", "EAD", "EBA-Transparency Item 2520522 (post-CCF)", "published",
       "EBA Transparency 2025"],
@@ -439,8 +475,9 @@ annahme("A-02", "LGD-Quelle: Pillar-3 EU-CR6 (31.12.2024)",
     "erwarteten Verlust und fast linear auf die Kapitalanforderung — der "
     "direkteste Hebel unter den Parametern.")
 annahme("A-02c", "Backtest-Zeitreihe (nur Pillar-3, no-look-ahead)",
-    "**Festlegung:** Eigene Roh-Reihe über 10 Banken × FY2021–FY2024 (252 "
-    "Punkte); ein Quartal im Jahr Y nutzt ausschließlich den Stichtag "
+    "**Festlegung:** Eigene Roh-Reihe über 10 Banken × FY2021–FY2024 "
+    "(255 quellenbelegte Zeilen, davon 253 modellfähig); ein Quartal im "
+    "Jahr Y nutzt ausschließlich den Stichtag "
     "31.12.(Y−1) — den jüngsten, der damals publiziert war. **Warum:** Nur "
     "so ist die Validierung echt out-of-sample. **Verworfene Alternative:** "
     "den 2024-Snapshot rückwirkend anzuwenden (Look-ahead-Verzerrung) oder "
