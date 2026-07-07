@@ -189,6 +189,89 @@ if os.path.exists(DL + "ca_raw_rows.csv"):
         add(CASA, "Credit Agricole SA", r["vasicek_class"], r["vintage_date"], r["pd_pct"],
             r["lgd_pct"], r["ead_eur_m"], "Credit Agricole S.A. Pillar 3 EU CR6 A-IRB (raw subtotal)")
 
+# ====================================================================
+# Lueckenschluss-Sweep Juli 2026: 27 Zellen, alle wort-woertlich aus den
+# Quell-PDFs belegt (Seite + Rohzeile), Dichte-Check (RWA/EAD vs. gedruckte
+# Dichte <=1pp) und EAD-Kontinuitaet gegen Nachbarjahre bestanden.
+# Verbleibende echte Quellgrenzen (NICHT extrahierbar):
+#   - SocGen sovereign 2022: PD/LGD/Dichte als woertliche "0"-Platzhalter
+#     gedruckt, doppelt geprueft (socgen_2022 S.145 UND socgen_2023 S.147).
+#   - CM corporate+sme 2021: kombinierte NI-Tabelle bricht A-/F-IRB-Konvention.
+#   - CA sme 2021: echter A-IRB-Perimeterbruch (Kontinuitaetsregel).
+# ====================================================================
+
+# --- BNP 2021 (7/7): 31.12.2021-Vergleichsspalten der URD 2022 (bnp_2022.pdf,
+#     Euronext-Download), S.411-423. Dezimalwerte, Dichte-Checks bestanden. ---
+for cls, pd_, lgd, ead, page in [
+    ("sovereign",     0.05,  2.00, 469143, 411),
+    ("bank",          0.67, 28.00,  43767, 411),
+    ("corporate",     2.86, 34.00, 350196, 415),
+    ("sme_corporate", 7.30, 29.00,  43188, 414),
+    ("mortgage",      2.19, 12.00, 179316, 419),
+    ("qrre",          9.54, 53.00,  12425, 422),
+    ("other_retail",  7.24, 40.00,  47407, 423),
+]:
+    add(BNP, "BNP Paribas", cls, "2021-12-31", pd_, lgd, ead,
+        f"BNP Paribas URD 2022 EU CR6 IRBA, 31.12.2021-Vergleich (S.{page}, quellverifiziert)")
+
+# --- SocGen bank 2022: Institutions-Subtotal, doppelt belegt (socgen_2022.pdf
+#     S.145 primaer + socgen_2023.pdf S.147 Vorjahres-Vergleich, identisch). ---
+add(SG, "Societe Generale", "bank", "2022-12-31", 1.24, 25.01, 38844,
+    "SocGen Pillar 3 2022 EU CR6 AIRB Institutions subtotal (S.145; doppelt belegt via 2023-Bericht S.147)")
+
+# --- Rabobank 2024: bank = A-IRB-Residuum nach Rollback (S.76, EAD 5,783->465->55,
+#     woertlich + dichte-verifiziert); other_retail S.82 (Parse-Luecke geschlossen). ---
+add(RABO, "Rabobank", "bank", "2024-12-31", 2.23, 10.65, 55,
+    "Rabobank Pillar 3 2024 EU CR6 (S.76, quellverifiziert)",
+    "A-IRB-Residuum nach IRB-Rollback (A->F-IRB), EAD stark verkleinert, dichte-verifiziert")
+add(RABO, "Rabobank", "other_retail", "2024-12-31", 5.38, 24.00, 1771,
+    "Rabobank Pillar 3 2024 EU CR6 (S.82, quellverifiziert)")
+
+# --- Credit Mutuel 2021-2023: bank-Serie ist durchgaengig F-IRB 'Etablissements'
+#     (A-IRB weist keine Institute aus; 2024-Anker 30,410 = F-IRB-Zeile).
+#     other_retail = 'Clientele de detail'-Subtotal (Serienkonvention wie 2023/24). ---
+add(CM, "Credit Mutuel", "bank", "2021-12-31", 0.16, 30.00, 27374,
+    "Credit Mutuel Pilier 3 2021 EU CR6 NI (S.52, quellverifiziert)",
+    "F-IRB-Zeile (Serienkonvention: CM meldet Institute nur F-IRB)")
+add(CM, "Credit Mutuel", "other_retail", "2021-12-31", 2.55, 17.00, 361722,
+    "Credit Mutuel Pilier 3 2021 EU CR6 (S.52, quellverifiziert)")
+add(CM, "Credit Mutuel", "bank", "2022-12-31", 0.19, 35.00, 25423,
+    "Credit Mutuel Pilier 3 2022 EU CR6 F-IRB Etablissements (S.51, quellverifiziert)",
+    "F-IRB-Zeile (Serienkonvention: CM meldet Institute nur F-IRB)")
+add(CM, "Credit Mutuel", "sme_corporate", "2022-12-31", 4.89, 23.00, 86416,
+    "Credit Mutuel Pilier 3 2022 EU CR6 A-IRB Entreprises (S.48, quellverifiziert)")
+add(CM, "Credit Mutuel", "other_retail", "2022-12-31", 2.52, 16.00, 385061,
+    "Credit Mutuel Pilier 3 2022 EU CR6 Clientele de detail (S.48, quellverifiziert)")
+add(CM, "Credit Mutuel", "bank", "2023-12-31", 0.19, 35.00, 29543,
+    "Credit Mutuel Pilier 3 2023 EU CR6 F-IRB Etablissements (S.50, quellverifiziert)",
+    "F-IRB-Zeile (Serienkonvention: CM meldet Institute nur F-IRB; 2024-Anker 30,410 kontinuierlich)")
+
+# --- Credit Agricole S.A. qrre 2022: 31.12.2022-Vergleich im H1-2023-Bericht
+#     (ca_sa_2023h1.pdf S.42), Dichte-Check bestanden. ---
+add(CASA, "Credit Agricole SA", "qrre", "2022-12-31", 5.13, 79.12, 11827,
+    "Credit Agricole S.A. Pillar 3 H1-2023, 31.12.2022 EU CR6 A-IRB Vergleich (S.42, quellverifiziert)")
+
+# --- BPCE corporate/sme/qrre 2021-2023: Block-Anker-Matching. 2021 aus dem
+#     H1-2022-Update (31.12.2021-Vergleich, S.81-85, umbrochene Subtotal-Labels);
+#     2022 aus bpce_2022 S.128-132, doppelt belegt via bpce_2023 S.157-161;
+#     2023 aus bpce_2023 S.149-153. Dichte-Checks exakt. Corporate-PD-Sprung
+#     2022->2023 (17,90->4,07) ist wie-gemeldet in beiden Publikationen. ---
+for vint, cells in [
+    ("2021-12-31", [("corporate", 16.54, 33.74, 78604), ("sme_corporate", 8.34, 22.25, 5527),
+                    ("mortgage", 19.91, 10.81, 278290), ("qrre", 9.28, 21.20, 11217)]),
+    ("2022-12-31", [("corporate", 17.90, 33.58, 80498), ("sme_corporate", 7.15, 21.99, 6041),
+                    ("qrre", 9.70, 21.64, 11189)]),
+    ("2023-12-31", [("corporate", 4.07, 33.99, 85550), ("sme_corporate", 7.81, 23.06, 6735),
+                    ("qrre", 9.50, 37.08, 23933)]),
+]:
+    src_map = {"2021-12-31": "BPCE Pillar III H1-2022 update, 31.12.2021 A-IRB Vergleich (S.81-85, quellverifiziert)",
+               "2022-12-31": "BPCE Pillar III 2022 EU CR6 A-IRB (S.128-132; doppelt belegt via 2023-Bericht S.157-161)",
+               "2023-12-31": "BPCE Pillar III 2023 EU CR6 A-IRB (S.149-153, quellverifiziert)"}
+    for cls, pd_, lgd, ead in cells:
+        note = ("PD-Niveausprung 2022->2023 wie-gemeldet (in beiden Publikationen identisch gedruckt)"
+                if cls == "corporate" else "")
+        add(BP, "Groupe BPCE", cls, vint, pd_, lgd, ead, src_map[vint], note)
+
 # --- Post-process: ING has NO Qualifying Revolving (QRRE) A-IRB block in any year;
 #     its 'qrre' rows are actually "Retail - Secured by immovable property SME"
 #     (verification finding). Relabel -> mortgage_sme so it does not contaminate the

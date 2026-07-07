@@ -329,11 +329,13 @@ with tab_bt:
                "eine Bank gar nicht im A-IRB führt (z. B. UniCredit kein separates "
                "Mortgage; Rabobank/Crédit Mutuel/ING kein QRRE; mehrere kein "
                "IRB-Sovereign), sind <em>strukturell</em> und zählen nicht als Lücke.",
-        modell="Die wenigen unvollständigen Zellen sind dokumentierte "
-               "<strong>Quellgrenzen</strong>: BNP-Report 2021 rundet die PD auf "
-               "ganze % (0 %/5 %); SocGen 2022 Bank+Sovereign sind im PDF-Text "
-               "verschmolzen; Crédit Mutuel/BPCE-Vorjahre haben mehrdeutige Anker. "
-               "Diese werden <strong>nicht</strong> mit abgeleiteten Werten gefüllt "
+        modell="Die vier verbleibenden Zellen sind endgültige, dokumentierte "
+               "<strong>Quellgrenzen</strong>: SocGen Sovereign 2022 druckt "
+               "wörtliche „0“-Platzhalter (in zwei Publikationen identisch); "
+               "Crédit Mutuel Corporate+SME 2021 stehen nur in einer kombinierten "
+               "Tabelle, die die A-/F-IRB-Konvention der Serie bricht; Crédit "
+               "Agricole SME 2021 hat einen echten A-IRB-Perimeterbruch. Diese "
+               "werden <strong>nicht</strong> mit abgeleiteten Werten gefüllt "
                "(keine Fabrikation) — daher bleiben sie offen statt erfunden.",
         metrik="Quelle: jeder Wert ist ein bankpubliziertes <em>EU-CR6-A-IRB-"
                "Sub-total</em> (EBA-ITS/2020/04, CRR Art. 431-455), gegen FY2024 "
@@ -827,7 +829,7 @@ with tab_bt:
         'border-radius:8px;padding:1.0rem 1.25rem;margin:0.6rem 0 0.4rem 0;'
         'color:#051C2C;font-size:1.0rem;line-height:1.8;">'
         '<div style="font-size:1.05rem;font-weight:800;color:#A52F4D;'
-        'margin-bottom:0.3rem;">Ursache der Abweichung 2022 (~2,7 pp) '
+        'margin-bottom:0.3rem;">Ursache der Abweichung 2022 (~2,5 pp) '
         '→ <span style="text-decoration:underline;">PIT vs. TTC</span></div>'
         '2022 stieg der Zins stark (<strong>+2,8 pp</strong>). '
         '<strong>Unser Modell ist Point-in-Time (PIT)</strong> — es reagiert '

@@ -130,7 +130,7 @@ unter den F-IRB-Standardwerten von 45 %.
 Portfolio an jedem historischen Stichtag T0 mit den *damals gültigen*
 PD/LGD eingefroren werden — **kein Look-ahead** aus dem 2024-Snapshot.
 Dafür existiert eine eigene **Roh-Reihe `data/pillar3_backtest_pdlgd.csv`**:
-**10 Banken × FY2021–FY2024, 225 Datenpunkte**, je Zeile
+**10 Banken × FY2021–FY2024, 252 Datenpunkte**, je Zeile
 `LEI × vasicek_class × vintage_date` mit **PD, LGD und EAD aus derselben
 EU-CR6-Vintage**. Das Live-Modell nutzt weiterhin den kuratierten
 31.12.2024-Snapshot (`data/pillar3_bank_pd_lgd.csv`) — beide Reihen sind
@@ -164,17 +164,19 @@ kein Single-Faktor-Aggregat) und durch die IRB-K-Formel (`vasicek.py`); der
 relative Effekt wird auf die *gemeldeten* Größen skaliert
 (`build_pdlgd_panel`, `build_cet1_backtest`).
 
-**Validierungs-Befund (CET1-Kern-Test, 29 Bank-Jahre 2022–2024):** Die
+**Validierungs-Befund (CET1-Kern-Test, 30 Bank-Jahre 2022–2024 — vollständig,
+alle 10 Banken in allen drei Jahren):** Die
 **Zielgröße des Backtests ist die CET1-Quote** (Solvenz-Kennzahl), nicht die
 RWA-Änderung. Methode: realer Jahres-Schock ins Ende-Vorjahr eingefrorene
 Portfolio → gestresste CET1-Quote über zwei Kanäle (Nenner: RWA_total +
 ΔRWA_credit; Zähler: CET1 − ΔEL) → Vergleich mit der tatsächlich gemeldeten
 CET1-Quote. Bewusst **konservative Abwärts-Sicht**: Gewinnthesaurierung und
 Zinsüberschuss (NII) werden *nicht* gegengerechnet. **Ergebnis:** MAE ≈ 1,3 pp
-(auf ~15 %-Niveau ≈ 9 % relativ), 65 % der Bank-Jahre ≤ 1 pp Abstand, 72 %
-konservativ (Prognose ≤ Ist), Bias −1,0 pp; im Zinsschock-Jahr 2022 ~2,7 pp
-zu konservativ, weil Banken am Zinsanstieg verdienten (NII-Gegeneffekt,
-modellseitig bewusst ausgeklammert).
+(genau 1,28 pp; auf ~15 %-Niveau ≈ 9 % relativ), 60 % der Bank-Jahre ≤ 1 pp
+Abstand, 73 % konservativ (Prognose ≤ Ist), Bias −1,0 pp; im Zinsschock-Jahr
+2022 ~2,5 pp zu konservativ (alle 10 Banken auf der sicheren Seite), weil
+Banken am Zinsanstieg verdienten (NII-Gegeneffekt, modellseitig bewusst
+ausgeklammert); in den ruhigeren Jahren 2023/2024 MAE nur 0,5/0,8 pp.
 
 **Ehrliche Grenze (PIT vs. TTC):** Die einzelnen Kanäle (gemeldete PD,
 Kredit-RWA) sind **nicht punktprognostizierbar** (Richtungs-Trefferquote ≈
@@ -209,15 +211,26 @@ existiert erst seit der CRR2-Offenlegungs-ITS (Stichtage ab ~Mitte 2021).
 Saubere, konsistente Reihen daher für **FY2021–FY2024**; FY2020 (Alt-Template)
 ist bewusst ausgeklammert.
 
-**Status (abgeschlossen):** Alle **10 Banken** sind extrahiert — 225
-Datenpunkte, **88 % Abdeckung relativ zum bank-eigenen Meldeumfang**
-(strukturell nicht geführte Klassen — z. B. kein IRB-Sovereign/QRRE bei
-einzelnen Häusern — zählen nicht als Lücke). Die 31 verbleibenden Zellen sind
-dokumentierte **Quellgrenzen** (BNP 2021: PD auf ganze % gerundet; SocGen
-2022: Bank+Sovereign im PDF-Text verschmolzen; Crédit-Mutuel-/BPCE-Vorjahre:
-mehrdeutige Anker) und werden **nicht** mit abgeleiteten Werten gefüllt.
-Detail-Protokoll: `tools/pillar3_backfill/STATUS.md` +
-`VERIFICATION_REPORT.json` (adversariale 9-Agenten-Quellprüfung).
+**Status (abgeschlossen):** Alle **10 Banken** sind extrahiert — **252
+Datenpunkte, 98 % Abdeckung relativ zum bank-eigenen Meldeumfang** (252 von
+256 gemeldeten Bank×Jahr×Klasse-Zellen; strukturell nicht geführte Klassen —
+z. B. kein IRB-Sovereign/QRRE bei einzelnen Häusern — zählen nicht als
+Lücke). Der Lückenschluss-Sweep (Juli 2026) hat 27 zuvor offene Zellen über
+zwei Wege geschlossen: (a) **Vorjahres-Vergleichsspalten** der
+Folgejahres-Berichte (z. B. BNP-URD 2022 liefert 31.12.2021 mit
+Dezimal-PDs; BPCE-2023-Bericht bestätigt die 2022-Werte doppelt) und
+(b) **Block-Anker-Matching** (der Tabellenblock wird über bereits
+verifizierte Nachbarwerte identifiziert, die fehlende Klasse aus demselben
+Block gelesen). Jede Zelle ist wort-wörtlich mit Seitenbeleg erfasst,
+dichte-geprüft (RWA/EAD vs. gedruckte Density ≤ 1 pp) und
+EAD-kontinuitäts-geprüft. Die **4 verbleibenden Zellen** sind endgültige
+**Quellgrenzen**: SocGen Sovereign 2022 (PD/LGD als wörtliche
+„0"-Platzhalter gedruckt, in zwei Publikationen identisch), Crédit Mutuel
+Corporate+SME 2021 (kombinierte NI-Tabelle bricht die A-/F-IRB-Konvention
+der Serie) und Crédit Agricole SME 2021 (echter A-IRB-Perimeterbruch).
+Sie werden **nicht** mit abgeleiteten Werten gefüllt. Detail-Protokoll:
+`tools/pillar3_backfill/STATUS.md` + `VERIFICATION_REPORT.json`
+(adversariale Multi-Agenten-Quellprüfung).
 
 **Loader:** Backtest-Reihe über `backtesting_walkforward.load_backtest_series()`
 (+ `build_pdlgd_panel`, `build_cet1_backtest`, `build_pd_backtest`);

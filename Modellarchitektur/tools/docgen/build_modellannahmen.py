@@ -347,12 +347,16 @@ body("**70 Parameter-Zeilen** = 10 Banken × 7 IRB-Klassen zum einheitlichen "
      "ausgenommen.")
 h2("Historische Backtest-Reihe")
 body("Für die Validierung existiert eine eigene Roh-Reihe: **10 Banken × "
-     "FY2021–FY2024, 225 Datenpunkte** (PD, LGD und EAD je Klasse aus "
-     "derselben Report-Vintage). Das entspricht **88 % Abdeckung relativ "
-     "zum bank-eigenen Meldeumfang** — Klassen, die eine Bank gar nicht im "
-     "A-IRB führt, zählen nicht als Lücke. Die verbleibenden Zellen sind "
-     "dokumentierte Quellgrenzen (z. B. auf ganze Prozent gerundete PD im "
-     "BNP-Report 2021) und werden **nicht** mit geschätzten Werten gefüllt.")
+     "FY2021–FY2024, 252 Datenpunkte** (PD, LGD und EAD je Klasse aus "
+     "derselben Report-Vintage). Das entspricht **98 % Abdeckung relativ "
+     "zum bank-eigenen Meldeumfang** (252 von 256 gemeldeten Zellen) — "
+     "Klassen, die eine Bank gar nicht im A-IRB führt, zählen nicht als "
+     "Lücke. Geschlossen wurden die Lücken über die Vorjahres-"
+     "Vergleichsspalten der Folgejahres-Berichte und über Block-Anker-"
+     "Matching im Quell-PDF; jede Zelle ist wort-wörtlich mit Seitenbeleg "
+     "erfasst. Die vier verbleibenden Zellen sind endgültige Quellgrenzen "
+     "(z. B. druckt Société Générale für Sovereign 2022 wörtliche "
+     "„0“-Platzhalter) und werden **nicht** mit geschätzten Werten gefüllt.")
 h2("Vier Integritäts-Sicherungen je Datenpunkt")
 bullet("**Kalibrier-Anker:** Jeder Extraktions-Parser muss zunächst alle "
        "hand-verifizierten 2024-Werte exakt reproduzieren, bevor Vorjahre "
@@ -379,7 +383,7 @@ table(
      ["A-02", "LGD-Quelle", "identisch A-01 (EU-CR6-LGD)", "published",
       "wie A-01"],
      ["A-02c", "Backtest-Zeitreihe", "eigene Pillar-3-Roh-Reihe, 10 Banken × "
-      "FY2021–2024 (225 Punkte, 88 %), strikt no-look-ahead", "published",
+      "FY2021–2024 (252 Punkte, 98 %), strikt no-look-ahead", "published",
       "Bank-Pillar-3-Reports FY2021–2024"],
      ["A-03", "EAD", "EBA-Transparency Item 2520522 (post-CCF)", "published",
       "EBA Transparency 2025"],
@@ -435,7 +439,7 @@ annahme("A-02", "LGD-Quelle: Pillar-3 EU-CR6 (31.12.2024)",
     "erwarteten Verlust und fast linear auf die Kapitalanforderung — der "
     "direkteste Hebel unter den Parametern.")
 annahme("A-02c", "Backtest-Zeitreihe (nur Pillar-3, no-look-ahead)",
-    "**Festlegung:** Eigene Roh-Reihe über 10 Banken × FY2021–FY2024 (225 "
+    "**Festlegung:** Eigene Roh-Reihe über 10 Banken × FY2021–FY2024 (252 "
     "Punkte); ein Quartal im Jahr Y nutzt ausschließlich den Stichtag "
     "31.12.(Y−1) — den jüngsten, der damals publiziert war. **Warum:** Nur "
     "so ist die Validierung echt out-of-sample. **Verworfene Alternative:** "
@@ -528,19 +532,25 @@ figure("fig4_walkforward.png", 16.2,
        "Abb. 4 · No-Look-Ahead-Prinzip: einfrieren (31.12. des Vorjahres) → "
        "realen Schock einspeisen → gegen die gemeldete CET1-Quote halten → "
        "ein Jahr weiterrollen.")
-h2("Ergebnis (29 Bank-Jahre, 2022–2024)")
+h2("Ergebnis (30 Bank-Jahre, 2022–2024 — vollständiges Panel)")
 table(
     ["Kennzahl", "Wert", "Bedeutung"],
     [["MAE (mittlerer absoluter Fehler)", "**≈ 1,3 pp**",
       "Ø-Abstand Prognose ↔ gemeldete CET1-Quote; auf ~15 %-Niveau "
       "≈ 9 % relativer Abstand"],
-     ["Treffer ≤ 1 pp", "**65 %**", "Anteil der Bank-Jahre mit höchstens "
+     ["Treffer ≤ 1 pp", "**60 %**", "Anteil der Bank-Jahre mit höchstens "
       "1 Prozentpunkt Abweichung"],
-     ["Konservativ-Anteil", "**72 %**", "Prognose ≤ gemeldete Quote — das "
+     ["Konservativ-Anteil", "**73 %**", "Prognose ≤ gemeldete Quote — das "
       "Modell irrt auf der sicheren Seite"],
      ["Bias", "**−1,0 pp**", "systematisch vorsichtig (gewollt: kein "
       "NII-Gegeneffekt angesetzt)"]],
     [30, 14, 56], fontsize=9)
+body("Alle 10 Banken sind in allen drei Backtest-Jahren vertreten (30 von "
+     "30 möglichen Bank-Jahren). Im Zinsschock-Jahr 2022 liegt das Modell "
+     "bei allen 10 Banken auf der konservativen Seite (Ø −2,5 pp — der "
+     "bewusst nicht angesetzte NII-Gegeneffekt); in den ruhigeren Jahren "
+     "2023/2024 beträgt der mittlere Fehler nur 0,5 bzw. 0,8 pp.",
+     size=9.5)
 h2("Ehrliche Grenze: Point-in-Time vs. Through-the-Cycle")
 body("Die einzelnen Melde-Kanäle (PD, Kredit-RWA) sind **nicht "
      "punktprognostizierbar** — und zwar aus einem dokumentierten "

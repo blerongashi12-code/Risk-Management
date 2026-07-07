@@ -1,4 +1,11 @@
 LEI,bank_name,vasicek_class,vintage_date,pd_pct,lgd_pct,ead_eur_m,source,note
+R0MUWSFPU8MPRO8K5P83,BNP Paribas,bank,2021-12-31,0.67,28.00,43767,"BNP Paribas URD 2022 EU CR6 IRBA, 31.12.2021-Vergleich (S.411, quellverifiziert)",
+R0MUWSFPU8MPRO8K5P83,BNP Paribas,corporate,2021-12-31,2.86,34.00,350196,"BNP Paribas URD 2022 EU CR6 IRBA, 31.12.2021-Vergleich (S.415, quellverifiziert)",
+R0MUWSFPU8MPRO8K5P83,BNP Paribas,mortgage,2021-12-31,2.19,12.00,179316,"BNP Paribas URD 2022 EU CR6 IRBA, 31.12.2021-Vergleich (S.419, quellverifiziert)",
+R0MUWSFPU8MPRO8K5P83,BNP Paribas,other_retail,2021-12-31,7.24,40.00,47407,"BNP Paribas URD 2022 EU CR6 IRBA, 31.12.2021-Vergleich (S.423, quellverifiziert)",
+R0MUWSFPU8MPRO8K5P83,BNP Paribas,qrre,2021-12-31,9.54,53.00,12425,"BNP Paribas URD 2022 EU CR6 IRBA, 31.12.2021-Vergleich (S.422, quellverifiziert)",
+R0MUWSFPU8MPRO8K5P83,BNP Paribas,sme_corporate,2021-12-31,7.30,29.00,43188,"BNP Paribas URD 2022 EU CR6 IRBA, 31.12.2021-Vergleich (S.414, quellverifiziert)",
+R0MUWSFPU8MPRO8K5P83,BNP Paribas,sovereign,2021-12-31,0.05,2.00,469143,"BNP Paribas URD 2022 EU CR6 IRBA, 31.12.2021-Vergleich (S.411, quellverifiziert)",
 R0MUWSFPU8MPRO8K5P83,BNP Paribas,bank,2022-12-31,0.76,28.00,38441,BNP Paribas URD EU CR6 IRBA-by-PD-scale (raw subtotal),
 R0MUWSFPU8MPRO8K5P83,BNP Paribas,corporate,2022-12-31,2.52,33.00,378795,BNP Paribas URD EU CR6 IRBA-by-PD-scale (raw subtotal),
 R0MUWSFPU8MPRO8K5P83,BNP Paribas,mortgage,2022-12-31,2.00,12.00,189058,BNP Paribas URD EU CR6 IRBA-by-PD-scale (raw subtotal),
@@ -54,6 +61,7 @@ F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,bank,2022-12-31,1.73,30.90,26505,Credit 
 F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,corporate,2022-12-31,1.94,36.44,133580,Credit Agricole S.A. Pillar 3 EU CR6 A-IRB (raw subtotal),
 F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,mortgage,2022-12-31,1.32,10.85,113906,Credit Agricole S.A. Pillar 3 EU CR6 A-IRB (raw subtotal),
 F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,other_retail,2022-12-31,5.69,27.70,61574,Credit Agricole S.A. Pillar 3 EU CR6 A-IRB (raw subtotal),
+F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,qrre,2022-12-31,5.13,79.12,11827,"Credit Agricole S.A. Pillar 3 H1-2023, 31.12.2022 EU CR6 A-IRB Vergleich (S.42, quellverifiziert)",
 F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,sme_corporate,2022-12-31,4.44,40.89,13162,Credit Agricole S.A. Pillar 3 EU CR6 A-IRB (raw subtotal),
 F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,sovereign,2022-12-31,0.05,8.21,132966,Credit Agricole S.A. Pillar 3 EU CR6 A-IRB (raw subtotal),
 F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,bank,2023-12-31,2.23,29.97,21278,Credit Agricole S.A. Pillar 3 EU CR6 A-IRB (raw subtotal),
@@ -70,9 +78,15 @@ F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,other_retail,2024-12-31,6.16,30.38,63181
 F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,qrre,2024-12-31,5.46,79.67,13432,Credit Agricole S.A. Pillar 3 EU CR6 A-IRB (raw subtotal),
 F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,sme_corporate,2024-12-31,4.38,43.33,18440,Credit Agricole S.A. Pillar 3 EU CR6 A-IRB (raw subtotal),
 F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,sovereign,2024-12-31,0.06,8.26,144574,Credit Agricole S.A. Pillar 3 EU CR6 A-IRB (raw subtotal),
+9695000CG7B84NLR5984,Credit Mutuel,bank,2021-12-31,0.16,30.00,27374,"Credit Mutuel Pilier 3 2021 EU CR6 NI (S.52, quellverifiziert)",F-IRB-Zeile (Serienkonvention: CM meldet Institute nur F-IRB)
 9695000CG7B84NLR5984,Credit Mutuel,mortgage,2021-12-31,2.14,15.00,214247,"Credit Mutuel Pilier 3 2021 EU CR6 AIRB mortgage (LGD-distinctive, continuity-verified)",
+9695000CG7B84NLR5984,Credit Mutuel,other_retail,2021-12-31,2.55,17.00,361722,"Credit Mutuel Pilier 3 2021 EU CR6 (S.52, quellverifiziert)",
+9695000CG7B84NLR5984,Credit Mutuel,bank,2022-12-31,0.19,35.00,25423,"Credit Mutuel Pilier 3 2022 EU CR6 F-IRB Etablissements (S.51, quellverifiziert)",F-IRB-Zeile (Serienkonvention: CM meldet Institute nur F-IRB)
 9695000CG7B84NLR5984,Credit Mutuel,corporate,2022-12-31,2.39,45.00,66725,"Credit Mutuel Pilier 3 2022 EU CR6 AIRB corporate (LGD-distinctive, continuity-verified)",
 9695000CG7B84NLR5984,Credit Mutuel,mortgage,2022-12-31,2.10,15.00,229540,"Credit Mutuel Pilier 3 2022 EU CR6 AIRB mortgage (LGD-distinctive, continuity-verified)",
+9695000CG7B84NLR5984,Credit Mutuel,other_retail,2022-12-31,2.52,16.00,385061,"Credit Mutuel Pilier 3 2022 EU CR6 Clientele de detail (S.48, quellverifiziert)",
+9695000CG7B84NLR5984,Credit Mutuel,sme_corporate,2022-12-31,4.89,23.00,86416,"Credit Mutuel Pilier 3 2022 EU CR6 A-IRB Entreprises (S.48, quellverifiziert)",
+9695000CG7B84NLR5984,Credit Mutuel,bank,2023-12-31,0.19,35.00,29543,"Credit Mutuel Pilier 3 2023 EU CR6 F-IRB Etablissements (S.50, quellverifiziert)","F-IRB-Zeile (Serienkonvention: CM meldet Institute nur F-IRB; 2024-Anker 30,410 kontinuierlich)"
 9695000CG7B84NLR5984,Credit Mutuel,corporate,2023-12-31,2.42,45.00,70064,Credit Mutuel Pilier 3 EU CR6 AIRB (raw subtotal),
 9695000CG7B84NLR5984,Credit Mutuel,mortgage,2023-12-31,1.63,15.00,289619,Credit Mutuel Pilier 3 EU CR6 AIRB (raw subtotal),
 9695000CG7B84NLR5984,Credit Mutuel,other_retail,2023-12-31,2.38,19.00,395260,Credit Mutuel Pilier 3 EU CR6 AIRB (raw subtotal),
@@ -111,15 +125,25 @@ F0HUI1NY1AZMJMD8LP67,Credit Agricole SA,sovereign,2024-12-31,0.06,8.26,144574,Cr
 7LTWFZYICNSX8D621K86,Deutsche Bank,sme_corporate,2024-12-31,6.77,33.03,25888,DB Pillar 3 EU CR6 AIRB (raw subtotal),
 7LTWFZYICNSX8D621K86,Deutsche Bank,sovereign,2024-12-31,0.31,66.37,135860,DB Pillar 3 EU CR6 AIRB (raw subtotal),
 FR9695005MSX1OYEMGDF,Groupe BPCE,bank,2021-12-31,2.83,32.32,7480,"BPCE Pillar III H1-2022 update, 31.12.2021 A-IRB comparative (source-verified)",
+FR9695005MSX1OYEMGDF,Groupe BPCE,corporate,2021-12-31,16.54,33.74,78604,"BPCE Pillar III H1-2022 update, 31.12.2021 A-IRB Vergleich (S.81-85, quellverifiziert)",PD-Niveausprung 2022->2023 wie-gemeldet (in beiden Publikationen identisch gedruckt)
+FR9695005MSX1OYEMGDF,Groupe BPCE,mortgage,2021-12-31,19.91,10.81,278290,"BPCE Pillar III H1-2022 update, 31.12.2021 A-IRB Vergleich (S.81-85, quellverifiziert)",
 FR9695005MSX1OYEMGDF,Groupe BPCE,other_retail,2021-12-31,14.67,24.15,45285,"BPCE Pillar III H1-2022 update, 31.12.2021 A-IRB comparative (source-verified)",
+FR9695005MSX1OYEMGDF,Groupe BPCE,qrre,2021-12-31,9.28,21.20,11217,"BPCE Pillar III H1-2022 update, 31.12.2021 A-IRB Vergleich (S.81-85, quellverifiziert)",
+FR9695005MSX1OYEMGDF,Groupe BPCE,sme_corporate,2021-12-31,8.34,22.25,5527,"BPCE Pillar III H1-2022 update, 31.12.2021 A-IRB Vergleich (S.81-85, quellverifiziert)",
 FR9695005MSX1OYEMGDF,Groupe BPCE,sovereign,2021-12-31,0.33,9.00,58551,"BPCE Pillar III H1-2022 update, 31.12.2021 A-IRB comparative (source-verified)",
 FR9695005MSX1OYEMGDF,Groupe BPCE,bank,2022-12-31,2.80,39.19,7708,"BPCE Pillar III EU CR6 A-IRB block-1 (distinctive class, source-verified)",
+FR9695005MSX1OYEMGDF,Groupe BPCE,corporate,2022-12-31,17.90,33.58,80498,BPCE Pillar III 2022 EU CR6 A-IRB (S.128-132; doppelt belegt via 2023-Bericht S.157-161),PD-Niveausprung 2022->2023 wie-gemeldet (in beiden Publikationen identisch gedruckt)
 FR9695005MSX1OYEMGDF,Groupe BPCE,mortgage,2022-12-31,19.68,10.66,303715,"BPCE Pillar III EU CR6 A-IRB block-1 (distinctive class, source-verified)",
 FR9695005MSX1OYEMGDF,Groupe BPCE,other_retail,2022-12-31,15.65,24.37,45693,"BPCE Pillar III EU CR6 A-IRB block-1 (distinctive class, source-verified)",
+FR9695005MSX1OYEMGDF,Groupe BPCE,qrre,2022-12-31,9.70,21.64,11189,BPCE Pillar III 2022 EU CR6 A-IRB (S.128-132; doppelt belegt via 2023-Bericht S.157-161),
+FR9695005MSX1OYEMGDF,Groupe BPCE,sme_corporate,2022-12-31,7.15,21.99,6041,BPCE Pillar III 2022 EU CR6 A-IRB (S.128-132; doppelt belegt via 2023-Bericht S.157-161),
 FR9695005MSX1OYEMGDF,Groupe BPCE,sovereign,2022-12-31,0.57,9.48,55833,"BPCE Pillar III EU CR6 A-IRB block-1 (distinctive class, source-verified)",
 FR9695005MSX1OYEMGDF,Groupe BPCE,bank,2023-12-31,0.71,35.57,6968,"BPCE Pillar III EU CR6 A-IRB block-1 (distinctive class, source-verified)",
+FR9695005MSX1OYEMGDF,Groupe BPCE,corporate,2023-12-31,4.07,33.99,85550,"BPCE Pillar III 2023 EU CR6 A-IRB (S.149-153, quellverifiziert)",PD-Niveausprung 2022->2023 wie-gemeldet (in beiden Publikationen identisch gedruckt)
 FR9695005MSX1OYEMGDF,Groupe BPCE,mortgage,2023-12-31,14.26,10.77,308983,"BPCE Pillar III EU CR6 A-IRB block-1 (distinctive class, source-verified)",
 FR9695005MSX1OYEMGDF,Groupe BPCE,other_retail,2023-12-31,20.25,27.75,45191,"BPCE Pillar III EU CR6 A-IRB block-1 (distinctive class, source-verified)",
+FR9695005MSX1OYEMGDF,Groupe BPCE,qrre,2023-12-31,9.50,37.08,23933,"BPCE Pillar III 2023 EU CR6 A-IRB (S.149-153, quellverifiziert)",
+FR9695005MSX1OYEMGDF,Groupe BPCE,sme_corporate,2023-12-31,7.81,23.06,6735,"BPCE Pillar III 2023 EU CR6 A-IRB (S.149-153, quellverifiziert)",
 FR9695005MSX1OYEMGDF,Groupe BPCE,sovereign,2023-12-31,0.73,8.60,70124,"BPCE Pillar III EU CR6 A-IRB block-1 (distinctive class, source-verified)",
 FR9695005MSX1OYEMGDF,Groupe BPCE,bank,2024-12-31,0.41,40.42,8677,BPCE Pillar III 2024 EU CR6 AIRB (raw subtotal),
 FR9695005MSX1OYEMGDF,Groupe BPCE,corporate,2024-12-31,5.68,33.28,115996,BPCE Pillar III 2024 EU CR6 AIRB (raw subtotal),
@@ -170,8 +194,10 @@ DG3RU1DBUFHT4ZF9WN62,Rabobank,mortgage,2023-12-31,1.17,9.10,196634,Rabobank Pill
 DG3RU1DBUFHT4ZF9WN62,Rabobank,other_retail,2023-12-31,4.84,23.63,1339,Rabobank Pillar 3 Year Report EU CR6 AIRB (raw subtotal),
 DG3RU1DBUFHT4ZF9WN62,Rabobank,sme_corporate,2023-12-31,4.69,13.29,76153,Rabobank Pillar 3 Year Report EU CR6 AIRB (raw subtotal),
 DG3RU1DBUFHT4ZF9WN62,Rabobank,sovereign,2023-12-31,0.12,22.53,1024,Rabobank Pillar 3 Year Report EU CR6 AIRB (raw subtotal),
+DG3RU1DBUFHT4ZF9WN62,Rabobank,bank,2024-12-31,2.23,10.65,55,"Rabobank Pillar 3 2024 EU CR6 (S.76, quellverifiziert)","A-IRB-Residuum nach IRB-Rollback (A->F-IRB), EAD stark verkleinert, dichte-verifiziert"
 DG3RU1DBUFHT4ZF9WN62,Rabobank,corporate,2024-12-31,9.98,22.20,38965,Rabobank Pillar 3 Year Report EU CR6 AIRB (raw subtotal),"A-IRB-Residuum nach IRB-Rollback (A->F-IRB), EAD stark verkleinert, dichte-verifiziert"
 DG3RU1DBUFHT4ZF9WN62,Rabobank,mortgage,2024-12-31,1.09,9.10,198765,Rabobank Pillar 3 Year Report EU CR6 AIRB (raw subtotal),
+DG3RU1DBUFHT4ZF9WN62,Rabobank,other_retail,2024-12-31,5.38,24.00,1771,"Rabobank Pillar 3 2024 EU CR6 (S.82, quellverifiziert)",
 DG3RU1DBUFHT4ZF9WN62,Rabobank,sme_corporate,2024-12-31,5.05,12.82,77266,Rabobank Pillar 3 Year Report EU CR6 AIRB (raw subtotal),
 DG3RU1DBUFHT4ZF9WN62,Rabobank,sovereign,2024-12-31,1.07,31.73,725,Rabobank Pillar 3 Year Report EU CR6 AIRB (raw subtotal),"A-IRB-Residuum nach IRB-Rollback (A->F-IRB), EAD stark verkleinert, dichte-verifiziert"
 O2RNE8IBXP4R0TD8PU41,Societe Generale,bank,2021-12-31,0.89,23.38,39906,SocGen Pillar 3 2021 EU CR6 AIRB Institutions subtotal (source-verified),
@@ -181,6 +207,7 @@ O2RNE8IBXP4R0TD8PU41,Societe Generale,other_retail,2021-12-31,6.63,28.44,34041,S
 O2RNE8IBXP4R0TD8PU41,Societe Generale,qrre,2021-12-31,8.00,49.20,5398,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),DENSITY?
 O2RNE8IBXP4R0TD8PU41,Societe Generale,sme_corporate,2021-12-31,3.86,15.79,54516,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),
 O2RNE8IBXP4R0TD8PU41,Societe Generale,sovereign,2021-12-31,1.00,2.70,265428,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),
+O2RNE8IBXP4R0TD8PU41,Societe Generale,bank,2022-12-31,1.24,25.01,38844,SocGen Pillar 3 2022 EU CR6 AIRB Institutions subtotal (S.145; doppelt belegt via 2023-Bericht S.147),
 O2RNE8IBXP4R0TD8PU41,Societe Generale,corporate,2022-12-31,2.53,30.92,162968,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),
 O2RNE8IBXP4R0TD8PU41,Societe Generale,mortgage,2022-12-31,1.51,15.92,126745,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),DENSITY?
 O2RNE8IBXP4R0TD8PU41,Societe Generale,other_retail,2022-12-31,6.43,29.29,33307,SocGen Pillar 3 EU CR6 AIRB (raw subtotal),DENSITY?
