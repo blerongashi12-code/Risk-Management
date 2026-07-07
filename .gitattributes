@@ -1,4 +1,27 @@
-# Zeilenenden pro Plattform-Launcher erzwingen
+# Text normalization
+* text=auto
+.gitattributes text eol=lf
+.gitignore     text eol=lf
+
+# Platform launchers
 *.command text eol=lf
 *.sh      text eol=lf
 *.bat     text eol=crlf
+
+# Data and docs with stable diffs
+*.csv text eol=lf
+*.md  text eol=lf
+*.txt text eol=lf
+*.py  text eol=lf
+*.json text eol=lf
+
+# Binary deliverables / assets
+*.docx binary
+*.pptx binary
+*.xlsx binary
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.ico  binary
+*.parquet binary

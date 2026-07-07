@@ -1,21 +1,30 @@
 # Abgabe-Files
 
-Deliverables des Projekts — getrennt von der Modellarchitektur.
+Dieser Ordner enthält die finalen Abgabe-Artefakte. Die technische
+Modellarchitektur liegt getrennt in `../Modellarchitektur/`.
 
-## Struktur
+## Schnelle Orientierung
 
-```
-Abgabe-Files/
-├── Praesentation/              ← Ablageort für die finale Präsentation (wird manuell hochgeladen)
-└── Abgabedokumente/
-    ├── Modellannahmen.docx     ← kuratierte Annahmen-Doku des aktuellen Modells
-    │                              (9 Kapitel, 4 Schaubilder, Annahmen-Inventar A-01–A-10)
-    └── Schaubilder/            ← die 4 Schaubilder als PNG (wiederverwendbar, z. B. für die PPT)
-```
+| Pfad | Zweck |
+|---|---|
+| `Abgabedokumente/Modellannahmen.docx` | Kuratierte Modelldokumentation für die Abgabe: Methodik, Annahmen, Quellen, Backtest-Grenzen. |
+| `Abgabedokumente/Schaubilder/` | Exportierte Grafiken aus der Modelldokumentation. |
+| `Praesentation/` | Präsentationsdateien und Visuals für die mündliche/folienbasierte Abgabe. |
 
-## Hinweis zur Quelle der Annahmen
+## Cockpit starten
 
-`Modellannahmen.docx` ist die **kuratierte Abgabefassung** — verständlich aufbereitet,
-mit didaktischen Schaubildern (Modell-Pipeline, Sensitivitäts-Matrix, CET1-Bridge,
-Walk-Forward-Prinzip). Die **technische Single Source of Truth** bleibt
-[`Modellarchitektur/docs/MODEL_ASSUMPTIONS.md`](../Modellarchitektur/docs/MODEL_ASSUMPTIONS.md) (V2.1).
+Bitte nicht aus diesem Ordner starten, sondern eine Ebene höher:
+
+- Windows: `Start-Cockpit-Windows.bat`
+- macOS: `Start-Cockpit-Mac.command`
+
+Beide Starter installieren beim ersten Start die benötigten Python-Pakete aus
+`Modellarchitektur/requirements.txt` und öffnen anschließend das Streamlit-
+Cockpit im Browser.
+
+## Quellen der Methodik
+
+Die Word-Datei `Abgabedokumente/Modellannahmen.docx` ist die lesbare
+Abgabefassung. Die technische Single Source of Truth bleibt:
+
+`../Modellarchitektur/docs/MODEL_ASSUMPTIONS.md`

@@ -570,8 +570,15 @@ Die geänderten Werte wirken sofort und global auf alle Charts.
 ## 8 · Repository-Struktur
 
 ```text
+RiskMgmt/
+├── Abgabe-Files/                       ← finale Deliverables für die Abgabe
+├── Modellarchitektur/                  ← Modellcode, Daten, Methodik, App
+├── Start-Cockpit-Windows.bat           ← Cockpit-Start für Windows
+└── Start-Cockpit-Mac.command           ← Cockpit-Start für macOS
+
 Modellarchitektur/
 ├── README.md                          ← dieses File
+├── requirements.txt                    ← Python-Abhängigkeiten für Cockpit + Tools
 ├── run_clean.py                       ← Streamlit-Start mit Cache-Cleanup
 ├── config.py                          ← Pfade, Konstanten
 │
@@ -753,9 +760,19 @@ Modellarchitektur/
 
 ### 10.1 · Setup
 
+Für die Abgabe genügt normalerweise einer der Starter im Hauptordner:
+
+- Windows: `Start-Cockpit-Windows.bat`
+- macOS: `Start-Cockpit-Mac.command`
+
+Die Starter installieren beim ersten Start automatisch die Abhängigkeiten aus
+`Modellarchitektur/requirements.txt` und öffnen das Cockpit im Browser.
+
+Manuelles Setup für Entwicklung:
+
 ```bash
-pip install streamlit pandas pyarrow numpy scipy openpyxl yfinance plotly \
-            python-docx pdfplumber
+cd "Modellarchitektur"
+pip install -r requirements.txt
 ```
 
 Python ≥ 3.10 empfohlen.
@@ -792,6 +809,15 @@ Top-10-Tabelle erforderlich. Der einzige aktive Fallback ist Santander
 Sovereign, weil hierfür regulatorisch keine IRB-PD/LGD publiziert wird.
 
 ### 10.3 · Cockpit starten
+
+Empfohlener Start aus dem Hauptordner:
+
+```text
+Start-Cockpit-Windows.bat   # Windows
+Start-Cockpit-Mac.command   # macOS
+```
+
+Alternativ manuell aus der Modellarchitektur:
 
 ```bash
 cd "Modellarchitektur"

@@ -1,6 +1,6 @@
 @echo off
 REM ============================================================
-REM  Start_Cockpit.bat - startet das Credit Stress Cockpit lokal
+REM  Start-Cockpit-Windows.bat - startet das Credit Stress Cockpit lokal
 REM  Einfach doppelklicken. Der Browser oeffnet sich automatisch.
 REM  Beim allerersten Start werden fehlende Pakete installiert.
 REM ============================================================
@@ -22,7 +22,7 @@ python -c "import streamlit" >nul 2>&1
 if errorlevel 1 (
     echo [Setup] Installiere benoetigte Pakete ^(nur beim ersten Start^) ...
     python -m pip install --upgrade pip
-    python -m pip install -r requirements.txt
+    python -m pip install -r "Modellarchitektur\requirements.txt"
 )
 
 REM --- 2b) Alte Cockpit-Server beenden + Bytecode-Cache leeren ---

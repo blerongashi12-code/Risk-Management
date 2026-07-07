@@ -1,9 +1,9 @@
 #!/bin/bash
 # ============================================================
-#  Start_Cockpit.command - startet das Credit Stress Cockpit (macOS)
+#  Start-Cockpit-Mac.command - startet das Credit Stress Cockpit (macOS)
 #  Einfach doppelklicken. Beim ersten Mal: Rechtsklick -> "Oeffnen"
 #  (Gatekeeper). Der Browser oeffnet sich automatisch.
-#  Gleiche Logik wie Start_Cockpit.bat (Windows).
+#  Gleiche Logik wie Start-Cockpit-Windows.bat.
 # ============================================================
 set -u
 cd "$(dirname "$0")"
@@ -21,7 +21,7 @@ fi
 if ! "$PY" -c "import streamlit" >/dev/null 2>&1; then
     echo "[Setup] Installiere benoetigte Pakete (nur beim ersten Start) ..."
     "$PY" -m pip install --upgrade pip
-    "$PY" -m pip install -r requirements.txt
+    "$PY" -m pip install -r "Modellarchitektur/requirements.txt"
 fi
 
 # --- 2b) Alte Cockpit-Server beenden + Bytecode-Cache leeren ---

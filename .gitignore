@@ -1,20 +1,33 @@
-# Python bytecode
+# Python bytecode and local environments
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
 
 # Editor / IDE
 .vscode/
 .idea/
 
-# Claude Code tooling (worktrees, sessions)
+# Local AI/tooling worktrees and sessions (not part of the deliverable)
 .claude/
 
-# Streamlit runtime cache
+# Streamlit runtime cache and local secrets
 .streamlit/secrets.toml
+.streamlit/cache/
 
-# Large EBA raw files (kept locally only — too big for git, ~1.3 GB total)
+# Local runtime/output artefacts
+*.log
+*.tmp
+*.bak
+~$*
+
+# Large EBA raw files (kept locally only; too big for git, ~1.3 GB total)
 Modellarchitektur/data/tr_cre.csv
 Modellarchitektur/data/tr_sov.csv
 Modellarchitektur/data/tr_oth.csv
@@ -37,7 +50,6 @@ Modellarchitektur/data/transparency_*/
 # OS junk
 .DS_Store
 Thumbs.db
-*.log
 
-# Pillar-3 source PDFs (large, ~210MB) — co-located with project, not committed
+# Pillar-3 source PDFs (large, ~210MB) - co-located locally, not committed
 Modellarchitektur/data/pillar3_reports/
