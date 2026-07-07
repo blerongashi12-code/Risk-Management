@@ -580,7 +580,7 @@ table(
     ["Kennzahl", "Wert", "Bedeutung"],
     [["MAE (mittlerer absoluter Fehler)", "**≈ 1,3 pp**",
       "Ø-Abstand Prognose ↔ gemeldete CET1-Quote; auf ~15 %-Niveau "
-      "≈ 9 % relativer Abstand"],
+      "≈ 8 % relativer Abstand"],
      ["Treffer ≤ 1 pp", "**60 %**", "Anteil der Bank-Jahre mit höchstens "
       "1 Prozentpunkt Abweichung"],
      ["Konservativ-Anteil", "**73 %**", "Prognose ≤ gemeldete Quote — das "

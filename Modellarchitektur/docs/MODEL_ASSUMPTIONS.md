@@ -176,7 +176,7 @@ Portfolio → gestresste CET1-Quote über zwei Kanäle (Nenner: RWA_total +
 ΔRWA_credit; Zähler: CET1 − ΔEL) → Vergleich mit der tatsächlich gemeldeten
 CET1-Quote. Bewusst **konservative Abwärts-Sicht**: Gewinnthesaurierung und
 Zinsüberschuss (NII) werden *nicht* gegengerechnet. **Ergebnis:** MAE ≈ 1,3 pp
-(genau 1,28 pp; auf ~15 %-Niveau ≈ 9 % relativ), 60 % der Bank-Jahre ≤ 1 pp
+(genau 1,26 pp; auf ~15 %-Niveau ≈ 8 % relativ), 60 % der Bank-Jahre ≤ 1 pp
 Abstand, 73 % konservativ (Prognose ≤ Ist), Bias −1,0 pp; im Zinsschock-Jahr
 2022 ~2,5 pp zu konservativ (alle 10 Banken auf der sicheren Seite), weil
 Banken am Zinsanstieg verdienten (NII-Gegeneffekt, modellseitig bewusst
@@ -242,7 +242,11 @@ source_verified_model_excluded` und `include_in_backtest = 0`; es wird
 keine PD/LGD aus RWA oder Nachbarjahren abgeleitet. Die einzige verbleibende
 offene **Quellgrenze** ist Crédit Mutuel Corporate 2021: Der Report enthält
 keine zur 2022–2024-Serienkonvention passende F-IRB-PD/LGD-Zeile, daher wird
-kein Wert erfunden. Detail-Protokoll:
+kein Wert erfunden. Am Quelltext verifiziert (`cm_2021.pdf`): der 2021-Bericht
+führt Firmenkunden ausschließlich unter Tableau 34 „Approche NI" (A-IRB,
+Entreprises-Subtotal = `sme_corporate`); der separate F-IRB-Block „Approche IRB
+Fondation" — aus dem die `corporate`-Serie 2022–2024 stammt (LGD 45 %) — wurde
+erst ab dem 2022-Bericht eingeführt. Detail-Protokoll:
 `tools/pillar3_backfill/STATUS.md` + `VERIFICATION_REPORT.json`
 (adversariale Multi-Agenten-Quellprüfung).
 

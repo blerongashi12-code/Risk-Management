@@ -1843,5 +1843,39 @@ footer(
     "Svensson · Backend-Module in `Modellarchitektur/backend/`"
 )
 
-# Build-Marker — bestätigt, welche Version in der Cloud live ist.
-st.caption("Build 2026-06-02 · derived-cache fallback aktiv")
+# Build-Marker — selbst-aktualisierend, damit sofort erkennbar ist, welcher
+# Stand läuft (verhindert die Verwechslung eines alten Cloud-/Lokal-Builds mit
+# dem aktuellen Modell). Primär der echte Git-Commit (Hash + Datum, gegen
+# `git log` verifizierbar); Fallback ist die mtime der Single Source of Truth.
+def _build_marker() -> str:
+    build = ""
+    try:
+        import subprocess
+        out = subprocess.run(
+            ["git", "-C", str(_HERE), "log", "-1",
+             "--format=%h · %cd", "--date=format:%Y-%m-%d"],
+            capture_output=True, text=True, timeout=2,
+        )
+        if out.returncode == 0 and out.stdout.strip():
+            build = out.stdout.strip()
+    except Exception:
+        build = ""
+    if not build:
+        try:
+            from datetime import datetime
+            mp = _HERE.parent / "docs" / "MODEL_ASSUMPTIONS.md"
+            build = "Stand " + datetime.fromtimestamp(
+                mp.stat().st_mtime).strftime("%Y-%m-%d")
+        except Exception:
+            build = "Stand unbekannt"
+    pts = ""
+    try:
+        import pandas as _pd
+        _n = len(_pd.read_csv(
+            _HERE.parent / "data" / "pillar3_backtest_pdlgd.csv"))
+        pts = f" · EU-CR6-Reihe {_n} Datenpunkte"
+    except Exception:
+        pts = ""
+    return f"Build {build}{pts} · 2-Faktor-CET1-Backtest"
+
+st.caption(_build_marker())

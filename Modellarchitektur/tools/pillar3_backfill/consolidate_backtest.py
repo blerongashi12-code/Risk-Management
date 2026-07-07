@@ -193,11 +193,18 @@ if os.path.exists(DL + "ca_raw_rows.csv"):
 # Lueckenschluss-Sweep Juli 2026: 27 Zellen, alle wort-woertlich aus den
 # Quell-PDFs belegt (Seite + Rohzeile), Dichte-Check (RWA/EAD vs. gedruckte
 # Dichte <=1pp) und EAD-Kontinuitaet gegen Nachbarjahre bestanden.
-# Verbleibende echte Quellgrenzen (NICHT extrahierbar):
-#   - SocGen sovereign 2022: PD/LGD/Dichte als woertliche "0"-Platzhalter
-#     gedruckt, doppelt geprueft (socgen_2022 S.145 UND socgen_2023 S.147).
-#   - CM corporate+sme 2021: kombinierte NI-Tabelle bricht A-/F-IRB-Konvention.
-#   - CA sme 2021: echter A-IRB-Perimeterbruch (Kontinuitaetsregel).
+# Quellenbelegte Sonderfaelle -> als Zeile erfasst, aber include_in_backtest=0
+# (source_verified_model_excluded, keine Ableitung aus RWA/Nachbarjahren):
+#   - SocGen sovereign 2022: PD/LGD nur als woertliche "0"-Platzhalter
+#     gedruckt, doppelt geprueft (socgen_2022 S.145 UND socgen_2023 S.147);
+#     EAD 271.679 ist echt gedruckt -> Zeile bleibt fuer Audit sichtbar.
+#   - CA sme 2021: gedruckt (3.074/26,43/33,29, ca_sa_2022h1 S.40), aber
+#     echter A-IRB-Perimeterbruch gegenueber 2022+ (Kontinuitaetsregel).
+# Einzige verbleibende ECHTE Quellgrenze (kein Wert erfunden):
+#   - CM corporate 2021: am Quelltext verifiziert -> cm_2021.pdf fuehrt
+#     Firmenkunden nur unter Tableau 34 "Approche NI" (A-IRB, = sme_corporate);
+#     der F-IRB-Block "Approche IRB Fondation" (Quelle der corporate-Serie
+#     2022-2024, LGD 45%) existiert erst ab dem 2022-Bericht.
 # ====================================================================
 
 # --- BNP 2021 (7/7): 31.12.2021-Vergleichsspalten der URD 2022 (bnp_2022.pdf,
