@@ -36,7 +36,18 @@ regulatorische Eigenkapitalquote (CET1) der 10 größten EU-IRB-Banken
 | 1 | **Loan Book** | Sektor-differenzierte PD/LGD-Transmission via β-Sensitivitäten |
 | 2 | **Sovereign Book** | Modified-Duration-MtM auf Δr_10y, CET1-wirksam nur der bank-individuell gemeldete HfT/FVTPL/FVOCI-Anteil (EBA-IFRS-9-Split) |
 
-*(Der frühere dritte Trading-Book-Channel wurde entfernt — siehe A-07.)*
+Das Trading Book ist kein eigener Stress-Kanal; die Begründung und Scope-
+Wirkung sind in A-07 dokumentiert.
+
+### Prüfpfad für kritische Evaluation
+
+| Prüffrage | Nachvollziehbarer Beleg | Artefakt |
+|---|---|---|
+| Woher kommen PD/LGD/EAD? | Bank-individuelle Pillar-3-EU-CR6-Zeilen mit `source_url`, `source_page`, Tabellenname und Dichte-Cross-Check; keine Ableitung aus RWA oder NPL-Quoten. | `data/pillar3_bank_pd_lgd.csv`, `data/pillar3_backtest_pdlgd.csv` |
+| Welche Werte sind Annahmen, welche nicht? | Jede Modellentscheidung ist als `[published]`, `[estimate]`, `[approximation]` oder `[assumption]` klassifiziert; `ρ` ist ein CRR-Klassenparameter, keine eigene Schätzung. | Abschnitt 3; `backend/vasicek.py` |
+| Wie läuft ein Schock durch das Modell? | ΔBrent/Δr_10y → ΔPD/ΔLGD → Basel-IRB-K-Formel → ΔRWA/ΔEL → CET1-Bridge; Sovereign-MtM separat über Duration und IFRS-9-Split. | `backend/two_factor_stress.py`, `backend/vasicek.py`, `pages/4_Eigenkapital.py` |
+| Wie wird Look-ahead im Backtest verhindert? | Walk-Forward: Portfolio zum Vorjahresstichtag einfrieren, realen Jahresschock einspeisen, erst danach mit gemeldeter CET1 vergleichen. | `backend/backtesting_walkforward.py`, A-02c |
+| Wo liegen die bewussten Grenzen? | Scope-Grenzen separat dokumentiert: u. a. kein NII-Gegeneffekt, kein Hedge-Rekonstrukt, kein Mehrjahrespfad, keine bankindividuellen β. | Abschnitt 5 |
 
 ---
 
@@ -47,7 +58,7 @@ Jede Annahme wird transparent klassifiziert:
 - **[published]** = direkt veröffentlichte Messung
 - **[estimate]** = statistische Schätzung aus Literatur oder Eigen-Regression
 - **[approximation]** = strukturelle Vereinfachung
-- **[assumption]** = hardcoded Annahme
+- **[assumption]** = gesetzte Modellkonvention
 
 ---
 
@@ -188,7 +199,9 @@ Zufall). Ursache ist eine Daten-Eigenschaft, kein Modellfehler: das Modell
 projiziert eine **Point-in-Time**-Reaktion, die gemeldeten A-IRB-Parameter
 sind **Through-the-Cycle** — regulatorisch geglättet und antizyklisch
 (CRR Art. 180) sowie management-getrieben (CRM, Rekalibrierung, IRB↔SA).
-Beleg 2022: Zins +2,8 pp → Modell-PD +0,5 pp, gemeldete PD −0,2 pp. Ein
+Beleg 2022: Zins +2,8 pp → Modell-PD +0,5 pp, gemeldete PD −0,1 pp
+(ungewichteter Ø über die Bank-Klassen-Paare; EAD-gewichtet:
++0,6 vs. −0,2 pp). Ein
 sauberer PIT-Test bräuchte realisierte Ausfallraten je Segment (bank-intern,
 nicht offengelegt; EBA-NPE-Panel erst ab 2024Q3). Das Modell ist damit als
 **konservatives Solvenz-/Frühwarn-Instrument** validiert (im CET1-Niveau nah
@@ -271,7 +284,7 @@ für Stress (im Gegensatz zum ursprünglichen Kreditbetrag).
 Juni 2025.
 
 **Limitation:** EAD bleibt unter Stress statisch — Drawdown-Risiken auf
-Off-Balance-Linien (CCF steigt) sind in V1 nicht modelliert.
+Off-Balance-Linien (CCF steigt) sind im finalen Modell nicht modelliert.
 
 ---
 
@@ -521,10 +534,10 @@ Brutto-MtM CET1-wirksam (Juni 2025).
 
 **Implementierung (Stand 2026-06-10):** Die CET1-Bridge konsumiert
 exakt diesen gefilterten MtM via `sovereign_cet1_pnl_lookup()`
-(eba_loader). Die frühere V1-Vereinfachung — gesamte Maturity-Ladder
-als FVOCI-ähnlich, d. h. 100 % Durchleitung — sowie die noch ältere
-60/40-Pauschale sind ersetzt; Tab 1, Tab 3 und Tab 4 rechnen auf
-identischer Datenbasis. Regressionstest:
+(eba_loader). Nicht verwendet werden eine vollständige 100-%-Durchleitung
+der Maturity-Ladder oder eine pauschale 60/40-Durchleitung; Tab 1, Tab 3
+und Tab 4 rechnen auf identischer bankindividueller Datenbasis.
+Regressionstest:
 `_test_sovereign_effective_lt_gross` (effective < gross, Ratio
 plausibel 30–90 %).
 
@@ -538,11 +551,10 @@ Kap. 4.
 
 ---
 
-### A-07 · Trading-Book-Channel [ENTFERNT, Stand 2026-06-10]
+### A-07 · Kein separater Trading-Book-Channel [assumption]
 
-**Was:** Der frühere dritte CET1-Kanal (Market-RWA-Multiplier +
-Trading-Book-P&L-Haircut) wurde **vollständig entfernt** — er lief
-zuletzt mit hartkodiertem m_factor = 0.0 und damit wirkungslos.
+**Was:** Das finale Modell enthält keinen separaten CET1-Kanal für
+Market-RWA-Multiplikatoren oder Trading-Book-P&L-Haircuts.
 
 **Begründung:** Die Handelsbücher der 10 überwiegend Retail-/
 Corporate-lastigen Banken sind klein, und eine belastbare
@@ -573,29 +585,30 @@ ein konsistentes **2-Kanal-Modell** (Kreditbuch + Sovereign);
 **Coverage:** €8.28 tn IRB-EAD = 56% der gesamten IRB-EAD im EBA-
 Datensatz.
 
-**Begründung der Restriktion:** Einheitliche Datenqualität via
-EBA-Annex-PDs ist nur für diese 10 Banken via Heimatland-Aggregat
-sauber abbildbar. Andere Banken müssten Pillar-3-spezifisch
-extrahiert werden (siehe Limitation A-01).
+**Begründung der Restriktion:** Einheitliche Datenqualität — nur für
+diese 10 Banken ließen sich vollständige, bank-individuelle
+EU-CR6-Offenlegungen (7-Klassen-Raster, A-01/A-02) über alle Jahrgänge
+FY2021–2024 quellenverifiziert aufbauen (Live-Snapshot 70/70 Zellen,
+Backtest-Reihe 99,6 % Abdeckung, A-02c). Kleinere Institute legen
+heterogener offen und wären nicht mit derselben Integritätssicherung
+abbildbar. Country-Aggregate werden nicht als Bank-Proxy genutzt.
 
 ---
 
-### A-09 · Bank-Klassen-Mapping pro Heimatland [approximation]
+### A-09 · Klassen-Raster: 7 IRB-Klassen [approximation]
 
-**Was:** Jeder Bank wird ein Heimatland zugeordnet und alle EBA-Annex-
-PDs/LGDs dieses Landes als ihre Counterparty-Sensitivität verwendet.
+**Was:** Alle Rechnungen laufen auf dem EU-CR6-Raster: corporate,
+sme_corporate, mortgage, qrre, other_retail, bank, sovereign.
 
-| Bank | Land | EBA-Country-Row im Annex |
-|---|---|---|
-| Crédit Agricole, BNP, Soc Gen, BPCE, Crédit Mutuel | FR | France |
-| Deutsche Bank | DE | Germany |
-| ING, Rabobank | NL | Netherlands |
-| Santander | ES | Spain |
-| UniCredit | IT | Italy |
+**Warum:** Es ist der kleinste gemeinsame Nenner, den alle zehn Banken
+identisch offenlegen — feinere Raster (z. B. NACE-Branchen) sind
+öffentlich nicht flächendeckend verfügbar.
 
-**Limitation:** Banken haben in der Realität multinationale Exposures
-(BNP hat US-Geschäft, Santander hat LatAm-Anteile, etc.). Unsere
-Approximation überschätzt die Heimatland-Konzentration.
+**Limitation:** Heterogenität innerhalb einer Klasse (Branchen, Länder,
+Besicherungsgrade) wird auf den EAD-gewichteten Durchschnitt gemittelt.
+
+**Abgrenzung:** Country-Aggregate oder Heimatland-Proxys werden nicht
+verwendet; damit entsteht keine künstliche Heimatland-Konzentration.
 
 ---
 
@@ -605,11 +618,17 @@ Approximation überschätzt die Heimatland-Konzentration.
 Faktoren modelliert.
 
 **Empirische Belegung:**
-- Pearson ρ über 5 Jahre (Mai 2021 – Mai 2026) = +0.07
-- 95%-Konfidenzintervall: [+0.01, +0.12]
+- Pearson ρ über 5 Jahre auf Tagesbasis (April 2021 – April 2026,
+  1 242 Handelstage) = +0.07
+- 95%-Konfidenzintervall (Fisher-z): [+0.01, +0.12]
 - OLS R²(Δr ~ ΔBrent) = 0.005
-- Spearman-Rangkorrelation = (siehe Wirkungskette Tab 1)
+- Spearman-Rangkorrelation = +0.08
 - Rolling-252d-Korrelation bleibt stabil im Korridor [−0.10, +0.20]
+- **Grenze:** gemessen auf Tages-Returns; für den Jahres-Horizont
+  stehen nur wenige unabhängige Beobachtungen zur Verfügung (2022
+  stiegen Öl und Zins gemeinsam). Der CET1-Backtest speist deshalb die
+  realisierten **gemeinsamen** Jahres-Schocks ein — die
+  Additivitätsannahme wird dort mitvalidiert.
 
 **Quelle:** `backend/factor_correlation.py`, basierend auf Brent (ICE
 via yfinance) + Bundesbank-Svensson-Zero-Curve, daily.
@@ -619,9 +638,9 @@ Punkt 9 (Korrelations-Analyse).
 
 ---
 
-## 4. Methodik im Vergleich zur Vorgänger-Version
+## 4. Finales Methodikprofil und verworfene Alternativen
 
-| Aspekt | Vorgänger (V1, abgelöst) | Jetzt (V2) |
+| Aspekt | Nicht verwendet | Finale Festlegung |
 |---|---|---|
 | PD-Quelle | Defaulted/Original-Ratio aus tr_cre.csv | **bank-spezifische Pillar-3 EU-CR6 (31.12.2024), 10/10 Banken verifiziert** |
 | LGD-Quelle | F-IRB-Default (CRR Art. 161) | **bank-spezifische Pillar-3 EU-CR6 LGD (31.12.2024)** |
@@ -661,6 +680,8 @@ Punkt-Prognose.
 
 - BCBS (2017). *Basel III: Finalising post-crisis reforms*. Basel
   Committee on Banking Supervision.
+- BCBS (2016). *Interest rate risk in the banking book* (BCBS 368;
+  Zeitband-/Midpoint-Slotting als Vorbild des Sovereign-Kanal-Bucketing).
 - Bandoni, E., Fourné, F. & Jarmulska, B. (2025). *Mortgage loan rates
   and the defaults of variable rate mortgages*. ECB Working Paper 3112.
 - EBA (2024). *2025 EU-wide Stress Test — Methodological Note* (11 Nov
@@ -689,7 +710,8 @@ Punkt-Prognose.
 - Gordy, M. (2003). *A Risk-Factor Model Foundation for Ratings-Based Bank
   Capital Rules*. Journal of Financial Intermediation.
 - Svensson, L. (1994). *Estimating and Interpreting Forward Interest Rates:
-  Sweden 1992–1994*. NBER WP 4871 (Bundesbank-Zinsstrukturparameter).
+  Sweden 1992–1994*. NBER WP 4871 / IMF WP 94/114
+  (Bundesbank-Zinsstrukturparameter; identisches Paper in beiden Reihen).
 - Nelson, C. & Siegel, A. (1987). *Parsimonious Modeling of Yield Curves*.
   Journal of Business.
 - Brunnermeier, M. et al. (2016). *The Sovereign-Bank Diabolic Loop and
@@ -706,10 +728,8 @@ Punkt-Prognose.
   macroeconomic and monetary policy shocks on credit risk in the euro
   area corporate sector*. ECB Working Paper 2897.
 - Reinhart, C. & Rogoff, K. (2009). *This Time Is Different: Eight
-  Centuries of Financial Folly*. Princeton UP.
-- SR 11-7 — Federal Reserve / OCC Supervisory Guidance on Model Risk
-  Management (2011).
-- Svensson, L. (1994). *Estimating and Interpreting Forward Interest
-  Rates: Sweden 1992-1994*. IMF Working Paper 94/114.
-- Tsay, R. (2010). *Analysis of Financial Time Series*, 3rd ed., Wiley.
-- Vasicek, O. (2002). *Loan Portfolio Value*. Risk Magazine, Dec 2002.
+  Centuries of Financial Folly*. Princeton UP (Sovereign-Default als
+  fiskalisches, nicht makroökonomisches Ereignis; zitiert in der
+  Cockpit-Einführung).
+- Tsay, R. (2010). *Analysis of Financial Time Series*, 3rd ed., Wiley
+  (log-Return-Konvention; zitiert in der Cockpit-Einführung).
