@@ -9,7 +9,7 @@ import sys, os, datetime, math
 from statistics import NormalDist
 from docx import Document
 from docx.shared import Pt, Cm, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT, WD_TAB_LEADER
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
@@ -202,7 +202,7 @@ for m in ("top_margin", "bottom_margin", "left_margin", "right_margin"):
 
 foot = sec.footer.paragraphs[0]
 foot.alignment = WD_ALIGN_PARAGRAPH.CENTER
-r = foot.add_run("Modellannahmen · EU Banking Credit Stress Cockpit · Seite ")
+r = foot.add_run("Modellannahmen | EU Banking Credit Stress Cockpit | Seite ")
 r.font.size = Pt(8); r.font.color.rgb = GREY; r.font.name = "Arial"
 fld = OxmlElement("w:fldSimple"); fld.set(qn("w:instr"), "PAGE")
 foot._p.append(fld)
@@ -214,9 +214,15 @@ def shade(el, hexcol):
     sh.set(qn("w:fill"), hexcol); el.append(sh)
 
 
+def clean_text(text):
+    """Small typography cleanup for reader-facing text."""
+    return str(text).replace(" — ", " - ").replace(" – ", " - ")
+
+
 def body(text, bold_parts=(), size=10.5, italic=False, color=None,
          space_after=7):
     """Absatz; **…** wird fett gesetzt."""
+    text = clean_text(text)
     p = doc.add_paragraph()
     p.paragraph_format.space_after = Pt(space_after)
     for i, tok in enumerate(text.split("**")):
@@ -232,6 +238,7 @@ def body(text, bold_parts=(), size=10.5, italic=False, color=None,
 
 
 def bullet(text):
+    text = clean_text(text)
     p = doc.add_paragraph(style="List Bullet")
     for i, tok in enumerate(text.split("**")):
         if not tok:
@@ -250,8 +257,21 @@ def figure(fname, width_cm, caption):
     p.add_run().add_picture(f"{FIGS}/{fname}", width=Cm(width_cm))
     c = doc.add_paragraph(); c.alignment = WD_ALIGN_PARAGRAPH.CENTER
     c.paragraph_format.space_after = Pt(12)
-    r = c.add_run(caption); r.font.size = Pt(8.5); r.font.color.rgb = GREY
+    r = c.add_run(clean_text(caption)); r.font.size = Pt(8.5); r.font.color.rgb = GREY
     r.italic = True
+
+
+def toc_entry(title, page, level=0):
+    p = doc.add_paragraph()
+    p.paragraph_format.left_indent = Cm(0.55 * level)
+    p.paragraph_format.space_after = Pt(3)
+    p.paragraph_format.tab_stops.add_tab_stop(
+        Cm(16.4), WD_TAB_ALIGNMENT.RIGHT, WD_TAB_LEADER.DOTS)
+    r = p.add_run(f"{title}\t{page}")
+    r.font.name = "Arial"
+    r.font.size = Pt(9.5)
+    r.bold = (level == 0)
+    return p
 
 
 def table(headers, rows, col_pct, fontsize=9):
@@ -262,7 +282,7 @@ def table(headers, rows, col_pct, fontsize=9):
         cell = tab.rows[0].cells[c]
         cell.width = Cm(16.6 * col_pct[c] / 100)
         cell.paragraphs[0].text = ""
-        r = cell.paragraphs[0].add_run(htxt)
+        r = cell.paragraphs[0].add_run(clean_text(htxt))
         r.bold = True; r.font.size = Pt(fontsize)
         shade(cell._tc.get_or_add_tcPr(), "D9E4EC")
     for ri, row in enumerate(rows):
@@ -270,7 +290,7 @@ def table(headers, rows, col_pct, fontsize=9):
             cell = tab.rows[1 + ri].cells[c]
             cell.width = Cm(16.6 * col_pct[c] / 100)
             cell.paragraphs[0].text = ""
-            for i, tok in enumerate(str(val).split("**")):
+            for i, tok in enumerate(clean_text(val).split("**")):
                 if not tok:
                     continue
                 r = cell.paragraphs[0].add_run(tok)
@@ -286,12 +306,12 @@ r = t.add_run("Modellannahmen"); r.font.size = Pt(32); r.bold = True
 r.font.color.rgb = NAVY
 s2 = doc.add_paragraph(); s2.alignment = WD_ALIGN_PARAGRAPH.CENTER
 r = s2.add_run("EU Banking Credit Stress Cockpit\n"
-               "2-Faktor-Kreditstress (Basel-III-IRB) · Zielgröße CET1-Quote · "
+               "2-Faktor-Kreditstress (Basel-III-IRB) | Zielgröße CET1-Quote | "
                "Pillar-3-Datenbasis")
 r.font.size = Pt(13); r.font.color.rgb = MID
 meta = doc.add_paragraph(); meta.alignment = WD_ALIGN_PARAGRAPH.CENTER
 meta.paragraph_format.space_before = Pt(30)
-r = meta.add_run("Kuratierte Abgabefassung · Stand "
+r = meta.add_run("Kuratierte Abgabefassung | Stand "
                  + datetime.date.today().strftime("%d.%m.%Y")
                  + "\nTechnische Referenz: Modellarchitektur/docs/MODEL_ASSUMPTIONS.md (V2.1)")
 r.font.size = Pt(9.5); r.font.color.rgb = GREY
@@ -300,26 +320,23 @@ doc.add_page_break()
 # ---------------- Inhaltsverzeichnis ----------------
 p = doc.add_paragraph(); r = p.add_run("Inhaltsverzeichnis")
 r.font.size = Pt(16); r.bold = True; r.font.color.rgb = NAVY
-table(
-    ["Kapitel", "Seite"],
-    [["Abkürzungen und Symbole", "3"],
-     ["1 · Das Modell auf einen Blick", "5"],
-     ["  Prüfpfad für kritische Evaluation", "5"],
-     ["2 · Die zwei Risikofaktoren", "6"],
-     ["  Warum Brent-log-Return?", "6"],
-     ["  Datenquellen und ihre Rollen", "7"],
-     ["3 · Sektor-differenzierte Stress-Transmission", "7"],
-     ["  Ökonomische Logik je Kreditklasse", "8"],
-     ["  Durchgerechnetes Beispiel", "8"],
-     ["4 · Kapitalrechnung und CET1-Bridge", "9"],
-     ["  Die Formelstrecke im Detail", "9"],
-     ["  Der Sovereign-Kanal konkret", "10"],
-     ["5 · Datenbasis und Integritätssicherung", "11"],
-     ["6 · Annahmen-Inventar (A-01 bis A-10)", "12"],
-     ["7 · Validierung: CET1-Walk-Forward-Backtest", "15"],
-     ["8 · Bewusste Scope-Grenzen", "16"],
-     ["9 · Bibliographie", "17"]],
-    [86, 14], fontsize=9)
+toc_entry("Abkürzungen und Symbole", "3")
+toc_entry("1. Das Modell auf einen Blick", "5")
+toc_entry("Orientierung für die Prüfung", "5", level=1)
+toc_entry("2. Die zwei Risikofaktoren", "6")
+toc_entry("Warum Brent und Log-Renditen?", "6", level=1)
+toc_entry("Datenquellen und ihre Rollen", "7", level=1)
+toc_entry("3. Stressübertragung nach Kreditklasse", "7")
+toc_entry("Ökonomische Logik je Kreditklasse", "8", level=1)
+toc_entry("Durchgerechnetes Beispiel", "8", level=1)
+toc_entry("4. Kapitalrechnung und CET1-Überleitung", "9")
+toc_entry("Die wichtigsten Formeln", "9", level=1)
+toc_entry("Der Sovereign-Kanal konkret", "10", level=1)
+toc_entry("5. Datenbasis und Qualitätsprüfung", "11")
+toc_entry("6. Annahmenübersicht (A-01 bis A-10)", "12")
+toc_entry("7. Validierung: CET1-Walk-Forward-Backtest", "15")
+toc_entry("8. Bewusste Modellgrenzen", "16")
+toc_entry("9. Bibliographie", "17")
 doc.add_page_break()
 
 # ---------------- Abkürzungen und Symbole ----------------
@@ -406,8 +423,8 @@ table(
     [16, 62, 22], fontsize=8.5)
 doc.add_page_break()
 
-# ================= 1 · Das Modell auf einen Blick =================
-h1("1 · Das Modell auf einen Blick")
+# ================= 1. Das Modell auf einen Blick =================
+h1("1. Das Modell auf einen Blick")
 body("Das Cockpit beantwortet eine aufsichtlich zentrale Frage: "
      "**Wie stünde die harte Kernkapitalquote (CET1) der zehn größten "
      "EU-IRB-Banken, wenn ein Ölpreis- und/oder Zinsschock einträte?** "
@@ -428,11 +445,11 @@ bullet("**Konservative Auslegung** — im Zweifel überschätzt das Modell den "
        "Kapitalbedarf; entlastende Effekte (z. B. Zinsüberschuss) werden "
        "bewusst nicht gegengerechnet.")
 figure("fig1_pipeline.png", 16.2,
-       "Abb. 1 · Modell-Pipeline: Zwei Makro-Schocks laufen über die "
+       "Abb. 1: Modell-Pipeline. Zwei Makro-Schocks laufen über die "
        "β-Transmission und die Basel-III-Kapitalformel in das Kreditbuch; "
        "der Zinsschock wirkt zusätzlich über den Sovereign-Kanal. Zielgröße "
        "ist stets die CET1-Quote unter Stress.")
-h2("Prüfpfad für kritische Evaluation")
+h2("Orientierung für die Prüfung")
 body("Das Dokument ist so aufgebaut, dass ein Dritter die Modelllogik vom "
      "Rohdatum bis zur CET1-Quote nachvollziehen kann. Die folgende "
      "Kurzlandkarte nennt die jeweils prüfbare Stelle; Details folgen in "
@@ -460,8 +477,8 @@ table(
       "8"]],
     [30, 50, 20], fontsize=8.5)
 
-# ================= 2 · Die zwei Risikofaktoren =================
-h1("2 · Die zwei Risikofaktoren")
+# ================= 2. Die zwei Risikofaktoren =================
+h1("2. Die zwei Risikofaktoren")
 body("Beide Faktoren sind täglich beobachtbare Marktgrößen — das Modell "
      "braucht keine latenten Zustandsvariablen:")
 table(
@@ -475,7 +492,7 @@ table(
       "Anschlussfinanzierung, senkt Sicherheiten- und Anleihewerte",
       "+2,0 = +200 Basispunkte"]],
     [16, 12, 50, 22])
-h2("Warum Brent-log-Return?")
+h2("Warum Brent und Log-Renditen?")
 body("**Warum Brent?** Brent ist der liquide, täglich verfügbare "
      "Rohöl-Benchmark mit hoher Relevanz für europäische Energie- und "
      "Importpreise. Das Modell nutzt Brent nicht, weil jede Bank direkt "
@@ -526,8 +543,8 @@ table(
       "Sovereign-Kanal (CET1-wirksamer Anteil)"]],
     [24, 33, 43])
 
-# ================= 3 · Stress-Transmission =================
-h1("3 · Sektor-differenzierte Stress-Transmission")
+# ================= 3. Stressübertragung =================
+h1("3. Stressübertragung nach Kreditklasse")
 body("Kern des Modells ist die Übersetzung der beiden Schocks in "
      "Risikoparameter — **mit eigenen Sensitivitäten je Kreditklasse** "
      "(Annahme A-04):")
@@ -545,7 +562,7 @@ body("Die gestressten Werte werden begrenzt — jede Grenze hat einen "
      "Besicherung; die **Obergrenze 100 %** ist definitorisch (mehr als "
      "das Exposure kann nicht verloren gehen).")
 figure("fig2_beta.png", 14.5,
-       "Abb. 2 · Die Sensitivitäts-Matrix als Bild: Jede Zelle ist eine "
+       "Abb. 2: Sensitivitätsmatrix. Jede Zelle ist eine "
        "dokumentierte Annahme — rot = Risiko steigt mit dem Schock, blau = "
        "sinkt, weiß = kein Effekt. Auffällig: Hypotheken sind zinsgetrieben, "
        "Banken profitieren leicht von Zinsanstiegen (Zinsüberschuss), "
@@ -631,8 +648,8 @@ body("Auf Portfolioebene wiederholt sich diese Rechnung für jede Bank und "
      "Beispielwerte sind live aus der Modell-Engine gerechnet, nicht "
      "handgepflegt.", size=9.5, italic=True)
 
-# ================= 4 · Kapitalrechnung =================
-h1("4 · Kapitalrechnung und CET1-Bridge")
+# ================= 4. Kapitalrechnung =================
+h1("4. Kapitalrechnung und CET1-Überleitung")
 body("Die gestressten PD/LGD laufen durch die **regulatorische "
      "Basel-III-IRB-Kapitalformel** (Vasicek/ASRF; BCBS 2017, §272–284) — "
      "bewusst der aufsichtliche Standard, keine Eigenkonstruktion:")
@@ -646,43 +663,43 @@ body("Dabei ist ρ der regulatorische IRB-Klassenparameter nach CRR "
      "Art. 153/154, MA das Laufzeit-Adjustment und N die "
      "Standardnormalverteilung; ΔMtM_Sov ist bei Zinsanstieg negativ "
      "(Kurswertverlust) und umfasst nur den CET1-wirksamen "
-     "FVOCI/FVTPL-Anteil. Das Kreditbuch wirkt also auf Zähler (−ΔEL) "
-     "**und** Nenner (+ΔRWA), der Sovereign-Kanal nur auf den Zähler. "
+     "FVOCI/FVTPL-Anteil. Das Kreditbuch wirkt auf Zähler (−ΔEL) "
+     "und Nenner (+ΔRWA), der Sovereign-Kanal nur auf den Zähler. "
      "Die theoretische Fundierung des ASRF-Rahmens liefern Vasicek "
      "(1991, 2002) und Gordy (2003).")
 
-h2("Die Formelstrecke im Detail")
+h2("Die wichtigsten Formeln")
 body("Für die kritische Evaluation sind vier Formeln zentral. Sie bilden "
-     "die komplette Wirkungskette ab: zuerst werden die makroökonomischen "
+     "die komplette Wirkungskette ab. Zuerst werden die makroökonomischen "
      "Schocks in Risikoparameter übersetzt, danach werden diese Parameter "
      "in regulatorische Kapitalanforderungen und schließlich in die CET1-"
      "Quote überführt. Wichtig: Die Formeln trennen strikt zwischen "
-     "**gemeldeten Größen** (PD, LGD, EAD, CET1, RWA, IFRS-9-Split), "
-     "**regulatorisch vorgegebenen Parametern** (z. B. ρ, 99,9 %-Quantil, "
-     "RWA-Faktor 12,5) und **Modellkonventionen** (z. B. lineare β/γ-"
+     "gemeldeten Größen (PD, LGD, EAD, CET1, RWA, IFRS-9-Split), "
+     "regulatorisch vorgegebenen Parametern (z. B. ρ, 99,9 %-Quantil, "
+     "RWA-Faktor 12,5) und Modellkonventionen (z. B. lineare β/γ-"
      "Transmission, konstante EAD unter Stress).")
-body("**1 · Stress-Transmission:** "
+body("**1. Stress-Transmission:** "
      "PD_stress = clip(PD_0 + β_Zins · Δr_10y + β_Öl · ΔBrent_log); "
      "LGD_stress = clip(LGD_0 + γ_Zins · Δr_10y + γ_Öl · ΔBrent_log). "
      "Diese Gleichungen sind die eigentliche ökonomische Modellannahme: "
      "sie legen fest, wie stark eine Kreditklasse auf Öl- und Zinsschocks "
      "reagiert. Die Grenzen verhindern unplausible oder numerisch instabile "
      "Werte (PD-Floor 0,03 %, PD-Cap 50 %, LGD 5–100 %).")
-body("**2 · Erwarteter Verlust:** EL = PD · LGD · EAD; entsprechend "
+body("**2. Erwarteter Verlust:** EL = PD · LGD · EAD; entsprechend "
      "ΔEL = EL_stress − EL_0. Der erwartete Verlust ist der direkte "
      "Zähler-Effekt der Kreditbuch-Bridge: zusätzlicher erwarteter Verlust "
      "senkt das harte Kernkapital. Diese Behandlung ist bewusst einfach und "
      "konservativ; sie ersetzt keine vollständige IFRS-9-Lifetime-EL-"
      "Simulation, sondern bildet den Einjahres-Stress als Risikovorsorge-"
      "Proxy ab.")
-body("**3 · Unerwarteter Verlust / RWA:** K ist die IRB-Kapitalanforderung "
+body("**3. Unerwarteter Verlust / RWA:** K ist die IRB-Kapitalanforderung "
      "pro Exposure-Einheit. Der Term mit N und N⁻¹ transformiert die "
      "unbedingte PD in eine 99,9-%-Stress-PD des asymptotischen "
      "Ein-Faktor-Portfolios; LGD multipliziert diese Stress-PD und der "
      "erwartete Verlust wird abgezogen. Aus K folgt RWA = K · 12,5 · EAD, "
      "weil 8 % Mindestkapitalquote dem Multiplikator 1 / 0,08 = 12,5 "
      "entsprechen.")
-body("**4 · CET1-Bridge:** CET1_stress = (CET1_0 − ΔEL_Kredit + "
+body("**4. CET1-Überleitung:** CET1_stress = (CET1_0 − ΔEL_Kredit + "
      "ΔMtM_Sovereign) / (RWA_0 + ΔRWA_Kredit). Damit ist klar, welcher "
      "Kanal wo wirkt: Kreditrisiko senkt den Zähler und erhöht den Nenner; "
      "Sovereign-MtM wirkt nur auf den Zähler und nur für Positionen, deren "
@@ -747,14 +764,14 @@ body("Parallel zum Kreditbuch werden die Staatsanleihebestände bewertet: "
      "Bewertungsverluste — stützen sich auf Brunnermeier et al. (2016), "
      "Acharya/Drechsler/Schnabl (2014) und Jiang et al. (2023).")
 figure("fig3_bridge.png", 15.8,
-       "Abb. 3 · Die CET1-Bridge: Das Kreditbuch erhöht den Nenner (ΔRWA) "
+       "Abb. 3: CET1-Überleitung. Das Kreditbuch erhöht den Nenner (ΔRWA) "
        "und senkt über erwartete Verluste den Zähler (ΔEL); der "
        "Sovereign-Kanal senkt den Zähler zusätzlich (ΔMtM). Entlastende "
        "Gewinn-Effekte werden bewusst nicht angesetzt — die Quote unter "
        "Stress ist eine konservative Untergrenze.")
 
-# ================= 5 · Datenbasis =================
-h1("5 · Datenbasis und Integritätssicherung")
+# ================= 5. Datenbasis =================
+h1("5. Datenbasis und Qualitätsprüfung")
 h2("Das Banken-Universum")
 body("Die zehn größten EU-Banken nach IRB-EAD — zusammen **≈ 8,28 Bio. € "
      "IRB-EAD ≈ 56 %** des gesamten IRB-EAD im EBA-Transparency-Datensatz "
@@ -777,11 +794,11 @@ table(
 body("¹ Live-Universum auf Gruppenebene (LEI FR969500TJ5KRTCJQWXH); die "
      "Backtest-Reihe läuft auf der börsennotierten **Crédit Agricole "
      "S.A.** (LEI F0HUI1NY1AZMJMD8LP67, CET1 18,8 %) — der Ebene des "
-     "EBA-Transparency-Kapitalpanels. · * (+1) = eine zusätzliche "
+     "EBA-Transparency-Kapitalpanels. * (+1) = eine zusätzliche "
      "quellenbelegte, aber modell-ausgeschlossene Audit-Zeile "
-     "(`include_in_backtest = 0`, siehe unten). · ² inkl. der "
+     "(`include_in_backtest = 0`, siehe unten). ² inkl. der "
      "ING-spezifischen Zusatzklasse mortgage_sme; kein QRRE-/Sovereign-"
-     "A-IRB im Meldeumfang. · ³ dünnster Meldeumfang (5 Klassen); enthält "
+     "A-IRB im Meldeumfang. ³ dünnster Meldeumfang (5 Klassen); enthält "
      "die einzige offene Zelle (corporate 2021). Summe genutzter "
      "Backtest-Zeilen: **253**.", size=8.5, italic=True)
 h2("Live-Snapshot (Cockpit)")
@@ -818,11 +835,11 @@ bullet("**Adversariale Quellprüfung:** Ein unabhängiger Prüfdurchlauf je "
        "Bank gegen die Quell-PDFs (protokolliert in "
        "tools/pillar3_backfill/VERIFICATION_REPORT.json).")
 
-# ================= 6 · Annahmen-Inventar =================
-h1("6 · Annahmen-Inventar (A-01 bis A-10)")
+# ================= 6. Annahmenübersicht =================
+h1("6. Annahmenübersicht (A-01 bis A-10)")
 body("Jede Annahme trägt eine Konfidenzklasse: **[published]** = "
-     "veröffentlichte Messung · **[estimate]** = belegte Schätzung · "
-     "**[approximation]** = strukturelle Vereinfachung · **[assumption]** = "
+     "veröffentlichte Messung; **[estimate]** = belegte Schätzung; "
+     "**[approximation]** = strukturelle Vereinfachung; **[assumption]** = "
      "gesetzte Konvention. Die Tabelle gibt den Überblick; darunter wird jede Annahme einzeln begründet — inklusive der verworfenen Alternative und der Wirkung einer Fehlspezifikation.")
 body("Leselogik: Eine Annahme ist hier nicht automatisch eine frei gesetzte "
      "Zahl. Viele Einträge sind bewusst als [published] klassifiziert, weil "
@@ -897,7 +914,7 @@ table(
 h2("Die Annahmen im Detail")
 
 def annahme(aid, titel, text):
-    doc.add_paragraph(f"{aid} · {titel}", style="Heading 3")
+    doc.add_paragraph(f"{aid} - {titel}", style="Heading 3")
     body(text, size=9.5, space_after=9)
 
 annahme("A-01", "PD-Quelle: Pillar-3 EU-CR6 (31.12.2024)",
@@ -1013,8 +1030,8 @@ annahme("A-10", "Faktor-Unabhängigkeit (kein Kreuzterm)",
     "Bei gleichzeitigen Extremschocks entstünde ein Effekt zweiter "
     "Ordnung; im beobachteten Wertebereich ist er vernachlässigbar.")
 
-# ================= 7 · Validierung =================
-h1("7 · Validierung: der CET1-Walk-Forward-Backtest")
+# ================= 7. Validierung =================
+h1("7. Validierung: CET1-Walk-Forward-Backtest")
 body("Das Modell wird nicht an dem Datenstand geprüft, mit dem es gebaut "
      "wurde, sondern **rollierend durch die Vergangenheit**: Für jedes Jahr "
      "wird das Portfolio mit den damals bekannten Pillar-3-Parametern des "
@@ -1022,10 +1039,10 @@ body("Das Modell wird nicht an dem Datenstand geprüft, mit dem es gebaut "
      "des Jahres eingespeist und die prognostizierte CET1-Quote mit der "
      "später gemeldeten verglichen — ohne jeden Blick in die Zukunft.")
 figure("fig4_walkforward.png", 16.2,
-       "Abb. 4 · No-Look-Ahead-Prinzip: einfrieren (31.12. des Vorjahres) → "
+       "Abb. 4: No-Look-Ahead-Prinzip. Einfrieren (31.12. des Vorjahres) → "
        "realen Schock einspeisen → gegen die gemeldete CET1-Quote halten → "
        "ein Jahr weiterrollen.")
-h2("Ergebnis (30 Bank-Jahre, 2022–2024 — vollständiges Panel)")
+h2("Ergebnis (30 Bank-Jahre, 2022-2024, vollständiges Panel)")
 _sg = STATS["gesamt"]
 _sy = STATS["jahre"]
 table(
@@ -1068,7 +1085,7 @@ body("Der Test skaliert die gesamte PD-/LGD-Transmission um ±50 %. Er "
      "Richtung bleibt stabil: stärkere β verschärfen den konservativen "
      "Bias, schwächere β reduzieren ihn, ohne das Backtest-Narrativ zu "
      "drehen.", size=9.5)
-h2("Ehrliche Grenze: Point-in-Time vs. Through-the-Cycle")
+h2("Einordnung: Point-in-Time vs. Through-the-Cycle")
 body("Die einzelnen Melde-Kanäle (PD, Kredit-RWA) sind **nicht "
      "punktprognostizierbar** — und zwar aus einem dokumentierten "
      "Daten-Grund, nicht wegen eines Modellfehlers: Das Modell rechnet "
@@ -1082,10 +1099,10 @@ body("Die einzelnen Melde-Kanäle (PD, Kredit-RWA) sind **nicht "
      "Solvenz-/Frühwarn-Instrument** (im CET1-Niveau nah und auf der "
      "sicheren Seite) — nicht als Prognose einzelner Meldegrößen.")
 
-# ================= 8 · Scope =================
-h1("8 · Bewusste Scope-Grenzen")
-body("Die Grenzen des Modells sind nicht nachträgliche Schwächen, sondern "
-     "bewusst gesetzte Abgrenzungen gegen Scheingenauigkeit. Entscheidend "
+# ================= 8. Modellgrenzen =================
+h1("8. Bewusste Modellgrenzen")
+body("Die Grenzen des Modells sind keine nachträglichen Einschränkungen, "
+     "sondern klare Abgrenzungen gegen Scheingenauigkeit. Entscheidend "
      "ist jeweils, ob ein Effekt öffentlich, bankindividuell und konsistent "
      "über alle zehn Banken rekonstruierbar ist. Wo das nicht der Fall ist, "
      "wird der Effekt nicht modelliert oder nur als separate Analyse "
@@ -1135,8 +1152,8 @@ body("Kurz gesagt: Das Modell ist ein **konservatives, datenprüfbares "
      "offengelegten Risikoparametern über regulatorische Kapitalformeln bis "
      "zur CET1-Quote.", italic=True, size=9.5)
 
-# ================= 9 · Bibliographie =================
-h1("9 · Bibliographie")
+# ================= 9. Bibliographie =================
+h1("9. Bibliographie")
 body("Vollständige Liste aller im Modell verwendeten Quellen — gegliedert "
      "nach Regulatorik, wissenschaftlicher Literatur und Datenquellen. Jede "
      "Quelle ist an der Stelle ihrer Verwendung im Dokument bzw. im "
