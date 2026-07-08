@@ -1,15 +1,14 @@
 # Abgabe-Files
 
-Dieser Ordner enthält die finalen Abgabe-Artefakte. Die technische
-Modellarchitektur liegt getrennt in `../Modellarchitektur/`.
+Dieser Ordner enthält nur die finalen Unterlagen für die Abgabe. Die
+technische Modellarchitektur liegt getrennt in `../Modellarchitektur/`.
 
-## Schnelle Orientierung
+## Finale Abgabeunterlagen
 
 | Pfad | Zweck |
 |---|---|
-| `Abgabedokumente/Modellannahmen.docx` | Kuratierte Modelldokumentation für die Abgabe: Methodik, Annahmen, Quellen, Backtest-Grenzen. |
-| `Abgabedokumente/Schaubilder/` | Exportierte Grafiken aus der Modelldokumentation. |
-| `Praesentation/` | Präsentationsdateien und Visuals für die mündliche/folienbasierte Abgabe. |
+| `Praesentation/EU-Banking-Credit-Stress-Cockpit-Praesentation.pptx` | Finale Präsentation, inkl. Foliennummerierung unten rechts. |
+| `Abgabedokumente/Modellannahmen.docx` | Modelldokumentation: Methodik, Annahmen, Quellen, Backtest und Modellgrenzen. |
 
 ## Cockpit starten
 
@@ -25,6 +24,6 @@ Cockpit im Browser.
 ## Quellen der Methodik
 
 Die Word-Datei `Abgabedokumente/Modellannahmen.docx` ist die lesbare
-Abgabefassung. Die technische Single Source of Truth bleibt:
+Abgabefassung. Die technische Referenz bleibt:
 
 `../Modellarchitektur/docs/MODEL_ASSUMPTIONS.md`
