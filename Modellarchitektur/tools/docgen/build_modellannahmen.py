@@ -1192,11 +1192,16 @@ for b in [
     "ESBies. American Economic Review P&P (Doom-Loop, Marktbuch-Analyse).",
     "Gordy, M. (2003). A Risk-Factor Model Foundation for Ratings-Based Bank "
     "Capital Rules. Journal of Financial Intermediation (ASRF-Fundierung).",
+    "Hamilton, J. D. (1983). Oil and the macroeconomy since World War II. "
+    "Journal of Political Economy 91(2) (Öl-Makro-Transmission).",
     "Hyndman, R. J. & Athanasopoulos, G. (2021). Forecasting: Principles and "
     "Practice, 3. Aufl., Kap. 5.8 (Prognose-Evaluation, MAE).",
     "Jiang, E., Matvos, G., Piskorski, T. & Seru, A. (2023). Monetary "
     "Tightening and U.S. Bank Fragility. NBER Working Paper 31048 (latente "
     "Bewertungsverluste, Marktbuch-Analyse).",
+    "Kilian, L. (2009). Not All Oil Price Shocks Are Alike: Disentangling "
+    "Demand and Supply Shocks in the Crude Oil Market. American Economic "
+    "Review 99(3) (Identifikation von Angebots- und Nachfrageschocks bei Öl).",
     "Konietschke, P., Metzler, J. & Ponte Marques, A. (2026). A quantile "
     "probability model for sectoral corporate defaults in Europe. ECB "
     "Working Paper 3207 (Sektor-Heterogenität der Unternehmens-PD).",
@@ -1208,9 +1213,14 @@ for b in [
     "Pesaran, M. H. & Timmermann, A. (1992). A Simple Nonparametric Test of "
     "Predictive Performance. Journal of Business & Economic Statistics "
     "(Richtungs-Trefferquote).",
+    "Reinhart, C. M. & Rogoff, K. S. (2009). This Time Is Different: Eight "
+    "Centuries of Financial Folly. Princeton University Press "
+    "(Finanzkrisen-Historie und Sovereign-Kontext).",
     "Svensson, L. (1994). Estimating and Interpreting Forward Interest "
     "Rates: Sweden 1992–1994. NBER Working Paper 4871 "
     "(Zinsstrukturmodell der Bundesbank-Parameter).",
+    "Tsay, R. S. (2010). Analysis of Financial Time Series, 3. Aufl., Wiley "
+    "(Zeitreihen-Methodik und Log-Return-Konvention).",
     "Tuckman, B. & Serrat, A. (2012). Fixed Income Securities, 3. Aufl. "
     "(Modified Duration, Sovereign-Kanal).",
     "Vasicek, O. (1991). Limiting Loan Loss Probability Distribution. KMV "

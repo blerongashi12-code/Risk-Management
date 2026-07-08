@@ -771,6 +771,11 @@ Punkt-Prognose.
 - Vasicek, O. (1991). *Limiting Loan Loss Probability Distribution*. KMV WP.
 - Gordy, M. (2003). *A Risk-Factor Model Foundation for Ratings-Based Bank
   Capital Rules*. Journal of Financial Intermediation.
+- Hamilton, J. D. (1983). *Oil and the macroeconomy since World War II*.
+  Journal of Political Economy 91(2) (Öl-Makro-Transmission).
+- Kilian, L. (2009). *Not All Oil Price Shocks Are Alike: Disentangling
+  Demand and Supply Shocks in the Crude Oil Market*. American Economic
+  Review 99(3) (Identifikation von Angebots- und Nachfrageschocks bei Öl).
 - Svensson, L. (1994). *Estimating and Interpreting Forward Interest Rates:
   Sweden 1992–1994*. NBER WP 4871 / IMF WP 94/114
   (Bundesbank-Zinsstrukturparameter; identisches Paper in beiden Reihen).
