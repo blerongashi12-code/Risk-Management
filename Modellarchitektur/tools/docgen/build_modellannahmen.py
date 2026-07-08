@@ -300,13 +300,26 @@ doc.add_page_break()
 # ---------------- Inhaltsverzeichnis ----------------
 p = doc.add_paragraph(); r = p.add_run("Inhaltsverzeichnis")
 r.font.size = Pt(16); r.bold = True; r.font.color.rgb = NAVY
-tocp = doc.add_paragraph()
-fld = OxmlElement("w:fldSimple")
-fld.set(qn("w:instr"), 'TOC \\o "1-2" \\h \\z \\u')
-run = OxmlElement("w:r"); tel = OxmlElement("w:t")
-tel.text = ("Das Inhaltsverzeichnis wird beim Öffnen in Word automatisch "
-            "aufgebaut (Feld-Aktualisierung ist im Dokument hinterlegt).")
-run.append(tel); fld.append(run); tocp._p.append(fld)
+table(
+    ["Kapitel", "Seite"],
+    [["Abkürzungen und Symbole", "3"],
+     ["1 · Das Modell auf einen Blick", "5"],
+     ["  Prüfpfad für kritische Evaluation", "5"],
+     ["2 · Die zwei Risikofaktoren", "6"],
+     ["  Warum Brent-log-Return?", "6"],
+     ["  Datenquellen und ihre Rollen", "7"],
+     ["3 · Sektor-differenzierte Stress-Transmission", "7"],
+     ["  Ökonomische Logik je Kreditklasse", "8"],
+     ["  Durchgerechnetes Beispiel", "8"],
+     ["4 · Kapitalrechnung und CET1-Bridge", "9"],
+     ["  Die Formelstrecke im Detail", "9"],
+     ["  Der Sovereign-Kanal konkret", "10"],
+     ["5 · Datenbasis und Integritätssicherung", "11"],
+     ["6 · Annahmen-Inventar (A-01 bis A-10)", "12"],
+     ["7 · Validierung: CET1-Walk-Forward-Backtest", "15"],
+     ["8 · Bewusste Scope-Grenzen", "16"],
+     ["9 · Bibliographie", "17"]],
+    [86, 14], fontsize=9)
 doc.add_page_break()
 
 # ---------------- Abkürzungen und Symbole ----------------
@@ -462,6 +475,27 @@ table(
       "Anschlussfinanzierung, senkt Sicherheiten- und Anleihewerte",
       "+2,0 = +200 Basispunkte"]],
     [16, 12, 50, 22])
+h2("Warum Brent-log-Return?")
+body("**Warum Brent?** Brent ist der liquide, täglich verfügbare "
+     "Rohöl-Benchmark mit hoher Relevanz für europäische Energie- und "
+     "Importpreise. Das Modell nutzt Brent nicht, weil jede Bank direkt "
+     "Ölpreisrisiko hält, sondern als beobachtbaren Proxy für den "
+     "Energie-/Angebots-/Inflationsschock, der Unternehmensmargen, "
+     "Haushaltsbudgets und Sicherheitenwerte belastet. WTI wäre stärker "
+     "durch US-spezifische Lager- und Transportbedingungen geprägt; Gas- "
+     "oder Strompreise wären für Europa ebenfalls relevant, aber deutlich "
+     "heterogener und weniger stabil als ein einheitlicher, täglich "
+     "verfügbarer Faktor.")
+body("**Warum log-Return statt einfacher Prozentänderung?** Der Ölpreis "
+     "wird als ΔBrent_log = ln(P_t / P_0) gemessen. Log-Returns sind "
+     "skalierungsfrei, über Zeiträume addierbar und behandeln relative "
+     "Preisbewegungen konsistent: +0,50 entspricht exp(0,50)−1 ≈ +65 %, "
+     "−0,50 entspricht etwa −39 %. Gerade bei großen Stressbewegungen "
+     "vermeidet die Log-Konvention Verzerrungen einfacher Prozentänderungen "
+     "und ist Standard in der Finanzzeitreihenanalyse. Die β-Werte sind "
+     "daher als **Prozentpunkte ΔPD/ΔLGD pro Logpunkt Brent-Schock** zu "
+     "lesen. Der Zinsfaktor wird dagegen in Prozentpunkten gemessen, weil "
+     "Renditen bereits Prozentgrößen sind.")
 body("**Warum zwei getrennte Faktoren?** Gemessen auf Tagesbasis — "
      "tägliche Brent-log-Returns gegen tägliche Änderungen des "
      "10-Jahres-Svensson-Zinses, rollierendes 5-Jahres-Fenster mit "
@@ -798,6 +832,34 @@ body("Leselogik: Eine Annahme ist hier nicht automatisch eine frei gesetzte "
      "beobachtbare Stress-PD/LGD und Marktwertverluste schließt. Genau diese "
      "Punkte werden deshalb im Cockpit sichtbar gemacht, im Backtest "
      "sensitiviert und in Abschnitt 8 als Scope-Grenzen eingeordnet.")
+table(
+    ["Prüffeld", "Explizit dokumentierte Annahme / Festlegung",
+     "Wo im Dokument?"],
+    [["Faktorwahl und Einheiten",
+      "Brent als europäisch relevanter Energiepreis-Proxy; Log-Return "
+      "ln(P_t/P_0); 10-Jahres-Zins in Prozentpunkten",
+      "Abschnitt 2 / A-10"],
+     ["Risikoparameter",
+      "PD, LGD und EAD aus bankindividuellen Pillar-3-EU-CR6-Zeilen; "
+      "Backtest no-look-ahead mit historischen Vintages",
+      "Abschnitt 5 / A-01 bis A-03"],
+     ["Stress-Transmission",
+      "β/γ je Exposure-Klasse, lineare Basiskalibrierung, Floors/Caps und "
+      "±50-%-Robustheitstest",
+      "Abschnitt 3 / A-04 / Abschnitt 7"],
+     ["Regulatorische Kapitalformel",
+      "Basel-IRB-ASRF; ρ, 99,9 %-Quantil und Faktor 12,5 regulatorisch "
+      "vorgegeben; M = 2,5 Jahre und S = 20 Mio. € explizite Konventionen",
+      "Abschnitt 4 / A-05"],
+     ["Sovereign-Kanal",
+      "Duration-MtM auf Δr, Bucket-Midpoints, >10Y mit 15 Jahren, "
+      "CET1-Wirkung nur nach bankindividuellem IFRS-9-Split",
+      "Abschnitt 4 / A-06"],
+     ["Bewusste Nicht-Modellierung",
+      "u. a. Operational Risk, CVA, Spread-Risiko, IFRS-9-Lifetime-EL, "
+      "Hedging, Ertrags-Gegeneffekte und bankindividuelle β",
+      "Abschnitt 8"]],
+    [24, 53, 23], fontsize=8.3)
 table(
     ["ID", "Annahme", "Festlegung im Modell", "Klasse", "Quelle/Beleg"],
     [["A-01", "PD-Quelle", "Pillar-3 EU-CR6-Sub-totals je Bank×Klasse, "
@@ -1154,8 +1216,10 @@ for b in [
 ]:
     bullet(b)
 
-# ---- Word-Einstellungen: bestFit-Zoom + automatische Feld-Aktualisierung
-#      (TOC baut sich beim Öffnen selbst auf — kein manuelles F9 nötig). ----
+# ---- Word-Einstellungen: bestFit-Zoom. Das Inhaltsverzeichnis wird im
+#      Build-/QA-Schritt per Word-COM aktualisiert, nicht automatisch beim
+#      Öffnen. Das vermeidet blockierende Update-Dialoge in fremden
+#      Word-Sessions.
 _settings = doc.settings.element
 _zoom = _settings.find(qn("w:zoom"))
 if _zoom is None:
@@ -1163,11 +1227,6 @@ if _zoom is None:
     _settings.insert(0, _zoom)
 _zoom.set(qn("w:val"), "bestFit")
 _zoom.set(qn("w:percent"), "100")
-if _settings.find(qn("w:updateFields")) is None:
-    _upd = OxmlElement("w:updateFields")
-    _upd.set(qn("w:val"), "true")
-    # direkt nach dem zoom-Element einfuegen (schema-nah, Word-tolerant)
-    _zoom.addnext(_upd)
 
 doc.save(OUT)
 print("geschrieben:", OUT, "| Live-Stats:", STATS.get("live"))

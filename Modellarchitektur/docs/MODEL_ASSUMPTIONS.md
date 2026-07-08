@@ -21,6 +21,25 @@ regulatorische Eigenkapitalquote (CET1) der 10 größten EU-IRB-Banken
 - **Δr_10y (Prozentpunkte)** — 10-Jahres-Zins-Schock, repräsentiert
   Refinanzierungs-/Affordability-/Discount-Wirkung
 
+**Warum Brent-log-Return?** Brent ist der liquide, täglich verfügbare
+Rohöl-Benchmark mit hoher Relevanz für europäische Energie- und
+Importpreise. Im Modell steht Brent nicht für direkt gehaltenes Ölrisiko
+der Banken, sondern als beobachtbarer Proxy für einen Energie-/Angebots-/
+Inflationsschock, der Unternehmensmargen, Haushaltsbudgets und
+Sicherheitenwerte belastet. WTI wäre stärker durch US-spezifische Lager-
+und Transportbedingungen geprägt; Gas- oder Strompreise wären für Europa
+ebenfalls relevant, aber heterogener und weniger stabil als ein einheitlicher
+täglicher Faktor.
+
+Der Ölpreis wird als **ΔBrent_log = ln(P_t / P_0)** gemessen. Log-Returns
+sind skalierungsfrei, über Zeiträume addierbar und behandeln relative
+Preisbewegungen konsistent: +0.50 entspricht `exp(0.50)-1 ≈ +65 %`, −0.50
+entspricht etwa −39 %. Gerade bei großen Stressbewegungen vermeidet diese
+Konvention Verzerrungen einfacher Prozentänderungen. Die β-Werte sind daher
+als **Prozentpunkte ΔPD/ΔLGD pro Logpunkt Brent-Schock** zu lesen. Der
+Zinsfaktor wird dagegen in Prozentpunkten gemessen, weil Renditen bereits
+Prozentgrößen sind.
+
 **Empirisch validiert (5-Jahres-Sample, 1242 Handelstage):**
 - Pearson ρ(ΔBrent, Δr_10y) = +0.07 (95%-CI [+0.01, +0.12])
 - OLS R² = 0.005 — keine erklärende Varianz
@@ -381,6 +400,17 @@ Punktwahrheiten. Sie sind eine quellenkonforme Basiskalibrierung:
 Gerade weil diese Übersetzung der größte Modellunsicherheitsfaktor ist,
 bleibt sie im Cockpit sichtbar, kann übersteuert werden und wird im
 Backtest per ±50-%-Robustheitstest geprüft.
+
+### Prüfer-Check: Abdeckung der relevanten Annahmen
+
+| Prüffeld | Explizit dokumentierte Festlegung | Referenz |
+|---|---|---|
+| Faktorwahl und Einheiten | Brent als europäisch relevanter Energiepreis-Proxy; Log-Return `ln(P_t/P_0)`; 10-Jahres-Zins in Prozentpunkten. | Abschnitt 1 / A-10 |
+| Risikoparameter | PD, LGD und EAD aus bankindividuellen Pillar-3-EU-CR6-Zeilen; Backtest no-look-ahead mit historischen Vintages. | A-01 bis A-03 |
+| Stress-Transmission | β/γ je Exposure-Klasse, lineare Basiskalibrierung, Floors/Caps und ±50-%-Robustheitstest. | A-04 / Backtest |
+| Regulatorische Kapitalformel | Basel-IRB-ASRF; ρ, 99.9%-Quantil und Faktor 12.5 regulatorisch vorgegeben; M = 2.5 Jahre und S = 20 Mio. € als explizite Konventionen. | A-05 |
+| Sovereign-Kanal | Duration-MtM auf Δr, Bucket-Midpoints, >10Y mit 15 Jahren, CET1-Wirkung nur nach bankindividuellem IFRS-9-Split. | A-06 |
+| Bewusste Nicht-Modellierung | u. a. Operational Risk, CVA, Spread-Risiko, IFRS-9-Lifetime-EL, Hedging, Ertrags-Gegeneffekte und bankindividuelle β. | Abschnitt 5 |
 
 **Kalibrierungsprinzip — wichtiger Disclaimer:**
 
