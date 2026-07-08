@@ -618,6 +618,41 @@ body("Dabei ist ρ der regulatorische IRB-Klassenparameter nach CRR "
      "(1991, 2002) und Gordy (2003).")
 
 h2("Die Formelstrecke im Detail")
+body("Für die kritische Evaluation sind vier Formeln zentral. Sie bilden "
+     "die komplette Wirkungskette ab: zuerst werden die makroökonomischen "
+     "Schocks in Risikoparameter übersetzt, danach werden diese Parameter "
+     "in regulatorische Kapitalanforderungen und schließlich in die CET1-"
+     "Quote überführt. Wichtig: Die Formeln trennen strikt zwischen "
+     "**gemeldeten Größen** (PD, LGD, EAD, CET1, RWA, IFRS-9-Split), "
+     "**regulatorisch vorgegebenen Parametern** (z. B. ρ, 99,9 %-Quantil, "
+     "RWA-Faktor 12,5) und **Modellkonventionen** (z. B. lineare β/γ-"
+     "Transmission, konstante EAD unter Stress).")
+body("**1 · Stress-Transmission:** "
+     "PD_stress = clip(PD_0 + β_Zins · Δr_10y + β_Öl · ΔBrent_log); "
+     "LGD_stress = clip(LGD_0 + γ_Zins · Δr_10y + γ_Öl · ΔBrent_log). "
+     "Diese Gleichungen sind die eigentliche ökonomische Modellannahme: "
+     "sie legen fest, wie stark eine Kreditklasse auf Öl- und Zinsschocks "
+     "reagiert. Die Grenzen verhindern unplausible oder numerisch instabile "
+     "Werte (PD-Floor 0,03 %, PD-Cap 50 %, LGD 5–100 %).")
+body("**2 · Erwarteter Verlust:** EL = PD · LGD · EAD; entsprechend "
+     "ΔEL = EL_stress − EL_0. Der erwartete Verlust ist der direkte "
+     "Zähler-Effekt der Kreditbuch-Bridge: zusätzlicher erwarteter Verlust "
+     "senkt das harte Kernkapital. Diese Behandlung ist bewusst einfach und "
+     "konservativ; sie ersetzt keine vollständige IFRS-9-Lifetime-EL-"
+     "Simulation, sondern bildet den Einjahres-Stress als Risikovorsorge-"
+     "Proxy ab.")
+body("**3 · Unerwarteter Verlust / RWA:** K ist die IRB-Kapitalanforderung "
+     "pro Exposure-Einheit. Der Term mit N und N⁻¹ transformiert die "
+     "unbedingte PD in eine 99,9-%-Stress-PD des asymptotischen "
+     "Ein-Faktor-Portfolios; LGD multipliziert diese Stress-PD und der "
+     "erwartete Verlust wird abgezogen. Aus K folgt RWA = K · 12,5 · EAD, "
+     "weil 8 % Mindestkapitalquote dem Multiplikator 1 / 0,08 = 12,5 "
+     "entsprechen.")
+body("**4 · CET1-Bridge:** CET1_stress = (CET1_0 − ΔEL_Kredit + "
+     "ΔMtM_Sovereign) / (RWA_0 + ΔRWA_Kredit). Damit ist klar, welcher "
+     "Kanal wo wirkt: Kreditrisiko senkt den Zähler und erhöht den Nenner; "
+     "Sovereign-MtM wirkt nur auf den Zähler und nur für Positionen, deren "
+     "Bewertung nach IFRS 9 tatsächlich CET1-wirksam ist.")
 body("**Laufzeit-Adjustment:** b(PD) = (0,11852 − 0,05478 · ln PD)² und "
      "MA = (1 + (M − 2,5) · b) / (1 − 1,5 · b). MA gilt für corporate, "
      "sme_corporate, bank und sovereign; für die Retail-Klassen "
@@ -755,6 +790,14 @@ body("Jede Annahme trägt eine Konfidenzklasse: **[published]** = "
      "veröffentlichte Messung · **[estimate]** = belegte Schätzung · "
      "**[approximation]** = strukturelle Vereinfachung · **[assumption]** = "
      "gesetzte Konvention. Die Tabelle gibt den Überblick; darunter wird jede Annahme einzeln begründet — inklusive der verworfenen Alternative und der Wirkung einer Fehlspezifikation.")
+body("Leselogik: Eine Annahme ist hier nicht automatisch eine frei gesetzte "
+     "Zahl. Viele Einträge sind bewusst als [published] klassifiziert, weil "
+     "sie direkt aus Offenlegungen oder der CRR stammen. Kritisch sind vor "
+     "allem die [estimate]- und [approximation]-Elemente: sie bestimmen, wie "
+     "das Modell von beobachtbaren Marktschocks auf nicht direkt "
+     "beobachtbare Stress-PD/LGD und Marktwertverluste schließt. Genau diese "
+     "Punkte werden deshalb im Cockpit sichtbar gemacht, im Backtest "
+     "sensitiviert und in Abschnitt 8 als Scope-Grenzen eingeordnet.")
 table(
     ["ID", "Annahme", "Festlegung im Modell", "Klasse", "Quelle/Beleg"],
     [["A-01", "PD-Quelle", "Pillar-3 EU-CR6-Sub-totals je Bank×Klasse, "
@@ -840,7 +883,9 @@ annahme("A-04", "2-Faktor-Transmission (β/γ je Klasse)",
     "Matrix aus Abschnitt 3, mit begründeten Unter-/Obergrenzen. **Warum:** "
     "Die EBA-Stresstest-Methodik sieht sektorale Sensitivitäten explizit "
     "vor; die lineare Form ist transparent, prüfbar und per Regler "
-    "übersteuerbar. **Verworfene Alternative:** ein Ein-Faktor-Aggregat "
+    "übersteuerbar. Die β/γ-Werte sind deshalb keine behaupteten "
+    "Punktwahrheiten, sondern eine quellenkonforme Basiskalibrierung, deren "
+    "Auswirkung separat robustheitsgeprüft wird. **Verworfene Alternative:** ein Ein-Faktor-Aggregat "
     "(verliert die Sektor-Differenzierung und überzeichnete in Tests die "
     "Magnitude) sowie bankindividuell geschätzte Ökonometrie (Datenlage "
     "öffentlich nicht ausreichend). **Wirkung bei Fehlspezifikation:** Die "
@@ -853,7 +898,9 @@ annahme("A-05", "IRB-Kapitalformel (Basel III / ASRF)",
     "Prozessual: Öl-/Zinsschock → PD_stress/LGD_stress → Basel-IRB-K-Formel "
     "→ RWA → CET1. Der Parameter ρ ist dabei kein eigener Modellschritt und "
     "keine von uns geschätzte Annahme, sondern der durch CRR Art. 153/154 "
-    "vorgegebene Klassenparameter innerhalb der Formel. "
+    "vorgegebene Klassenparameter innerhalb der Formel; er beschreibt die "
+    "Kopplung einer Exposure-Klasse an den systematischen Kreditrisikofaktor "
+    "des ASRF-Modells, nicht eine empirische Öl-Zins-Korrelation. "
     "**Warum:** Nur der regulatorische Standard macht Modell-Output und "
     "gemeldete RWA vergleichbar. **Verworfene Alternative:** interne "
     "Portfoliomodelle (z. B. Migrationsmatrizen) — nicht gegen die "
@@ -975,25 +1022,56 @@ body("Die einzelnen Melde-Kanäle (PD, Kredit-RWA) sind **nicht "
 
 # ================= 8 · Scope =================
 h1("8 · Bewusste Scope-Grenzen")
-for b in [
-    "**Operational Risk** bleibt unter Stress konstant.",
-    "**CVA / Kontrahentenrisiko** nicht im Szenario.",
-    "**Sovereign-Spread-Risiko** (z. B. Italien vs. Bund) nicht modelliert — "
-    "nur der Niveauzins wirkt.",
-    "**IFRS-9-Lifetime-EL** (Stage-2-Migration) außerhalb des Scopes; "
-    "1-Jahres-Horizont.",
-    "**Mehrjahres-Stresspfade** (3-Jahres-EBA-Logik) nicht abgebildet.",
-    "**Hedging** (Swaps, CDS) aus Offenlegungen nicht rekonstruierbar.",
-    "**Ertrags-Gegeneffekte** (NII, Gebühren) bewusst nicht angesetzt — "
-    "Ergebnis ist eine konservative Untergrenze der CET1-Quote.",
-    "**Bank-individuelle β** — alle Banken teilen die Klassen-β; die "
-    "Differenzierung kommt aus dem realen Portfolio-Mix je Bank.",
-]:
-    bullet(b)
-body("Verwendungs-Scope: ICAAP-Validierungs-Übung und Lehre/Demonstration. "
-     "**Keine Anlageempfehlung**; Modell-Output ist eine konservative "
-     "Szenario-Schätzung, keine bank-individuelle Punktprognose.",
-     italic=True, size=9.5)
+body("Die Grenzen des Modells sind nicht nachträgliche Schwächen, sondern "
+     "bewusst gesetzte Abgrenzungen gegen Scheingenauigkeit. Entscheidend "
+     "ist jeweils, ob ein Effekt öffentlich, bankindividuell und konsistent "
+     "über alle zehn Banken rekonstruierbar ist. Wo das nicht der Fall ist, "
+     "wird der Effekt nicht modelliert oder nur als separate Analyse "
+     "ausgewiesen.")
+table(
+    ["Grenze", "Warum nicht modelliert?", "Richtung der Verzerrung"],
+    [["Operational Risk",
+      "Für einen Öl-/Zins-Einjahresschock liegen keine bankindividuellen "
+      "öffentlichen Parameter vor, die eine belastbare dynamische "
+      "Operational-Risk-Reaktion erlauben.",
+      "Kann Gesamtrisikowirkung unterschätzen."],
+     ["CVA / Kontrahentenrisiko",
+      "Der Schock ist auf Kreditbuch-PD/LGD und Sovereign-MtM kalibriert; "
+      "Derivate- und Gegenparteinetting sind aus Offenlegungen nicht "
+      "durchgängig rekonstruierbar.",
+      "Kann Kapitalbelastung in Marktstressphasen unterschätzen."],
+     ["Sovereign-Spread-Risiko",
+      "Modelliert wird der Niveauzins; länderspezifische Spreadpfade "
+      "(z. B. Italien vs. Bund) wären eine zusätzliche Szenarioannahme.",
+      "Unterschätzt Stress bei peripheren Staatsanleihen."],
+     ["IFRS-9-Lifetime-EL / Stage-2",
+      "Das Modell ist ein Einjahres-Solvency-Stress. Eine Lifetime-EL-"
+      "Simulation benötigt migrations- und portfoliointerne Daten.",
+      "Konservativer ΔEL-Proxy, aber keine vollständige IFRS-9-Prognose."],
+     ["Mehrjahres-Stresspfade",
+      "Der Backtest und das Cockpit sind auf ein Jahr ausgelegt; "
+      "3-Jahres-EBA-Pfade würden Bilanzmanagement, Neugeschäft und "
+      "Kapitalmaßnahmen erfordern.",
+      "Keine Aussage zur Pfaddynamik nach Jahr 1."],
+     ["Hedging",
+      "Swaps, Futures, CDS und Hedge Accounting sind öffentlich nicht "
+      "hinreichend granular je Bank und Exposure rekonstruierbar.",
+      "Kann Verluste überschätzen, wenn Banken stark gehedgt sind."],
+     ["Ertrags-Gegeneffekte",
+      "NII, Gebühren und Managementmaßnahmen werden nicht gegengerechnet, "
+      "weil sie keine reine Risikoparameter-Transmission sind.",
+      "CET1-Stress ist bewusst konservativ; 2022 zeigt diesen Effekt."],
+     ["Bank-individuelle β",
+      "Alle Banken teilen je Exposure-Klasse dieselbe Sensitivität; "
+      "Bankunterschiede entstehen über echte PD/LGD/EAD-Mixe.",
+      "Kann idiosynkratische Geschäftsmodelle glätten."]],
+    [22, 54, 24], fontsize=8.3)
+body("Kurz gesagt: Das Modell ist ein **konservatives, datenprüfbares "
+     "Solvenz-Stressmodell**. Es ist nicht als vollständige Bankplanung, "
+     "IFRS-9-Forecast, Handelsbuchmodell oder Anlageempfehlung zu lesen. "
+     "Seine Stärke liegt in der transparenten, reproduzierbaren Kette von "
+     "offengelegten Risikoparametern über regulatorische Kapitalformeln bis "
+     "zur CET1-Quote.", italic=True, size=9.5)
 
 # ================= 9 · Bibliographie =================
 h1("9 · Bibliographie")

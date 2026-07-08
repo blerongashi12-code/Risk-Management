@@ -375,6 +375,13 @@ also **nichts abgeschrieben**: die Quellen liefern Vorzeichen, relative
 Struktur und Größenordnung; die konkreten Zahlen sind eine **lineare,
 überschreibbare Experten-Kalibrierung**.
 
+**Leselogik der Formel:** Die β/γ-Werte sind keine behaupteten
+Punktwahrheiten. Sie sind eine quellenkonforme Basiskalibrierung:
+`Schockgröße × Sensitivität = zusätzliche PD/LGD in Prozentpunkten`.
+Gerade weil diese Übersetzung der größte Modellunsicherheitsfaktor ist,
+bleibt sie im Cockpit sichtbar, kann übersteuert werden und wird im
+Backtest per ±50-%-Robustheitstest geprüft.
+
 **Kalibrierungsprinzip — wichtiger Disclaimer:**
 
 | Frage | Einordnung |
@@ -465,14 +472,33 @@ ASRF (Asymptotic Single Risk Factor, Vasicek 2002 / BCBS 2017):
 ```
 Öl-/Zinsschock → PD_stress, LGD_stress → Basel-IRB-K-Formel → RWA → CET1
 
+PD_stress  = clip(PD_0  + β_rate · Δr_10y + β_oil · ΔBrent_log)
+LGD_stress = clip(LGD_0 + γ_rate · Δr_10y + γ_oil · ΔBrent_log)
+
+EL = PD · LGD · EAD
+ΔEL = EL_stress − EL_0
+
 K = LGD · [N((N⁻¹(PD) + √ρ · N⁻¹(α)) / √(1−ρ)) − PD] · MA(M_eff)
 RWA = K · 12.5 · EAD
+
+CET1_stress = (CET1_0 − ΔEL_credit + ΔMtM_sovereign)
+              / (RWA_0 + ΔRWA_credit)
 ```
 
 mit:
 - α = 0.999 (Konfidenz, Basel III)
 - ρ = regulatorischer IRB-Klassenparameter nach CRR Art. 153/154
 - MA = Maturity-Adjustment für effektive Laufzeit
+
+**Interpretation der Kernformeln:** Die erste Stufe ist die ökonomische
+Stress-Transmission: beobachtbare Marktbewegungen werden in gestresste
+PD/LGD übersetzt. Die zweite Stufe berechnet den erwarteten Verlust
+(`EL`) als Zähler-Proxy. Die dritte Stufe nutzt die regulatorische
+IRB-Formel zur Bestimmung des unerwarteten Verlusts und damit der RWA.
+Die vierte Stufe ist die CET1-Bridge: Kreditrisiko senkt den Zähler
+über `ΔEL` und erhöht den Nenner über `ΔRWA`; der Sovereign-MtM-Kanal
+wirkt nur auf den CET1-Zähler und nur für IFRS-9-Klassen, die tatsächlich
+CET1-wirksam sind.
 
 **Prozessuale Einordnung von ρ:** ρ ist **kein zusätzlicher Modellschritt**
 und kein von uns geschätzter Parameter. Unser Modell verändert PD und LGD über
@@ -561,7 +587,7 @@ Corporate-lastigen Banken sind klein, und eine belastbare
 FRTB-Sensitivität ließe sich aus den EBA-Bank-Aggregaten (Items
 2520210/2520311, keine Issuer-/Tranche-Granularität) nicht sauber
 kalibrieren. Ein Kanal, der konstruktionsbedingt 0 beiträgt,
-suggeriert nur Schein-Vollständigkeit. Die CET1-Bridge ist seitdem
+suggeriert nur Schein-Vollständigkeit. Die CET1-Bridge ist deshalb
 ein konsistentes **2-Kanal-Modell** (Kreditbuch + Sovereign);
 `cet1_ratio_bridge(tb_stress_df=...)` ignoriert den Legacy-Parameter.
 
@@ -653,17 +679,23 @@ Punkt 9 (Korrelations-Analyse).
 
 ---
 
-## 5. Aus Scope ausgeschlossen
+## 5. Bewusste Scope-Grenzen
 
-- **Operational Risk** konstant unter Stress
-- **CVA / Counterparty Credit Risk** nicht im Stress-Szenario
-- **Sovereign-Spread-Risk** (Italien-vs-Bund) out of scope
-- **Concentration Risk** (HHI) nur als KPI, nicht stress-gewichtet
-- **Liquidity-Risk / LCR / NSFR** nicht modelliert
-- **IFRS-9 Lifetime-EL** (Stage-2-Migration) out of scope — nur 1Y-Forward
-- **Multi-Period-Stress-Pfade** (3-Jahres-EBA-Logik) nicht modelliert
-- **Hedging-Effekte** (Swaps, Futures, CDS) nicht rekonstruierbar
-- **Bank-individuelle Sektor-Sensitivitäten** (alle gleichen β pro Klasse)
+Die Grenzen des Modells sind bewusst gesetzte Abgrenzungen gegen
+Scheingenauigkeit. Ein Effekt wird nur modelliert, wenn er öffentlich,
+bankindividuell und konsistent über alle zehn Banken rekonstruierbar ist.
+
+| Grenze | Warum nicht modelliert? | Richtung der Verzerrung |
+|---|---|---|
+| Operational Risk | Keine bankindividuellen öffentlichen Parameter für eine Öl-/Zins-getriebene Einjahres-Reaktion. | Kann Gesamtrisikowirkung unterschätzen. |
+| CVA / Counterparty Credit Risk | Derivate- und Gegenparteinetting sind aus Offenlegungen nicht durchgängig rekonstruierbar. | Kann Kapitalbelastung in Marktstressphasen unterschätzen. |
+| Sovereign-Spread-Risk | Modelliert wird der Niveauzins; länderspezifische Spreadpfade wären eine zusätzliche Szenarioannahme. | Unterschätzt Stress bei peripheren Staatsanleihen. |
+| Concentration Risk | HHI wird als KPI gezeigt, aber nicht in eine zusätzliche Kapitalbelastung übersetzt. | Kann Konzentrationsrisiken unterschätzen. |
+| Liquidity Risk / LCR / NSFR | Liquiditätsabflüsse und Refinanzierungsprofile sind nicht granular genug öffentlich verfügbar. | Keine Aussage zur Liquiditätsresilienz. |
+| IFRS-9 Lifetime-EL / Stage-2 | Modellhorizont ist ein Jahr; Lifetime-EL benötigt Migrationen und interne Portfoliodaten. | Konservativer ΔEL-Proxy, aber keine IFRS-9-Prognose. |
+| Multi-Period-Stress-Pfade | 3-Jahres-Pfade erfordern Bilanzmanagement, Neugeschäft und Kapitalmaßnahmen. | Keine Aussage zur Pfaddynamik nach Jahr 1. |
+| Hedging-Effekte | Swaps, Futures, CDS und Hedge Accounting sind öffentlich nicht konsistent je Bank rekonstruierbar. | Kann Verluste überschätzen, wenn Banken stark gehedgt sind. |
+| Bank-individuelle β | Alle Banken teilen je Exposure-Klasse dieselbe Sensitivität; Bankunterschiede entstehen über echte PD/LGD/EAD-Mixe. | Kann idiosynkratische Geschäftsmodelle glätten. |
 
 ---
 
